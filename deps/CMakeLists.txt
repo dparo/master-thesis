@@ -30,43 +30,43 @@ find_program(MAKE_EXE NAMES gmake nmake make)
 # is created (eg Release, Debug, RelWithDebugInfo)... Cmake will just delete the
 # submodule directory contents and start a new clone... Very bad.
 function(FetchGitSubmodule path)
-  get_filename_component(name "${path}" NAME)
+    get_filename_component(name "${path}" NAME)
 
-  fetchcontent_declare(
-    ${name}
-    DOWNLOAD_COMMAND ${GIT_EXECUTABLE} submodule update --recursive --init --depth 1 "${path}"
-    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
-    DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}"
-    SOURCE_DIR "${path}"
-  )
-  fetchcontent_makeavailable("${name}")
+    fetchcontent_declare(
+        ${name}
+        DOWNLOAD_COMMAND ${GIT_EXECUTABLE} submodule update --recursive --init --depth 1 "${path}"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        DOWNLOAD_DIR "${CMAKE_SOURCE_DIR}"
+        SOURCE_DIR "${path}"
+    )
+    fetchcontent_makeavailable("${name}")
 endfunction()
 
 function(FetchArchiveConfigureAndMakeAndInstall name url)
 
-  if(NOT EXISTS "${CMAKE_SOURCE_DIR}/.local/third_party")
-    file(REMOVE_RECURSE "${DEPS_DIR}/archives")
-  endif()
+    if(NOT EXISTS "${CMAKE_SOURCE_DIR}/.local/third_party")
+        file(REMOVE_RECURSE "${DEPS_DIR}/archives")
+    endif()
 
-  # In order to make find_package find the executables we need to run these download
-  # steps at configure time (since find_package works at configure time).
-  # Since `FetchContent_Declare` bans CONFIGURE_COMMAND, BUILD_COMMAND, INSTALL_COMMAND
-  # compared to the the ExternalProject_Add
-  # we are forced to combine all these commands inside the PATCH_COMMAND, which
-  # doesn't make much sense since the patch command is meant to just apply patches, but
-  # hey... whatever it works
-  fetchcontent_declare(
-    "${name}"
-    URL "${url}"
-    SOURCE_DIR "${DEPS_DIR}/archives/${name}"
-    PATCH_COMMAND cd "${DEPS_DIR}/archives/${name}"
-    && "${DEPS_DIR}/archives/${name}/configure" --prefix "${CMAKE_SOURCE_DIR}/.local/third_party"
-    && "${MAKE_EXE}" -C "${DEPS_DIR}/archives/${name}" all
-    && "${MAKE_EXE}" -C "${DEPS_DIR}/archives/${name}" install
-  )
-  if(NOT EXISTS "${DEPS_DIR}/archives/${name}")
-    fetchcontent_makeavailable("${name}")
-  endif()
+    # In order to make find_package find the executables we need to run these download
+    # steps at configure time (since find_package works at configure time).
+    # Since `FetchContent_Declare` bans CONFIGURE_COMMAND, BUILD_COMMAND, INSTALL_COMMAND
+    # compared to the the ExternalProject_Add
+    # we are forced to combine all these commands inside the PATCH_COMMAND, which
+    # doesn't make much sense since the patch command is meant to just apply patches, but
+    # hey... whatever it works
+    fetchcontent_declare(
+        "${name}"
+        URL "${url}"
+        SOURCE_DIR "${DEPS_DIR}/archives/${name}"
+        PATCH_COMMAND cd "${DEPS_DIR}/archives/${name}"
+        && "${DEPS_DIR}/archives/${name}/configure" --prefix "${CMAKE_SOURCE_DIR}/.local/third_party"
+        && "${MAKE_EXE}" -C "${DEPS_DIR}/archives/${name}" all
+        && "${MAKE_EXE}" -C "${DEPS_DIR}/archives/${name}" install
+    )
+    if(NOT EXISTS "${DEPS_DIR}/archives/${name}")
+        fetchcontent_makeavailable("${name}")
+    endif()
 endfunction()
 
 
