@@ -35,9 +35,9 @@ extern "C" {
 #endif
 
 #ifdef __GNUC__
-
-#define ATTRIB_CONSTRUCT(func) __attribute__((constructor));
-#define ATTRIB_DESTRUCT(func) __attribute__((destructor));
+#define ATTRIB_NORETURN __attribute__((noreturn))
+#define ATTRIB_CONSTRUCT(func) __attribute__((constructor))
+#define ATTRIB_DESTRUCT(func) __attribute__((destructor))
 #define ATTRIB_DEPRECATED __attribute__((deprecated))
 #define ATTRIB_PURE __attribute__((pure))
 #define ATTRIB_CONST __attribute__((const))
@@ -49,9 +49,11 @@ extern "C" {
 
 #elif defined _MSC_VER
 #if __cplusplus > 201703L
+#define ATTRIB_NORETURN [[noreturn]]
 #define ATTRIB_MAYBE_UNUSED [[maybe_unused]]
 #define ATTRIB_NODISCARD [[nodiscard]]
 #endif
+#define ATTRIB_NORETURN __declspec(noreturn)
 #define ATTRIB_MAYBE_UNUSED
 #define ATTRIB_NODISCARD _Check_return_
 #endif

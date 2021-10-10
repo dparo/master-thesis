@@ -84,3 +84,6 @@ target_include_directories(argparse PUBLIC "${CMAKE_SOURCE_DIR}/deps/argparse")
 
 # Customize unity
 target_compile_definitions(unity PRIVATE UNITY_INCLUDE_PRINT_FORMATTED)
+if (MSVC)
+    target_compile_definitions(unity PUBLIC "UNITY_NORETURN=__declspec(noreturn)")
+endif()
