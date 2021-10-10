@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021 Davide Paro
  *
@@ -78,6 +79,16 @@ extern "C" {
 #define memclr(SRC, SIZE) (memset((SRC), 0, (SIZE)))
 
 #define ZERO_STRUCT(S) memclr(S, sizeof(*(S)))
+
+#include "log.h"
+
+#define FATAL(...)                                                             \
+    do {                                                                       \
+        log_fatal(__VA_ARGS__);                                                \
+        fflush(stdout);                                                        \
+        fflush(stderr);                                                        \
+        abort();                                                               \
+    } while (0)
 
 #if __cplusplus
 }

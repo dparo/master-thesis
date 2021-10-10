@@ -16,9 +16,9 @@ target_include_directories(libcptp PUBLIC ./)
 target_link_libraries(libcptp PUBLIC logc)
 
 if (CPLEX_FOUND)
+    target_link_libraries(libcptp PUBLIC cplex-library)
     target_include_directories(libcptp PUBLIC "${CPLEX_INCLUDE_DIR}")
     target_compile_definitions(libcptp PUBLIC COMPILED_WITH_CPLEX=1)
-    target_link_libraries(libcptp PUBLIC cplex-library)
 endif()
 
 add_executable(cptp main.c)

@@ -24,7 +24,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+void instance_set_name(Instance *instance, const char *name) {
+    if (instance->name) {
+        free(instance->name);
+    }
+    instance->name = strdup(name);
+}
+
 void instance_destroy(Instance *instance) {
+    if (instance->name) {
+        free(instance->name);
+    }
     free(instance->positions);
     free(instance->demands);
     free(instance->duals);

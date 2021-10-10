@@ -27,8 +27,11 @@ extern "C" {
 #endif
 
 #include "types.h"
+#include "utils.h"
 
 typedef struct Instance {
+    char *name;
+
     int32_t num_customers;
     int32_t num_vehicles;
     double vehicle_cap;
@@ -58,6 +61,7 @@ typedef struct Solution {
     Tour tour;
 } Solution;
 
+void instance_set_name(Instance *instance, const char *name);
 void instance_destroy(Instance *instance);
 
 Tour tour_copy(Tour const *other);

@@ -36,8 +36,11 @@
 
 static void test_mip(void) {
     Instance instance = {0};
+    instance_set_name(&instance, "hello world");
     Solver solver = mip_solver_create(&instance);
     TEST_ASSERT_NOT_NULL_MESSAGE(solver.solve, "");
+    solver.destroy(&solver);
+    instance_destroy(&instance);
 }
 #endif
 
