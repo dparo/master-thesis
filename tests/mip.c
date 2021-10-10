@@ -34,7 +34,7 @@
 
 #include "solvers/mip.h"
 
-static void test_mip(void) {
+static void test_mip_solver_create(void) {
     Instance instance = {0};
     instance_set_name(&instance, "hello world");
     Solver solver = mip_solver_create(&instance);
@@ -48,7 +48,7 @@ int main(void) {
     UNITY_BEGIN();
 
 #if COMPILED_WITH_CPLEX
-    RUN_TEST(test_mip);
+    RUN_TEST(test_mip_solver_create);
 #endif
 
     return UNITY_END();

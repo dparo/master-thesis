@@ -35,9 +35,11 @@ void instance_destroy(Instance *instance) {
     if (instance->name) {
         free(instance->name);
     }
+
     free(instance->positions);
     free(instance->demands);
     free(instance->duals);
+
     memset(instance, 0, sizeof(*instance));
 }
 

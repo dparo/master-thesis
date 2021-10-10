@@ -85,7 +85,8 @@ static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
 typedef struct SolverData SolverData;
 
 typedef struct SolverParams {
-
+    // TODO :Implement me
+    int32_t ___dummy___;
 } SolverParams;
 
 typedef struct Solver {
