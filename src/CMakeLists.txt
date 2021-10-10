@@ -7,15 +7,12 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 endif()
 
 
-
 find_package(CPLEX REQUIRED)
 
 add_library(libcptp core.c parser.c)
 target_include_directories(libcptp PUBLIC ./)
-# target_include_directories(libcptp PUBLIC "${CPLEX_INCLUDE_DIR}")
-target_link_libraries(libcptp PUBLIC logc)
-target_link_libraries(libcptp PUBLIC cplex-library)
+target_include_directories(libcptp PUBLIC "${CPLEX_INCLUDE_DIR}")
+target_link_libraries(libcptp PUBLIC logc cplex-library)
 
 add_executable(cptp main.c)
-target_link_libraries(cptp PRIVATE libcptp)
-target_link_libraries(cptp PUBLIC argparse)
+target_link_libraries(cptp PRIVATE libcptp argparse)

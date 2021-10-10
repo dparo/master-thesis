@@ -20,8 +20,6 @@ foreach(SRC IN LISTS TEST_SOURCES_LIST)
   target_link_libraries("${TARGET}" PRIVATE libcptp)
   target_link_libraries("${TARGET}" PRIVATE logc)
   target_include_directories("${TARGET}" PRIVATE ./ ../src)
-  # target_include_directories("${TARGET}" PRIVATE "${CMAKE_SOURCE_DIR}/deps/Unity/src")
-
 
   if(UNIX AND NOT APPLE)
     target_compile_definitions("${TARGET}" PRIVATE _GNU_SOURCE)
