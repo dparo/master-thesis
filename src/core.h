@@ -67,12 +67,15 @@ void tour_destroy(Tour *tour);
 
 static inline int32_t *tour_succ(Tour *tour, int32_t vehicle_idx,
                                  int32_t customer_idx) {
-    return &tour->succ[vehicle_idx * (tour->num_customers + 1) + customer_idx];
+    return mati32_access(tour->succ, vehicle_idx, customer_idx,
+                         tour->num_customers + 1, tour->num_vehicles);
 }
 
 static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
                                  int32_t customer_idx) {
-    return &tour->comp[vehicle_idx * (tour->num_customers + 1) + customer_idx];
+
+    return mati32_access(tour->comp, vehicle_idx, customer_idx,
+                         tour->num_customers + 1, tour->num_vehicles);
 }
 
 #if __cplusplus

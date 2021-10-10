@@ -29,6 +29,8 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
+#include "misc.h"
 
 typedef struct Vec2d {
     double x, y;
@@ -36,6 +38,14 @@ typedef struct Vec2d {
 
 int32_t *veci32_copy(int32_t *other, int32_t len);
 int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h);
+
+static inline int32_t *mati32_access(int32_t *mat, int32_t row, int32_t col,
+                                     int32_t width,
+                                     ATTRIB_MAYBE_UNUSED int32_t height) {
+    assert(row >= 0 && row <= height);
+    assert(col >= 0 && col <= width);
+    return &mat[row * width + col];
+}
 
 #if __cplusplus
 }
