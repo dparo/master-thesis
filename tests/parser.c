@@ -35,9 +35,9 @@
 static void test_parser_on_single_instance(void) {
     const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
     Instance instance = parse(filepath);
-    TEST_ASSERT_NOT_NULL_MESSAGE(instance.positions, "");
-    TEST_ASSERT_NOT_NULL_MESSAGE(instance.demands, "");
-    TEST_ASSERT_NOT_NULL_MESSAGE(instance.duals, "");
+    TEST_ASSERT_NOT_NULL(instance.positions);
+    TEST_ASSERT_NOT_NULL(instance.demands);
+    TEST_ASSERT_NOT_NULL(instance.duals);
     TEST_ASSERT_EQUAL(instance.num_customers, 100);
     TEST_ASSERT_EQUAL(instance.num_vehicles, 14);
     instance_destroy(&instance);
@@ -50,9 +50,9 @@ static void test_parser_on_all_instances(void) {
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
-        TEST_ASSERT_NOT_NULL_MESSAGE(instance.positions, "");
-        TEST_ASSERT_NOT_NULL_MESSAGE(instance.demands, "");
-        TEST_ASSERT_NOT_NULL_MESSAGE(instance.duals, "");
+        TEST_ASSERT_NOT_NULL(instance.positions);
+        TEST_ASSERT_NOT_NULL(instance.demands);
+        TEST_ASSERT_NOT_NULL(instance.duals);
         TEST_ASSERT_EQUAL(instance.num_customers,
                           G_TEST_INSTANCES[i].expected_num_customers);
         TEST_ASSERT_EQUAL(instance.num_vehicles,
