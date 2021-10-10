@@ -32,13 +32,17 @@
 
 #if COMPILED_WITH_CPLEX
 
+#include "parser.h"
 #include "solvers/mip.h"
 
 static void test_mip_solver_create(void) {
-    Instance instance = {0};
-    instance_set_name(&instance, "hello world");
+
+    const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
+    Instance instance = parse(filepath);
+    instance_set_name(&instance, "test");
     Solver solver = mip_solver_create(&instance);
     TEST_ASSERT_NOT_NULL(solver.solve);
+    TEST_ASSERT_NOT_NULL(solver.destroy);
     solver.destroy(&solver);
     instance_destroy(&instance);
 }

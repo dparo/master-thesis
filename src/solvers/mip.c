@@ -97,6 +97,8 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
 
     char cname[128];
+    const char *pcname[] = {(const char *)cname};
+
     double obj[1];
     double lb[1] = {0.0};
     double ub[1] = {1.0};
@@ -111,7 +113,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
             obj[0] = cost(instance, i, j);
 
             if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub,
-                            xctype, (const char *const *)&cname)) {
+                            xctype, pcname)) {
                 log_fatal("%s :: CPXXnewcols returned an error", __func__);
                 return false;
             }
@@ -123,7 +125,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
         obj[0] = instance->duals[i];
 
         if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub, xctype,
-                        (const char *const *)&cname)) {
+                        pcname)) {
             log_fatal("%s :: CPXXnewcols returned an error", __func__);
             return false;
         }
@@ -138,10 +140,6 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
 Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
                ATTRIB_MAYBE_UNUSED const Instance *instance) {
-    if (!build_mip_formulation(self, instance)) {
-        log_fatal("%s : Failed to build mip formulation", __func__);
-        return (Solution){};
-    }
 
     // TODO: CPlex solve here
 
@@ -158,36 +156,51 @@ Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
     return (Solution){};
 }
 
+bool cplex_setup(Solver *solver, const Instance *instance) {
+    bool result = true;
+    int status_p = 0;
+    solver->data->env = CPXXopenCPLEX(&status_p);
+
+    log_trace("%s :: CPXopenCPLEX returned status_p = %d, env = %p\n", __func__,
+              status_p, solver->data->env);
+
+    if (!status_p && solver->data->env) {
+        log_info("%s :: CPLEX version is %s", __func__,
+                 CPXXversion(solver->data->env));
+        fflush(stdout);
+
+        solver->data->lp =
+            CPXXcreateprob(solver->data->env, &status_p,
+                           instance->name ? instance->name : "UNNAMED");
+        if (status_p != 0 || !solver->data->lp) {
+            log_fatal("CPXcreateprob FAILURE :: returned status_p: %d",
+                      status_p);
+            solver->destroy(solver);
+            result = false;
+        }
+    } else {
+        solver->destroy(solver);
+        result = false;
+    }
+
+    return result;
+}
+
 Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
+    log_trace("%s", __func__);
 
     Solver solver = {0};
     solver.solve = solve;
     solver.destroy = mip_solver_destroy;
-
-    int status_p = 0;
-
-    log_trace("%s", __func__);
-
     solver.data = calloc(1, sizeof(*solver.data));
-    solver.data->env = CPXXopenCPLEX(&status_p);
 
-    log_trace("%s :: CPXopenCPLEX returned status_p = %d, env = %p\n", __func__,
-              status_p, solver.data->env);
-
-    if (!status_p && solver.data->env) {
-        log_info("%s :: CPLEX version is %s", __func__,
-                 CPXXversion(solver.data->env));
-        fflush(stdout);
-
-        solver.data->lp =
-            CPXXcreateprob(solver.data->env, &status_p,
-                           instance->name ? instance->name : "UNNAMED");
-        if (status_p != 0 || !solver.data->lp) {
-            solver.destroy(&solver);
-            FATAL("CPXcreateprob FAILURE :: returned status_p: %d", status_p);
-        }
-    } else {
-        FATAL("CPXopenCPLEX FAILURE");
+    if (!cplex_setup(&solver, instance)) {
+        log_fatal("%s : Failed to initialize cplex", __func__);
+        solver.destroy(&solver);
+    }
+    if (!build_mip_formulation(&solver, instance)) {
+        log_fatal("%s : Failed to build mip formulation", __func__);
+        solver.destroy(&solver);
     }
 
     return solver;
