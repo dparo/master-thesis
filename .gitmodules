@@ -1,0 +1,9 @@
+[submodule "deps/log.c"]
+	path = deps/log.c
+	url = https://github.com/dparo/log.c/
+[submodule "deps/Unity"]
+	path = deps/Unity
+	url = https://github.com/ThrowTheSwitch/Unity
+[submodule "deps/argparse"]
+	path = deps/argparse
+	url = https://github.com/cofyc/argparse

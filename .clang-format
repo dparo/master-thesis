@@ -1,0 +1,11 @@
+---
+BasedOnStyle: LLVM
+UseTab: Never
+TabWidth: 8
+IndentWidth: 4
+ColumnLimit: 80
+SortIncludes: false
+AccessModifierOffset: -4
+AlwaysBreakTemplateDeclarations: true
+SpaceAfterTemplateKeyword: true
+...
