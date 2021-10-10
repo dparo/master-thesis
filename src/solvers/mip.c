@@ -36,7 +36,8 @@ Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
 }
 #else
 
-#include <ilcplex/cplex.h>
+// NOTE: cplexx is the 64 bit version of the API, while clex (one x) is the 32
+//       bit version of the API.
 #include <ilcplex/cplexx.h>
 #include <ilcplex/cpxconst.h>
 
@@ -51,11 +52,11 @@ typedef struct SolverData {
 void mip_solver_destroy(Solver *self) {
 
     if (self->data->lp) {
-        CPXfreeprob(self->data->env, &self->data->lp);
+        CPXXfreeprob(self->data->env, &self->data->lp);
     }
 
     if (self->data->env) {
-        CPXcloseCPLEX(&self->data->env);
+        CPXXcloseCPLEX(&self->data->env);
     }
 
     if (self->data) {
@@ -82,19 +83,19 @@ Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
     log_trace("%s", __func__);
 
     solver.data = calloc(1, sizeof(*solver.data));
-    solver.data->env = CPXopenCPLEX(&status_p);
+    solver.data->env = CPXXopenCPLEX(&status_p);
 
     log_trace("%s :: CPXopenCPLEX returned status_p = %d, env = %p\n", __func__,
               status_p, solver.data->env);
 
     if (!status_p && solver.data->env) {
         log_info("%s :: CPLEX version is %s", __func__,
-                 CPXversion(solver.data->env));
+                 CPXXversion(solver.data->env));
         fflush(stdout);
 
         solver.data->lp =
-            CPXcreateprob(solver.data->env, &status_p,
-                          instance->name ? instance->name : "UNNAMED");
+            CPXXcreateprob(solver.data->env, &status_p,
+                           instance->name ? instance->name : "UNNAMED");
         if (!status_p && solver.data->lp) {
         } else {
             solver.destroy(&solver);
