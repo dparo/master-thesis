@@ -9,7 +9,7 @@ endif()
 
 find_package(CPLEX)
 
-add_library(libcptp core.c parser.c)
+add_library(libcptp types.c core.c parser.c)
 target_include_directories(libcptp PUBLIC ./)
 target_link_libraries(libcptp PUBLIC logc)
 
