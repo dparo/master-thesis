@@ -45,6 +45,8 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+find_package(CPLEX)
+
 add_subdirectory(deps)
 add_subdirectory(src)
 

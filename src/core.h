@@ -78,6 +78,21 @@ static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
                          tour->num_customers + 1, tour->num_vehicles);
 }
 
+typedef struct SolverData SolverData;
+
+typedef struct SolverParams {
+
+} SolverParams;
+
+typedef struct Solver {
+    SolverData *data;
+
+    // TODO: set_params
+    bool (*set_params)(struct Solver *self, const SolverParams *params);
+    Solution (*solve)(struct Solver *self, const Instance *instance);
+    void (*destroy)(struct Solver *self);
+} Solver;
+
 #if __cplusplus
 }
 #endif

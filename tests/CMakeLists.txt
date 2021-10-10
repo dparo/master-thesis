@@ -5,6 +5,11 @@ set(
 )
 
 
+if (CPLEX_FOUND)
+    list(APPEND TEST_SOURCES_LIST "mip.c")
+endif()
+
+
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
     set(WARN_FLAGS "-Wall -Wextra -Wunused")
     string(APPEND CMAKE_C_FLAGS " ${WARN_FLAGS}")
