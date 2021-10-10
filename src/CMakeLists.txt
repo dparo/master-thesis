@@ -13,7 +13,7 @@ add_library(libcptp types.c core.c parser.c
     solvers/mip.c
     )
 target_include_directories(libcptp PUBLIC ./)
-target_link_libraries(libcptp PUBLIC logc)
+target_link_libraries(libcptp PUBLIC m logc)
 
 if (CPLEX_FOUND)
     target_link_libraries(libcptp PUBLIC cplex-library)

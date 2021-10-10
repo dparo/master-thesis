@@ -31,6 +31,7 @@ extern "C" {
 #include <stdbool.h>
 #include <assert.h>
 #include "misc.h"
+#include "math.h"
 
 typedef struct Vec2d {
     double x, y;
@@ -38,6 +39,12 @@ typedef struct Vec2d {
 
 int32_t *veci32_copy(int32_t *other, int32_t len);
 int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h);
+
+static inline double vec2d_dist(Vec2d const *a, Vec2d const *b) {
+    double dx = b->x - a->x;
+    double dy = b->y - a->y;
+    return sqrt(dx * dx + dy * dy);
+}
 
 static inline int32_t *mati32_access(int32_t *mat, int32_t row, int32_t col,
                                      int32_t width,

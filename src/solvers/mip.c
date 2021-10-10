@@ -66,9 +66,95 @@ void mip_solver_destroy(Solver *self) {
     memset(self, 0, sizeof(*self));
 }
 
+static inline double cost(const Instance *instance, int32_t idx1,
+                          int32_t idx2) {
+    return vec2d_dist(&instance->positions[idx1], &instance->positions[idx2]);
+}
+
+static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
+                                       int32_t j) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    assert(i >= 0 && j < instance->num_customers + 1);
+
+    size_t N = (size_t)instance->num_customers + 1;
+    size_t d = ((size_t)(i + 1) * (size_t)(i + 2)) / 2;
+    size_t result = i * N + j - d;
+    return result;
+}
+
+static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
+
+    assert(i >= 0 && i < instance->num_customers + 1);
+    return (size_t)i + get_x_mip_var_idx(instance, instance->num_customers,
+                                         instance->num_customers);
+}
+
+bool build_mip_formulation(Solver *self, const Instance *instance) {
+    bool result = true;
+
+    //
+    // Create all the MIP variables that we need first (eg add the columns)
+    //
+
+    char cname[128];
+    double obj[1];
+    double lb[1] = {0.0};
+    double ub[1] = {1.0};
+    char xctype[] = {'B'};
+
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+            if (i == j)
+                continue;
+
+            snprintf(cname, sizeof(cname), "x(%d,%d)", i, j);
+            obj[0] = cost(instance, i, j);
+
+            if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub,
+                            xctype, (const char *const *)&cname)) {
+                log_fatal("%s :: CPXXnewcols returned an error", __func__);
+                return false;
+            }
+        }
+    }
+
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        snprintf(cname, sizeof(cname), "y(%d)", i);
+        obj[0] = instance->duals[i];
+
+        if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub, xctype,
+                        (const char *const *)&cname)) {
+            log_fatal("%s :: CPXXnewcols returned an error", __func__);
+            return false;
+        }
+    }
+
+    //
+    // Now create the constraints (eg add the rows)
+    //
+
+    return result;
+}
+
 Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
                ATTRIB_MAYBE_UNUSED const Instance *instance) {
-    // TODO:: Implement me
+    if (!build_mip_formulation(self, instance)) {
+        log_fatal("%s : Failed to build mip formulation", __func__);
+        return (Solution){};
+    }
+
+    // TODO: CPlex solve here
+
+    // TODO: CPlex verify gap
+
+    // TODO: CPlex ask lower bound and upper bound
+
+    // TODO: CPlex convert mip variables into usable solution
+
+    // TODO:  CPlex destroy
+
+    // TODO: Return solution
+
     return (Solution){};
 }
 
@@ -96,8 +182,7 @@ Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
         solver.data->lp =
             CPXXcreateprob(solver.data->env, &status_p,
                            instance->name ? instance->name : "UNNAMED");
-        if (!status_p && solver.data->lp) {
-        } else {
+        if (status_p != 0 || !solver.data->lp) {
             solver.destroy(&solver);
             FATAL("CPXcreateprob FAILURE :: returned status_p: %d", status_p);
         }
