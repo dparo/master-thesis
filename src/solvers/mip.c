@@ -53,7 +53,7 @@ typedef struct SolverData {
 /// callback
 typedef struct {
     Solver *solver;
-    Instance *instance;
+    const Instance *instance;
 } CplexCallbackData;
 
 void mip_solver_destroy(Solver *self) {
@@ -214,9 +214,36 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
-Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
-               ATTRIB_MAYBE_UNUSED const Instance *instance) {
+static bool on_solve_start(ATTRIB_MAYBE_UNUSED Solver *self,
+                           ATTRIB_MAYBE_UNUSED const Instance *instance) {
 
+    CplexCallbackData data = {0};
+    data.solver = self;
+    data.instance = instance;
+
+    CPXLONG contextmask =
+        CPX_CALLBACKCONTEXT_CANDIDATE | CPX_CALLBACKCONTEXT_RELAXATION |
+        CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS | CPX_CALLBACKCONTEXT_THREAD_UP |
+        CPX_CALLBACKCONTEXT_THREAD_DOWN;
+
+    if (!CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
+                             cplex_callback, (void *)&data)) {
+        log_fatal(
+            "%s :: Failed to setup generic callback (CPXXcallbacksetfunc)",
+            __func__);
+        goto fail;
+    }
+
+    return true;
+fail:
+    return false;
+}
+
+Solution solve(ATTRIB_MAYBE_UNUSED Solver *self,
+               ATTRIB_MAYBE_UNUSED const Instance *instance) {
+    if (!on_solve_start(self, instance)) {
+        return (Solution){0};
+    }
     // TODO: CPlex solve here
 
     // TODO: CPlex verify gap
@@ -227,7 +254,7 @@ Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
 
     // TODO: Return solution
 
-    return (Solution){};
+    return (Solution){0};
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance) {
