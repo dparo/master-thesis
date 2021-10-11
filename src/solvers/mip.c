@@ -146,6 +146,24 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
+static void add_dfj_sec(ATTRIB_MAYBE_UNUSED Solver *self,
+                        ATTRIB_MAYBE_UNUSED const Instance *instance) {
+    // NOTE:
+    //    Dantizg Fulkerson Johnson subtour elimination constraints
+    //    See:
+    //         Taccari, L. (2016). Integer Programming
+    //         Formulations for the Elementary Shortest Path Problem.
+}
+
+static void add_gcs_sec(ATTRIB_MAYBE_UNUSED Solver *self,
+                        ATTRIB_MAYBE_UNUSED const Instance *instance) {
+    // NOTE:
+    //    Generalized Cuts Inequlities (GSC) subtour elimination constraints
+    //    See:
+    //         Taccari, L. (2016). Integer Programming
+    //         Formulations for the Elementary Shortest Path Problem.
+}
+
 static void add_sec(ATTRIB_MAYBE_UNUSED Solver *self,
                     ATTRIB_MAYBE_UNUSED const Instance *instance) {}
 
@@ -163,7 +181,6 @@ static inline int
 cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                         ATTRIB_MAYBE_UNUSED Solver *solver,
                         ATTRIB_MAYBE_UNUSED const Instance *intsance) {
-
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
@@ -216,7 +233,6 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
 
 static bool on_solve_start(ATTRIB_MAYBE_UNUSED Solver *self,
                            ATTRIB_MAYBE_UNUSED const Instance *instance) {
-
     CplexCallbackData data = {0};
     data.solver = self;
     data.instance = instance;
