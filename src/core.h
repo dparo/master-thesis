@@ -61,27 +61,6 @@ typedef struct Solution {
     Tour tour;
 } Solution;
 
-void instance_set_name(Instance *instance, const char *name);
-void instance_destroy(Instance *instance);
-
-Tour tour_copy(Tour const *other);
-Tour tour_move(Tour *other);
-
-void tour_destroy(Tour *tour);
-
-static inline int32_t *tour_succ(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-    return mati32_access(tour->succ, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
-}
-
-static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-
-    return mati32_access(tour->comp, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
-}
-
 typedef struct SolverData SolverData;
 
 typedef struct SolverParams {
@@ -97,6 +76,14 @@ typedef struct Solver {
     Solution (*solve)(struct Solver *self, const Instance *instance);
     void (*destroy)(struct Solver *self);
 } Solver;
+
+void instance_set_name(Instance *instance, const char *name);
+void instance_destroy(Instance *instance);
+
+Tour tour_copy(Tour const *other);
+Tour tour_move(Tour *other);
+
+void tour_destroy(Tour *tour);
 
 #if __cplusplus
 }
