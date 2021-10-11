@@ -32,11 +32,6 @@
 
 #if COMPILED_WITH_CPLEX
 
-#undef TEST_ABORT
-#define TEST_ABORT(...)                                                        \
-    do {                                                                       \
-    } while (0)
-
 #include "parser.h"
 #include "solvers/mip.h"
 
