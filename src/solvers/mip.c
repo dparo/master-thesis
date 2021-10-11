@@ -170,6 +170,24 @@ cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
+static inline int
+cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
+                         ATTRIB_MAYBE_UNUSED Solver *solver,
+                         ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+    double obj, bound;
+    CPXLONG num_processed_nodes, simplex_iterations;
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &obj);
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &bound);
+    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODECOUNT,
+                            &num_processed_nodes);
+    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
+                            &simplex_iterations);
+    log_info("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
+             "best_sol = %f, best_bound = %f\n",
+             __func__, num_processed_nodes, simplex_iterations, obj, bound);
+    return 0;
+}
+
 CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
                                     CPXLONG contextid, void *userhandle) {
     CplexCallbackData *data = (CplexCallbackData *)userhandle;
@@ -180,6 +198,13 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
         break;
     case CPX_CALLBACKCONTEXT_RELAXATION:
         return cplex_on_new_relaxation(context, data->solver, data->instance);
+        break;
+    case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
+        return cplex_on_global_progress(context, data->solver, data->instance);
+        break;
+    case CPX_CALLBACKCONTEXT_THREAD_UP:
+        break;
+    case CPX_CALLBACKCONTEXT_THREAD_DOWN:
         break;
     default:
         assert(!"Invalid case");
