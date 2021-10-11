@@ -49,6 +49,13 @@ typedef struct SolverData {
     CPXLPptr lp;
 } SolverData;
 
+/// Struct that is used as a userhandle to be passed to the cplex generic
+/// callback
+typedef struct {
+    Solver *solver;
+    Instance *instance;
+} CplexCallbackData;
+
 void mip_solver_destroy(Solver *self) {
 
     if (self->data) {
@@ -139,6 +146,49 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
+static void add_sec(ATTRIB_MAYBE_UNUSED Solver *self,
+                    ATTRIB_MAYBE_UNUSED const Instance *instance) {}
+
+static inline int
+cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context,
+                       ATTRIB_MAYBE_UNUSED Solver *solver,
+                       ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+    // NOTE:
+    //      Called when cplex has a new feasible integral solution satisfying
+    //      all constraints
+    return 0;
+}
+
+static inline int
+cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
+                        ATTRIB_MAYBE_UNUSED Solver *solver,
+                        ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+
+    // NOTE:
+    //      Called when cplex has a new feasible LP solution (not necessarily
+    //      satisfying the integrality constraints)
+    return 0;
+}
+
+CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
+                                    CPXLONG contextid, void *userhandle) {
+    CplexCallbackData *data = (CplexCallbackData *)userhandle;
+
+    switch (contextid) {
+    case CPX_CALLBACKCONTEXT_CANDIDATE:
+        return cplex_on_new_candidate(context, data->solver, data->instance);
+        break;
+    case CPX_CALLBACKCONTEXT_RELAXATION:
+        return cplex_on_new_relaxation(context, data->solver, data->instance);
+        break;
+    default:
+        assert(!"Invalid case");
+        break;
+    }
+
+    return 0;
+}
+
 Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
                ATTRIB_MAYBE_UNUSED const Instance *instance) {
 
@@ -149,8 +199,6 @@ Solution solve(ATTRIB_MAYBE_UNUSED struct Solver *self,
     // TODO: CPlex ask lower bound and upper bound
 
     // TODO: CPlex convert mip variables into usable solution
-
-    // TODO: CPlex destroy
 
     // TODO: Return solution
 

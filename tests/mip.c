@@ -36,7 +36,6 @@
 #include "solvers/mip.h"
 
 static void test_mip_solver_create(void) {
-
     const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
     Instance instance = parse(filepath);
     instance_set_name(&instance, "test");
