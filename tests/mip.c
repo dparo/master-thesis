@@ -32,6 +32,11 @@
 
 #if COMPILED_WITH_CPLEX
 
+#undef TEST_ABORT
+#define TEST_ABORT(...)                                                        \
+    do {                                                                       \
+    } while (0)
+
 #include "parser.h"
 #include "solvers/mip.h"
 
@@ -42,6 +47,8 @@ static void test_mip_solver_create(void) {
     instance_set_name(&instance, "test");
     Solver solver = mip_solver_create(&instance);
     TEST_ASSERT_NOT_NULL(solver.solve);
+    TEST_ASSERT_NOT_NULL(NULL);
+    printf("Testing print newline\n");
     TEST_ASSERT_NOT_NULL(solver.destroy);
     solver.destroy(&solver);
     instance_destroy(&instance);

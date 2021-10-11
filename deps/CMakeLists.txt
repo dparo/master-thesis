@@ -83,7 +83,7 @@ target_include_directories(logc PUBLIC "${CMAKE_SOURCE_DIR}/deps/log.c/src")
 target_include_directories(argparse PUBLIC "${CMAKE_SOURCE_DIR}/deps/argparse")
 
 # Customize unity
-target_compile_definitions(unity PRIVATE UNITY_INCLUDE_PRINT_FORMATTED)
+target_compile_definitions(unity PUBLIC UNITY_INCLUDE_PRINT_FORMATTED "UNITY_EXCLUDE_SETJMP_H=1")
 if (MSVC)
     target_compile_definitions(unity PUBLIC "UNITY_NORETURN=__declspec(noreturn)")
 endif()
