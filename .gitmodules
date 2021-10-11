@@ -4,6 +4,3 @@
 [submodule "deps/argparse"]
 	path = deps/argparse
 	url = https://github.com/cofyc/argparse
-[submodule "deps/Unity"]
-	path = deps/Unity
-	url = https://github.com/dparo/Unity
