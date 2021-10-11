@@ -47,9 +47,8 @@ static void test_mip_solver_create(void) {
     instance_set_name(&instance, "test");
     Solver solver = mip_solver_create(&instance);
     TEST_ASSERT_NOT_NULL(solver.solve);
-    TEST_ASSERT_NOT_NULL(NULL);
-    printf("Testing print newline\n");
     TEST_ASSERT_NOT_NULL(solver.destroy);
+    TEST_ASSERT_NOT_NULL(solver.data);
     solver.destroy(&solver);
     instance_destroy(&instance);
 }
