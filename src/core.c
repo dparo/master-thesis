@@ -135,7 +135,7 @@ static const SolverLookup *lookup_solver(char *solver_name) {
 
 static bool verify_solver_params(const SolverDescriptor *descriptor,
                                  const SolverParams *params) {
-    assert(!"TODO");
+    todo();
     return true;
 }
 
@@ -166,13 +166,16 @@ Solution cptp_solve(Instance *instance, char *solver_name,
     case SOLVE_STATUS_ERR:
         todo();
         break;
+    case SOLVE_STATUS_UNFEASIBLE:
+        todo();
+        break;
     case SOLVE_STATUS_INVALID:
         todo();
         break;
-    case SOLVE_STATUS_OK:
+    case SOLVE_STATUS_FEASIBLE:
         todo();
         break;
-    case SOLVE_STATUS_EXACT:
+    case SOLVE_STATUS_OPTIMAL:
         todo();
         break;
     }

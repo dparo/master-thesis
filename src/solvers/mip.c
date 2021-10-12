@@ -25,7 +25,8 @@
 #include <stdlib.h>
 
 #ifndef COMPILED_WITH_CPLEX
-Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
+Solver mip_solver_create(Instance *instance) {
+    UNUSED_PARAM(instance);
     fprintf(stderr,
             "%s: Cannot use mip solver as the program was not compiled with "
             "CPLEX\n",
@@ -150,8 +151,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
-static void add_dfj_sec(ATTRIB_MAYBE_UNUSED Solver *self,
-                        ATTRIB_MAYBE_UNUSED const Instance *instance) {
+static void add_dfj_sec(Solver *self, const Instance *instance) {
     // NOTE:
     //    Dantizg Fulkerson Johnson subtour elimination constraints
     //    See:
@@ -159,8 +159,7 @@ static void add_dfj_sec(ATTRIB_MAYBE_UNUSED Solver *self,
     //         Formulations for the Elementary Shortest Path Problem.
 }
 
-static void add_gcs_sec(ATTRIB_MAYBE_UNUSED Solver *self,
-                        ATTRIB_MAYBE_UNUSED const Instance *instance) {
+static void add_gcs_sec(Solver *self, const Instance *instance) {
     // NOTE:
     //    Generalized Cuts Inequlities (GSC) subtour elimination constraints
     //    See:
@@ -168,33 +167,29 @@ static void add_gcs_sec(ATTRIB_MAYBE_UNUSED Solver *self,
     //         Formulations for the Elementary Shortest Path Problem.
 }
 
-static void add_sec(ATTRIB_MAYBE_UNUSED Solver *self,
-                    ATTRIB_MAYBE_UNUSED const Instance *instance) {}
+static void add_sec(Solver *self, const Instance *instance) {}
 
-static inline int
-cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context,
-                       ATTRIB_MAYBE_UNUSED Solver *solver,
-                       ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+static inline int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context,
+                                         Solver *solver,
+                                         const Instance *intsance) {
     // NOTE:
     //      Called when cplex has a new feasible integral solution satisfying
     //      all constraints
     return 0;
 }
 
-static inline int
-cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
-                        ATTRIB_MAYBE_UNUSED Solver *solver,
-                        ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+static inline int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
+                                          Solver *solver,
+                                          const Instance *intsance) {
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
     return 0;
 }
 
-static inline int
-cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
-                         ATTRIB_MAYBE_UNUSED Solver *solver,
-                         ATTRIB_MAYBE_UNUSED const Instance *intsance) {
+static inline int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
+                                           Solver *solver,
+                                           const Instance *intsance) {
     double obj, bound;
     CPXLONG num_processed_nodes, simplex_iterations;
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &obj);
@@ -243,8 +238,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     return result;
 }
 
-static bool on_solve_start(ATTRIB_MAYBE_UNUSED Solver *self,
-                           ATTRIB_MAYBE_UNUSED const Instance *instance) {
+static bool on_solve_start(Solver *self, const Instance *instance) {
     CplexCallbackData data = {0};
     data.solver = self;
     data.instance = instance;
@@ -267,9 +261,7 @@ fail:
     return false;
 }
 
-SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
-                  ATTRIB_MAYBE_UNUSED const Instance *instance,
-                  Solution *solution) {
+SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     if (!on_solve_start(self, instance)) {
         return SOLVE_STATUS_ERR;
     }
@@ -316,7 +308,7 @@ fail:
     return false;
 }
 
-Solver mip_solver_create(ATTRIB_MAYBE_UNUSED Instance *instance) {
+Solver mip_solver_create(Instance *instance) {
     log_trace("%s", __func__);
 
     Solver solver = {0};

@@ -34,6 +34,8 @@ extern "C" {
 #define THREAD_LOCAL_STORAGE __declspec(thread)
 #endif
 
+#define UNUSED_PARAM(x) (void)(x)
+
 #ifdef __GNUC__
 #define ATTRIB_NORETURN __attribute__((noreturn))
 #define ATTRIB_CONSTRUCT(func) __attribute__((constructor))
