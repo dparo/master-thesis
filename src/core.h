@@ -63,13 +63,34 @@ typedef struct Solution {
 
 typedef struct SolverData SolverData;
 
+#define MAX_NUM_SOLVER_PARAMS (256)
+
 typedef struct SolverParams {
-    // TODO :Implement me
-    int32_t ___dummy___;
+    int32_t num_params;
+    struct {
+        char *name;
+        char *value;
+    } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
+
+typedef struct SolverDescriptor {
+    char *name;
+    struct {
+        bool required;
+        char *name;
+        char *type;
+        char *default_value;
+    } params[];
+} SolverDescriptor;
 
 typedef struct Solver {
     SolverData *data;
+
+    // TODO:
+#if 0
+    const SolverDescriptor *(*begin)(const SolverParams *params);
+    bool (*init)(struct Solver *solver, const SolverParams *params);
+#endif
 
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
@@ -84,6 +105,9 @@ Tour tour_copy(Tour const *other);
 Tour tour_move(Tour *other);
 
 void tour_destroy(Tour *tour);
+
+Solution cptp_solve(Instance *instance, char *solver_name,
+                    const SolverParams *params);
 
 #if __cplusplus
 }

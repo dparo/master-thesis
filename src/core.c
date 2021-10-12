@@ -24,6 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "solvers/mip.h"
+
 void instance_set_name(Instance *instance, const char *name) {
     if (instance->name) {
         free(instance->name);
@@ -69,4 +71,65 @@ void tour_destroy(Tour *tour) {
     free(tour->succ);
     free(tour->comp);
     memset(tour, 0, sizeof(*tour));
+}
+
+typedef Solver (*SolverCreateFn)(Instance *instance);
+
+static const struct SolverLookup {
+    const SolverDescriptor *descriptor;
+    SolverCreateFn create_fn;
+} SOLVERS_LOOKUP_TABLE[] = {
+    {&MIP_SOLVER_DESCRIPTOR, &mip_solver_create},
+};
+
+typedef struct SolverLookup SolverLookup;
+
+static const SolverLookup *lookup_solver(char *solver_name) {
+
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); i++) {
+        if (0 ==
+            strcmp(solver_name, SOLVERS_LOOKUP_TABLE[i].descriptor->name)) {
+            return &SOLVERS_LOOKUP_TABLE[i];
+        }
+    }
+
+    return NULL;
+}
+
+static bool verify_params(const SolverDescriptor *descriptor,
+                          const SolverParams *params) {
+    assert(!"TODO");
+    return true;
+}
+
+Solution cptp_solve(Instance *instance, char *solver_name,
+                    const SolverParams *params) {
+    Solution solution = {0};
+
+    const SolverLookup *lookup = lookup_solver(solver_name);
+
+    if (lookup == NULL) {
+        log_fatal("%s :: `%s` is not a know solver", __func__, solver_name);
+        goto fail;
+    } else {
+        log_info("%s :: Found descriptor for solver `%s`", __func__,
+                 solver_name);
+    }
+
+    if (!verify_params(lookup->descriptor, params)) {
+        log_fatal("%s :: Failed to veriy params", __func__);
+        goto fail;
+    }
+
+    Solver solver = lookup->create_fn(instance);
+    solution = solver.solve(&solver, instance);
+    solver.destroy(&solver);
+
+    // TODO: Check solution quality, print some stuff, validate the solution
+    // etc...
+
+    return solution;
+
+fail:
+    return (Solution){0};
 }
