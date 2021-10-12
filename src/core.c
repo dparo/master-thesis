@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "solvers/mip.h"
+#include "core-utils.h"
 
 void instance_set_name(Instance *instance, const char *name) {
     if (instance->name) {
@@ -43,6 +44,49 @@ void instance_destroy(Instance *instance) {
     free(instance->duals);
 
     memset(instance, 0, sizeof(*instance));
+}
+
+Tour tour_create(const Instance *instance) {
+    Tour result = {0};
+    result.num_customers = instance->num_customers;
+    result.num_vehicles = instance->num_vehicles;
+    result.num_connected_comps = 0;
+    result.succ =
+        mati32_create(instance->num_customers + 1, instance->num_vehicles);
+    result.comp =
+        mati32_create(instance->num_customers + 1, instance->num_vehicles);
+
+    if (result.succ) {
+        mati32_set(result.succ, instance->num_customers + 1,
+                   instance->num_vehicles, -1);
+    }
+
+    if (result.comp) {
+        mati32_set(result.comp, instance->num_customers + 1,
+                   instance->num_vehicles, -1);
+    }
+
+    return result;
+}
+
+void tour_destroy(Tour *tour) {
+    free(tour->num_connected_comps);
+    free(tour->succ);
+    free(tour->comp);
+    memset(tour, 0, sizeof(*tour));
+}
+
+Solution solution_create(const Instance *instance) {
+    Solution solution = {0};
+    solution.upper_bound = INFINITY;
+    solution.lower_bound = -INFINITY;
+    solution.tour = tour_create(instance);
+    return solution;
+}
+
+void solution_destroy(Solution *solution) {
+    tour_destroy(&solution->tour);
+    memset(solution, 0, sizeof(*solution));
 }
 
 Tour tour_copy(Tour const *other) {
@@ -64,13 +108,6 @@ Tour tour_move(Tour *other) {
     memcpy(&result, other, sizeof(result));
     memset(other, 0, sizeof(*other));
     return result;
-}
-
-void tour_destroy(Tour *tour) {
-    free(tour->num_connected_comps);
-    free(tour->succ);
-    free(tour->comp);
-    memset(tour, 0, sizeof(*tour));
 }
 
 typedef Solver (*SolverCreateFn)(Instance *instance);
@@ -96,16 +133,14 @@ static const SolverLookup *lookup_solver(char *solver_name) {
     return NULL;
 }
 
-static bool verify_params(const SolverDescriptor *descriptor,
-                          const SolverParams *params) {
+static bool verify_solver_params(const SolverDescriptor *descriptor,
+                                 const SolverParams *params) {
     assert(!"TODO");
     return true;
 }
 
 Solution cptp_solve(Instance *instance, char *solver_name,
                     const SolverParams *params) {
-    Solution solution = {0};
-
     const SolverLookup *lookup = lookup_solver(solver_name);
 
     if (lookup == NULL) {
@@ -116,15 +151,31 @@ Solution cptp_solve(Instance *instance, char *solver_name,
                  solver_name);
     }
 
-    if (!verify_params(lookup->descriptor, params)) {
+    if (!verify_solver_params(lookup->descriptor, params)) {
         log_fatal("%s :: Failed to veriy params", __func__);
         goto fail;
     }
 
+    Solution solution = solution_create(instance);
+
     Solver solver = lookup->create_fn(instance);
-    solution = solver.solve(&solver, instance);
+    SolveStatus solve_status = solver.solve(&solver, instance, &solution);
     solver.destroy(&solver);
 
+    switch (solve_status) {
+    case SOLVE_STATUS_ERR:
+        todo();
+        break;
+    case SOLVE_STATUS_INVALID:
+        todo();
+        break;
+    case SOLVE_STATUS_OK:
+        todo();
+        break;
+    case SOLVE_STATUS_EXACT:
+        todo();
+        break;
+    }
     // TODO: Check solution quality, print some stuff, validate the solution
     // etc...
 

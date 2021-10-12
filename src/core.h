@@ -43,11 +43,6 @@ typedef struct Instance {
     };
 } Instance;
 
-typedef struct CostSolution {
-    double upper_bound;
-    double lower_bound;
-} CostSolution;
-
 typedef struct Tour {
     int32_t num_customers;
     int32_t num_vehicles;
@@ -57,7 +52,8 @@ typedef struct Tour {
 } Tour;
 
 typedef struct Solution {
-    CostSolution cost;
+    double upper_bound;
+    double lower_bound;
     Tour tour;
 } Solution;
 
@@ -83,8 +79,16 @@ typedef struct SolverDescriptor {
     } params[];
 } SolverDescriptor;
 
+typedef enum SolveStatus {
+    SOLVE_STATUS_ERR = 0,
+    SOLVE_STATUS_INVALID = 1,
+    SOLVE_STATUS_OK = 2,
+    SOLVE_STATUS_EXACT = 3,
+} SolveStatus;
+
 typedef struct Solver {
     SolverData *data;
+    bool should_terminate;
 
     // TODO:
 #if 0
@@ -94,17 +98,21 @@ typedef struct Solver {
 
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
-    Solution (*solve)(struct Solver *self, const Instance *instance);
+    SolveStatus (*solve)(struct Solver *self, const Instance *instance,
+                         Solution *solution);
     void (*destroy)(struct Solver *self);
 } Solver;
 
 void instance_set_name(Instance *instance, const char *name);
 void instance_destroy(Instance *instance);
 
+Tour tour_create(const Instance *instance);
+void tour_destroy(Tour *tour);
 Tour tour_copy(Tour const *other);
 Tour tour_move(Tour *other);
 
-void tour_destroy(Tour *tour);
+Solution solution_create(const Instance *instance);
+void solution_destroy(Solution *solution);
 
 Solution cptp_solve(Instance *instance, char *solver_name,
                     const SolverParams *params);

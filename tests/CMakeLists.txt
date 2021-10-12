@@ -2,9 +2,8 @@ set(
     TEST_SOURCES_LIST
     "simple.c"
     "parser.c"
+    "core.c"
 )
-
-
 if (CPLEX_FOUND)
     list(APPEND TEST_SOURCES_LIST "mip.c")
 endif()

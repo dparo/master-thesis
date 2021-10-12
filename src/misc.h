@@ -102,6 +102,8 @@ extern "C" {
 #endif
 #endif
 
+#define todo(...) assert(!"!!!TODO!!!")
+
 #if __cplusplus
 }
 #endif

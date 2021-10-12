@@ -207,17 +207,21 @@ cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
 
 CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
                                     CPXLONG contextid, void *userhandle) {
+    log_trace("Called %s", __func__);
     CplexCallbackData *data = (CplexCallbackData *)userhandle;
+
+    int result = 0;
 
     switch (contextid) {
     case CPX_CALLBACKCONTEXT_CANDIDATE:
-        return cplex_on_new_candidate(context, data->solver, data->instance);
+        result = cplex_on_new_candidate(context, data->solver, data->instance);
         break;
     case CPX_CALLBACKCONTEXT_RELAXATION:
-        return cplex_on_new_relaxation(context, data->solver, data->instance);
+        result = cplex_on_new_relaxation(context, data->solver, data->instance);
         break;
     case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
-        return cplex_on_global_progress(context, data->solver, data->instance);
+        result =
+            cplex_on_global_progress(context, data->solver, data->instance);
         break;
     case CPX_CALLBACKCONTEXT_THREAD_UP:
         break;
@@ -228,7 +232,11 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
         break;
     }
 
-    return 0;
+    if (data->solver->should_terminate) {
+        result = -1;
+    }
+
+    return result;
 }
 
 static bool on_solve_start(ATTRIB_MAYBE_UNUSED Solver *self,
@@ -255,10 +263,11 @@ fail:
     return false;
 }
 
-Solution solve(ATTRIB_MAYBE_UNUSED Solver *self,
-               ATTRIB_MAYBE_UNUSED const Instance *instance) {
+SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
+                  ATTRIB_MAYBE_UNUSED const Instance *instance,
+                  Solution *solution) {
     if (!on_solve_start(self, instance)) {
-        return (Solution){0};
+        return SOLVE_STATUS_ERR;
     }
     // TODO: CPlex solve here
 
@@ -270,7 +279,9 @@ Solution solve(ATTRIB_MAYBE_UNUSED Solver *self,
 
     // TODO: Return solution
 
-    return (Solution){0};
+    todo();
+    // TODO: Change the return value here
+    return SOLVE_STATUS_ERR;
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance) {

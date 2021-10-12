@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021 Davide Paro
  *
@@ -20,30 +21,36 @@
  * SOFTWARE.
  */
 
-#include "types.h"
+#include <assert.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
-int32_t *veci32_create(int32_t len) {
-    int32_t *result;
-    result = malloc(len * sizeof(*result));
-    return result;
+#include <unity.h>
+
+#include "parser.h"
+#include "core.h"
+#include "core-utils.h"
+
+static void test_tour_create(void) {
+    const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
+    Instance instance = parse(filepath);
+    Tour tour = tour_create(&instance);
+    tour_destroy(&tour);
+    instance_destroy(&instance);
 }
 
-int32_t *mati32_create(int32_t w, int32_t h) {
-    int32_t *result;
-    result = malloc(w * h * sizeof(*result));
-    return result;
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_tour_create);
+    return UNITY_END();
 }
 
-int32_t *veci32_copy(int32_t *other, int32_t len) {
-    int32_t *result = malloc(len * sizeof(*result));
-    memcpy(result, other, len * sizeof(*result));
-    return result;
-}
+/// Ran before each test
+void setUp(void) {}
 
-int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h) {
-    int32_t *result = malloc(w * h * sizeof(*result));
-    memcpy(result, other, w * h * sizeof(*result));
-    return result;
-}
+/// Ran after each test
+void tearDown(void) {}

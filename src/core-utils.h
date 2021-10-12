@@ -47,8 +47,9 @@ static inline bool tour_are_all_customers_served(Tour *tour) {
 static inline void solver_params_push(SolverParams *params, char *name,
                                       char *value) {
     assert(params->num_params < MAX_NUM_SOLVER_PARAMS);
-    SolverParam p = {name, value};
-    params->params[params->num_params++] = p;
+    params->params[params->num_params].name = name;
+    params->params[params->num_params].value = value;
+    params->num_params++;
 }
 
 #if __cplusplus
