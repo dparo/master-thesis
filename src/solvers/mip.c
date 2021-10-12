@@ -130,7 +130,11 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
         snprintf(cname, sizeof(cname), "y(%d)", i);
-        obj[0] = instance->duals[i];
+        obj[0] = -1.0 * instance->duals[i];
+        if (i == 0) {
+            // We are the depot, make sure that the obj factor is 0.0
+            obj[0] = 0.0;
+        }
 
         if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub, xctype,
                         pcname)) {
