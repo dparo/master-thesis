@@ -80,7 +80,7 @@ extern "C" {
 #define ARRAY_LEN(arr)                                                         \
     (sizeof(arr) / sizeof((arr)[0]) +                                          \
      sizeof(typeof(int[1 - 2 * !!__builtin_types_compatible_p(                 \
-                                   typeof(arr), typeof(&arr[0]))])) *          \
+                                   typeof(arr), typeof(&(arr)[0]))])) *        \
          0)
 #else
 #define ARRAY_LEN(A)                                                           \
