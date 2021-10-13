@@ -79,9 +79,6 @@ typedef struct EnumToStrMapping {
 #define ENUM_TO_STR_TABLE_DECL(ENUM_TYPE)                                      \
     const EnumToStrMapping ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE[]
 
-#define ENUM_TO_STR_TABLE_DEF(ENUM_TYPE, ...)                                  \
-    const ENUM_TO_STR_TABLE_DECL(ENUM_TYPE) = {__VA_ARGS__}
-
 #define ENUM_TO_STR(ENUM_TYPE, x)                                              \
     (__enum_to_str(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                      \
                    (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
@@ -92,11 +89,27 @@ typedef struct EnumToStrMapping {
                    (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
                    (x)))
 
+#define STR_TO_ENUM_DEFAULT(ENUM_TYPE, x, default_val)                         \
+    ((ENUM_TYPE)(__str_to_enum_default(                                        \
+        ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                                 \
+        (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE), (x),        \
+        (default_val))))
+
 const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
                           int32_t value);
 
 const int32_t *__str_to_enum(const EnumToStrMapping *table, int32_t table_len,
                              const char *name);
+
+ATTRIB_MAYBE_UNUSED static inline int32_t
+__str_to_enum_default(const EnumToStrMapping *table, int32_t table_len,
+                      const char *name, int32_t default_val) {
+    const int32_t *lookup = __str_to_enum(table, table_len, name);
+    if (!lookup) {
+        return default_val;
+    }
+    return *lookup;
+}
 
 #if __cplusplus
 }

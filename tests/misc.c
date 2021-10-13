@@ -29,6 +29,7 @@
 #include <stdio.h>
 
 #include <unity.h>
+#include "types.h"
 
 static void test_example(void) { TEST_ASSERT_EQUAL(1 + 2, 3); }
 
@@ -52,12 +53,35 @@ static void test_malloc_0(void) {
     free(p);
 }
 
+static void test_enum_lookup(void) {
+
+    typedef enum DummyEnum {
+        RED = -1,
+        GREEN = 0xff2,
+    } DummyEnum;
+
+    static ENUM_TO_STR_TABLE_DECL(DummyEnum) = {
+        ENUM_TO_STR_TABLE_FIELD(RED),
+        ENUM_TO_STR_TABLE_FIELD(GREEN),
+    };
+
+    TEST_ASSERT(0 == strcmp("RED", ENUM_TO_STR(DummyEnum, RED)));
+    TEST_ASSERT(0 == strcmp("GREEN", ENUM_TO_STR(DummyEnum, GREEN)));
+
+    TEST_ASSERT(RED == *STR_TO_ENUM(DummyEnum, "RED"));
+    TEST_ASSERT(GREEN == *STR_TO_ENUM(DummyEnum, "GREEN"));
+
+    TEST_ASSERT_NULL(STR_TO_ENUM(DummyEnum, "NON_EXISTENT"));
+    TEST_ASSERT(RED == STR_TO_ENUM_DEFAULT(DummyEnum, "NON_EXISTENT", RED));
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_example);
     RUN_TEST(test_read);
     RUN_TEST(test_calloc_0_0);
     RUN_TEST(test_malloc_0);
+    RUN_TEST(test_enum_lookup);
     return UNITY_END();
 }
 

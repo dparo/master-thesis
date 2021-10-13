@@ -1,6 +1,6 @@
 set(
     TEST_SOURCES_LIST
-    "simple.c"
+    "misc.c"
     "parser.c"
     "core.c"
 )
