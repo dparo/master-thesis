@@ -46,6 +46,18 @@ void instance_destroy(Instance *instance) {
     memset(instance, 0, sizeof(*instance));
 }
 
+void tour_invalidate(Tour *tour) {
+    if (tour->succ) {
+        mati32_set(tour->succ, tour->num_customers + 1, tour->num_vehicles,
+                   INT32_MIN >> 1);
+    }
+
+    if (tour->comp) {
+        mati32_set(tour->comp, tour->num_customers + 1, tour->num_vehicles,
+                   INT32_MIN >> 1);
+    }
+}
+
 Tour tour_create(const Instance *instance) {
     Tour result = {0};
     result.num_customers = instance->num_customers;
@@ -56,16 +68,7 @@ Tour tour_create(const Instance *instance) {
     result.comp =
         mati32_create(instance->num_customers + 1, instance->num_vehicles);
 
-    if (result.succ) {
-        mati32_set(result.succ, instance->num_customers + 1,
-                   instance->num_vehicles, -1);
-    }
-
-    if (result.comp) {
-        mati32_set(result.comp, instance->num_customers + 1,
-                   instance->num_vehicles, -1);
-    }
-
+    tour_invalidate(&result);
     return result;
 }
 
@@ -82,6 +85,12 @@ Solution solution_create(const Instance *instance) {
     solution.lower_bound = -INFINITY;
     solution.tour = tour_create(instance);
     return solution;
+}
+
+void solution_invalidate(Solution *solution) {
+    solution->lower_bound = INFINITY;
+    solution->upper_bound = -INFINITY;
+    tour_invalidate(&solution->tour);
 }
 
 void solution_destroy(Solution *solution) {
@@ -135,12 +144,64 @@ static const SolverLookup *lookup_solver(char *solver_name) {
 
 static bool verify_solver_params(const SolverDescriptor *descriptor,
                                  const SolverParams *params) {
-    todo();
+    log_warn("TODO!");
     return true;
+}
+
+static void log_solve_status(SolveStatus status, char *solver_name) {
+    char *solve_status_str = NULL;
+
+    switch (status) {
+    case SOLVE_STATUS_ERR:
+        solve_status_str = "SOLVE_STATUS_ERR";
+        break;
+    case SOLVE_STATUS_UNFEASIBLE:
+        solve_status_str = "SOLVE_STATUS_UNFEASIBLE";
+        break;
+    case SOLVE_STATUS_INVALID:
+        solve_status_str = "SOLVE_STATUS_INVALID";
+        break;
+    case SOLVE_STATUS_FEASIBLE:
+        solve_status_str = "SOLVE_STATUS_FEASIBLE";
+        break;
+    case SOLVE_STATUS_OPTIMAL:
+        solve_status_str = "SOLVE_STATUS_OPTIMAL";
+        break;
+    }
+
+    log_info("Solver `%s` returned with solve status: %s", solver_name,
+             solve_status_str);
+}
+
+static void process_solver_solution(SolveStatus status, Solution *solution,
+                                    char *solver_name) {
+    switch (status) {
+    case SOLVE_STATUS_ERR:
+        solution_invalidate(solution);
+        break;
+    case SOLVE_STATUS_UNFEASIBLE:
+        solution->upper_bound = INFINITY;
+        solution->lower_bound = INFINITY;
+        break;
+    case SOLVE_STATUS_INVALID:
+        todo();
+        solution_invalidate(solution);
+        break;
+    case SOLVE_STATUS_FEASIBLE:
+        todo();
+        break;
+    case SOLVE_STATUS_OPTIMAL:
+        todo();
+        break;
+    }
+
+    // TODO: Check solution quality, print some stuff, validate the solution
+    // etc...
 }
 
 Solution cptp_solve(Instance *instance, char *solver_name,
                     const SolverParams *params) {
+    Solution solution = solution_create(instance);
     const SolverLookup *lookup = lookup_solver(solver_name);
 
     if (lookup == NULL) {
@@ -156,34 +217,14 @@ Solution cptp_solve(Instance *instance, char *solver_name,
         goto fail;
     }
 
-    Solution solution = solution_create(instance);
-
     Solver solver = lookup->create_fn(instance);
     SolveStatus solve_status = solver.solve(&solver, instance, &solution);
     solver.destroy(&solver);
-
-    switch (solve_status) {
-    case SOLVE_STATUS_ERR:
-        todo();
-        break;
-    case SOLVE_STATUS_UNFEASIBLE:
-        todo();
-        break;
-    case SOLVE_STATUS_INVALID:
-        todo();
-        break;
-    case SOLVE_STATUS_FEASIBLE:
-        todo();
-        break;
-    case SOLVE_STATUS_OPTIMAL:
-        todo();
-        break;
-    }
-    // TODO: Check solution quality, print some stuff, validate the solution
-    // etc...
-
+    log_solve_status(solve_status, solver_name);
+    process_solver_solution(solve_status, &solution, solver_name);
     return solution;
 
 fail:
+    solution_destroy(&solution);
     return (Solution){0};
 }

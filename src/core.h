@@ -109,11 +109,13 @@ void instance_destroy(Instance *instance);
 
 Tour tour_create(const Instance *instance);
 void tour_destroy(Tour *tour);
+void tour_invalidate(Tour *tour);
 Tour tour_copy(Tour const *other);
 Tour tour_move(Tour *other);
 
 Solution solution_create(const Instance *instance);
 void solution_destroy(Solution *solution);
+void solution_invalidate(Solution *solution);
 
 Solution cptp_solve(Instance *instance, char *solver_name,
                     const SolverParams *params);
