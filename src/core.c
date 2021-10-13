@@ -47,14 +47,21 @@ void instance_destroy(Instance *instance) {
 }
 
 void tour_invalidate(Tour *tour) {
+
+    if (tour->num_connected_comps) {
+        veci32_set(tour->num_connected_comps, tour->num_vehicles, 0);
+    }
+
+    const int32_t DEAD_VAL = INT32_MIN >> 1;
+
     if (tour->succ) {
         mati32_set(tour->succ, tour->num_customers + 1, tour->num_vehicles,
-                   INT32_MIN >> 1);
+                   DEAD_VAL);
     }
 
     if (tour->comp) {
         mati32_set(tour->comp, tour->num_customers + 1, tour->num_vehicles,
-                   INT32_MIN >> 1);
+                   DEAD_VAL);
     }
 }
 
@@ -62,7 +69,8 @@ Tour tour_create(const Instance *instance) {
     Tour result = {0};
     result.num_customers = instance->num_customers;
     result.num_vehicles = instance->num_vehicles;
-    result.num_connected_comps = 0;
+
+    result.num_connected_comps = veci32_create(instance->num_vehicles);
     result.succ =
         mati32_create(instance->num_customers + 1, instance->num_vehicles);
     result.comp =
@@ -225,6 +233,6 @@ Solution cptp_solve(Instance *instance, char *solver_name,
     return solution;
 
 fail:
-    solution_destroy(&solution);
-    return (Solution){0};
+    solution_invalidate(&solution);
+    return solution;
 }
