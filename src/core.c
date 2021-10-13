@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "solvers/stub.h"
 #include "solvers/mip.h"
 #include "core-utils.h"
 
@@ -127,12 +128,13 @@ Tour tour_move(Tour *other) {
     return result;
 }
 
-typedef Solver (*SolverCreateFn)(Instance *instance);
+typedef Solver (*SolverCreateFn)(const Instance *instance);
 
 static const struct SolverLookup {
     const SolverDescriptor *descriptor;
     SolverCreateFn create_fn;
 } SOLVERS_LOOKUP_TABLE[] = {
+    {&STUB_SOLVER_DESCRIPTOR, &stub_solver_create},
     {&MIP_SOLVER_DESCRIPTOR, &mip_solver_create},
 };
 

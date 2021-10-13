@@ -311,7 +311,7 @@ fail:
     return false;
 }
 
-Solver mip_solver_create(Instance *instance) {
+Solver mip_solver_create(const Instance *instance) {
     log_trace("%s", __func__);
 
     Solver solver = {0};
