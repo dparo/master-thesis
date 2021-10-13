@@ -105,6 +105,7 @@ extern "C" {
 #endif
 
 #define todo(...) assert(!"!!!TODO!!!")
+#define todo_msg(msg) assert(!(msg))
 
 #if __cplusplus
 }

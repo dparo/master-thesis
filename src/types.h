@@ -68,6 +68,28 @@ static inline double vec2d_dist(Vec2d const *a, Vec2d const *b) {
     return sqrt(dx * dx + dy * dy);
 }
 
+typedef struct EnumToStrMapping {
+    int32_t value;
+    const char *name;
+} EnumToStrMapping;
+
+#define ENUM_TO_STR_TABLE_FIELD(x)                                             \
+    { (x), #x }
+
+#define ENUM_TO_STR_TABLE_DECL(ENUM_TYPE)                                      \
+    const EnumToStrMapping ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE[]
+
+#define ENUM_TO_STR_TABLE_DEF(ENUM_TYPE, ...)                                  \
+    const ENUM_TO_STR_TABLE_DECL(ENUM_TYPE) = {__VA_ARGS__}
+
+#define ENUM_TO_STR(ENUM_TYPE, x)                                              \
+    __enum_to_str(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                       \
+                  (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),   \
+                  (x))
+
+const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
+                          int32_t value);
+
 #if __cplusplus
 }
 #endif

@@ -47,3 +47,12 @@ int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h) {
     memcpy(result, other, w * h * sizeof(*result));
     return result;
 }
+
+const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
+                          int32_t value) {
+    for (int32_t i = 0; i < table_len; i++)
+        if (table[i].value == value)
+            return table[i].name;
+
+    return "<INVALID>";
+}

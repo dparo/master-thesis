@@ -181,30 +181,38 @@ static void log_solve_status(SolveStatus status, char *solver_name) {
              solve_status_str);
 }
 
-static void process_solver_solution(SolveStatus status, Solution *solution,
-                                    char *solver_name) {
+static void postprocess_solver_solution(SolveStatus status, Solution *solution,
+                                        char *solver_name) {
     switch (status) {
     case SOLVE_STATUS_ERR:
-        solution_invalidate(solution);
-        break;
     case SOLVE_STATUS_UNFEASIBLE:
-        solution->upper_bound = INFINITY;
-        solution->lower_bound = INFINITY;
-        break;
     case SOLVE_STATUS_INVALID:
-        todo();
         solution_invalidate(solution);
+        if (status == SOLVE_STATUS_UNFEASIBLE) {
+            solution->upper_bound = INFINITY;
+            solution->lower_bound = INFINITY;
+        }
         break;
     case SOLVE_STATUS_FEASIBLE:
-        todo();
-        break;
     case SOLVE_STATUS_OPTIMAL:
         todo();
+        // TODO:
+        //       1. Validate the tour edges and connectivity
+        //       2. Validate that the upper bound populated from the solver is
+        //          equal to the `tour_eval()` function that recomputes the
+        //          upperbound from the tour
+        //       3. In case the solver returns an optimal solution, verify
+        //          that the upper_bound and lower_bound stays within a
+        //          reasonable gap
+
+        if (status == SOLVE_STATUS_OPTIMAL) {
+            todo_msg("upper_bound and lower_bound gap check");
+        }
+
         break;
     }
 
-    // TODO: Check solution quality, print some stuff, validate the solution
-    // etc...
+    // TODO: Check solution, print some stuff, validate the solution...
 }
 
 Solution cptp_solve(Instance *instance, char *solver_name,
@@ -229,7 +237,7 @@ Solution cptp_solve(Instance *instance, char *solver_name,
     SolveStatus solve_status = solver.solve(&solver, instance, &solution);
     solver.destroy(&solver);
     log_solve_status(solve_status, solver_name);
-    process_solver_solution(solve_status, &solution, solver_name);
+    postprocess_solver_solution(solve_status, &solution, solver_name);
     return solution;
 
 fail:
