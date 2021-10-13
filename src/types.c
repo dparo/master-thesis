@@ -56,3 +56,12 @@ const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
 
     return "<INVALID>";
 }
+
+const int32_t *__str_to_enum(const EnumToStrMapping *table, int32_t table_len,
+                             const char *name) {
+    for (int32_t i = 0; i < table_len; i++)
+        if (0 == strcmp(table[i].name, name))
+            return &table[i].value;
+
+    return NULL;
+}

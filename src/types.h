@@ -83,12 +83,20 @@ typedef struct EnumToStrMapping {
     const ENUM_TO_STR_TABLE_DECL(ENUM_TYPE) = {__VA_ARGS__}
 
 #define ENUM_TO_STR(ENUM_TYPE, x)                                              \
-    __enum_to_str(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                       \
-                  (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),   \
-                  (x))
+    (__enum_to_str(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                      \
+                   (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
+                   (x)))
+
+#define STR_TO_ENUM(ENUM_TYPE, x)                                              \
+    (__str_to_enum(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                      \
+                   (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
+                   (x)))
 
 const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
                           int32_t value);
+
+const int32_t *__str_to_enum(const EnumToStrMapping *table, int32_t table_len,
+                             const char *name);
 
 #if __cplusplus
 }
