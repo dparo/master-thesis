@@ -157,28 +157,16 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
 }
 
 static void log_solve_status(SolveStatus status, char *solver_name) {
-    char *solve_status_str = NULL;
-
-    switch (status) {
-    case SOLVE_STATUS_ERR:
-        solve_status_str = "SOLVE_STATUS_ERR";
-        break;
-    case SOLVE_STATUS_UNFEASIBLE:
-        solve_status_str = "SOLVE_STATUS_UNFEASIBLE";
-        break;
-    case SOLVE_STATUS_INVALID:
-        solve_status_str = "SOLVE_STATUS_INVALID";
-        break;
-    case SOLVE_STATUS_FEASIBLE:
-        solve_status_str = "SOLVE_STATUS_FEASIBLE";
-        break;
-    case SOLVE_STATUS_OPTIMAL:
-        solve_status_str = "SOLVE_STATUS_OPTIMAL";
-        break;
-    }
+    static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_UNFEASIBLE),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
+    };
 
     log_info("Solver `%s` returned with solve status: %s", solver_name,
-             solve_status_str);
+             ENUM_TO_STR(SolveStatus, status));
 }
 
 static void postprocess_solver_solution(SolveStatus status, Solution *solution,

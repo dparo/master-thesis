@@ -23,6 +23,7 @@
 #include "mip.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "core-utils.h"
 
 #ifndef COMPILED_WITH_CPLEX
 Solver mip_solver_create(Instance *instance) {
@@ -57,6 +58,29 @@ typedef struct {
     const Instance *instance;
 } CplexCallbackData;
 
+static int32_t *num_connected_comps(Tour *tour) {
+    return &tour->num_connected_comps[0];
+}
+
+static inline int32_t *succ(Tour *tour, int32_t i) {
+    return tour_succ(tour, 0, i);
+}
+
+static inline int32_t *comp(Tour *tour, int32_t i) {
+    return tour_comp(tour, 0, i);
+}
+
+static inline double cost(const Instance *instance, int32_t i, int32_t j) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    assert(j >= 0 && j < instance->num_customers + 1);
+    return vec2d_dist(&instance->positions[i], &instance->positions[j]);
+}
+
+static inline double profit(const Instance *instance, int32_t i) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    return instance->duals[i];
+}
+
 void mip_solver_destroy(Solver *self) {
 
     if (self->data) {
@@ -73,11 +97,6 @@ void mip_solver_destroy(Solver *self) {
 
     memset(self, 0, sizeof(*self));
     self->destroy = mip_solver_destroy;
-}
-
-static inline double cost(const Instance *instance, int32_t idx1,
-                          int32_t idx2) {
-    return vec2d_dist(&instance->positions[idx1], &instance->positions[idx2]);
 }
 
 static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
@@ -131,7 +150,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
         snprintf(cname, sizeof(cname), "y(%d)", i);
-        obj[0] = -1.0 * instance->duals[i];
+        obj[0] = -1.0 * profit(instance, i);
         if (i == 0) {
             // We are the depot, make sure that the obj factor is 0.0
             obj[0] = 0.0;
@@ -151,23 +170,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
-static void add_dfj_sec(Solver *self, const Instance *instance) {
-    // NOTE:
-    //    Dantizg Fulkerson Johnson subtour elimination constraints
-    //    See:
-    //         Taccari, L. (2016). Integer Programming
-    //         Formulations for the Elementary Shortest Path Problem.
-}
-
-static void add_gcs_sec(Solver *self, const Instance *instance) {
-    // NOTE:
-    //    Generalized Cuts Inequlities (GSC) subtour elimination constraints
-    //    See:
-    //         Taccari, L. (2016). Integer Programming
-    //         Formulations for the Elementary Shortest Path Problem.
-}
-
-static void add_sec(Solver *self, const Instance *instance) {}
+static void add_gsec(Solver *self, const Instance *instance) {}
 
 static inline int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context,
                                          Solver *solver,

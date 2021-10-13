@@ -23,6 +23,7 @@
 #include "types.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 int32_t *veci32_create(int32_t len) {
     int32_t *result;
@@ -54,7 +55,14 @@ const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,
         if (table[i].value == value)
             return table[i].name;
 
-    return "<INVALID>";
+#ifndef NDEBUG
+    fprintf(stderr, "__enum_to_str error: Failed to lookup for value %d\n",
+            value);
+    fflush(stderr);
+    assert(!"<INVALID_ENUM_VALUE>");
+#endif
+
+    return "<INVALID_ENUM_VALUE>";
 }
 
 const int32_t *__str_to_enum(const EnumToStrMapping *table, int32_t table_len,
