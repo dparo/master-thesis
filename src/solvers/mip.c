@@ -519,6 +519,50 @@ fail:
     return false;
 }
 
+static bool process_cplex_output(Solver *self, const Instance *instance,
+                                 Solution *solution, double *vstar,
+                                 int lpstat) {
+#define CHECKED(FUNC, __VA_ARGS__)                                             \
+    do {                                                                       \
+        if (0 != __VA_ARGS__) {                                                \
+            log_fatal("%s ::" #FUNC " failed", __func__);                      \
+            return false;                                                      \
+        }                                                                      \
+    } while (0)
+
+    double gap;
+    CPXDIM num_user_cuts;
+
+    CHECKED(CPXXgetbestobjval,
+            CPXXgetbestobjval(self->data->env, self->data->lp,
+                              &solution->lower_bound));
+
+    CHECKED(CPXXgetobjval, CPXXgetobjval(self->data->env, self->data->lp,
+                                         &solution->upper_bound));
+
+    CHECKED(CPXXgetmiprelgap,
+            CPXXgetmiprelgap(self->data->env, self->data->lp, &gap));
+
+    CHECKED(CPXXgetnumcuts, CPXXgetnumcuts(self->data->env, self->data->lp,
+                                           CPX_CUT_USER, &num_user_cuts));
+
+    CPXCNT simplex_iterations =
+        CPXXgetmipitcnt(self->data->env, self->data->lp);
+
+    CPXCNT nodecnt = CPXXgetnodecnt(self->data->env, self->data->lp);
+
+    assert(fcmp(gap, solution_relgap(solution), 1e-6));
+
+    log_info(
+        "Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
+        "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = %d",
+        lpstat, solution->lower_bound, solution->upper_bound, gap,
+        simplex_iterations, nodecnt, num_user_cuts);
+
+#undef CHECKED
+    return true;
+}
+
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     SolveStatus result = SOLVE_STATUS_ERR;
     if (!on_solve_start(self, instance)) {
@@ -543,21 +587,10 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         goto terminate;
     }
 
-    if (CPXXgetbestobjval(self->data->env, self->data->lp,
-                          &solution->lower_bound) != 0) {
-        log_fatal("%s :: CPXXgetbestobjval failed", __func__);
+    if (!process_cplex_output(self, instance, solution, vstar, lpstat)) {
+        log_fatal("%s :: process_cplex_output failed", __func__);
         goto terminate;
     }
-
-    if (CPXXgetobjval(self->data->env, self->data->lp,
-                      &solution->upper_bound) != 0) {
-        log_fatal("%s :: CPXXgetbestobjval failed", __func__);
-        goto terminate;
-    }
-
-    log_info(
-        "Cplex solution finished with cost in [%f, %f]       (lpstat = %d)",
-        solution->lower_bound, solution->upper_bound, lpstat);
 
     // TODO: CPlex verify gap
 

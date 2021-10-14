@@ -27,6 +27,13 @@ extern "C" {
 #endif
 
 #include "core.h"
+#include <math.h>
+
+static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
+
+// Number of entries in a full matrix of size `N x N`
+// Eg N**2 - num_entries(diagonal)
+static inline int64_t fm_nentries(int32_t n) { return (n * n) - n; }
 
 static inline int32_t *tour_succ(Tour *tour, int32_t vehicle_idx,
                                  int32_t customer_idx) {
@@ -66,6 +73,17 @@ static inline bool tour_are_all_customers_served(Tour *tour) {
     return false;
 }
 
+static inline double solution_relgap(Solution *solution) {
+    // Taken from:
+    // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetmiprelgap-cpxgetmiprelgap
+
+    double ub = solution->upper_bound;
+    double lb = solution->lower_bound;
+
+    assert(lb <= ub);
+    return (ub - lb) / (1e-10 + fabs(ub));
+}
+
 static inline void solver_params_push(SolverParams *params, char *name,
                                       char *value) {
     assert(params->num_params < MAX_NUM_SOLVER_PARAMS);
@@ -73,12 +91,6 @@ static inline void solver_params_push(SolverParams *params, char *name,
     params->params[params->num_params].value = value;
     params->num_params++;
 }
-
-static inline int64_t hm_nentries(int32_t N) { return ((N * N) - N) / 2; }
-
-// Number of entries in a full matrix of size `N x N`
-// Eg N**2 - num_entries(diagonal)
-static inline int64_t fm_nentries(int32_t N) { return (N * N) - N; }
 
 #if __cplusplus
 }

@@ -33,6 +33,10 @@ extern "C" {
 #include "misc.h"
 #include "math.h"
 
+static inline bool fcmp(double a, double b, double epsilon) {
+    return fabs(a - b) < epsilon;
+}
+
 typedef struct Vec2d {
     double x, y;
 } Vec2d;
