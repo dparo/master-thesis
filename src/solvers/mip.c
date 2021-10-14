@@ -566,7 +566,6 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     if (!on_solve_start(self, instance)) {
         return SOLVE_STATUS_ERR;
     }
-    // TODO: CPlex solve here
 
     if (CPXXmipopt(self->data->env, self->data->lp) != 0) {
         log_fatal("%s :: CPXmipopt() error", __func__);
@@ -593,6 +592,9 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     // TODO: CPlex convert mip variables into usable solution
     todo();
 
+    // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetstat-cpxgetstat
+    // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
+    // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-specific-mip-in-cplex-callable-library-c-api
     switch (lpstat) {
     case CPXMIP_OPTIMAL:
     case CPXMIP_OPTIMAL_TOL:
@@ -601,6 +603,11 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
 
     case CPXMIP_TIME_LIM_FEAS:
     case CPXMIP_NODE_LIM_FEAS:
+        break;
+
+    case CPX_STAT_NUM_BEST:
+        // Could not converge due to number difficulties
+        result = SOLVE_STATUS_ERR;
         break;
 
     default:
