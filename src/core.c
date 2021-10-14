@@ -49,8 +49,8 @@ void instance_destroy(Instance *instance) {
 
 void tour_invalidate(Tour *tour) {
 
-    if (tour->num_connected_comps) {
-        veci32_set(tour->num_connected_comps, tour->num_vehicles, 0);
+    if (tour->num_comps) {
+        veci32_set(tour->num_comps, tour->num_vehicles, 0);
     }
 
     const int32_t DEAD_VAL = INT32_MIN >> 1;
@@ -71,7 +71,7 @@ Tour tour_create(const Instance *instance) {
     result.num_customers = instance->num_customers;
     result.num_vehicles = instance->num_vehicles;
 
-    result.num_connected_comps = veci32_create(instance->num_vehicles);
+    result.num_comps = veci32_create(instance->num_vehicles);
     result.succ =
         mati32_create(instance->num_customers + 1, instance->num_vehicles);
     result.comp =
@@ -82,7 +82,7 @@ Tour tour_create(const Instance *instance) {
 }
 
 void tour_destroy(Tour *tour) {
-    free(tour->num_connected_comps);
+    free(tour->num_comps);
     free(tour->succ);
     free(tour->comp);
     memset(tour, 0, sizeof(*tour));
@@ -112,8 +112,8 @@ Tour tour_copy(Tour const *other) {
     result.num_customers = other->num_customers;
     result.num_vehicles = other->num_vehicles;
 
-    result.num_connected_comps =
-        veci32_copy(other->num_connected_comps, result.num_vehicles);
+    result.num_comps =
+        veci32_copy(other->num_comps, result.num_vehicles);
     result.succ =
         mati32_copy(other->succ, result.num_customers + 1, result.num_vehicles);
     result.comp =

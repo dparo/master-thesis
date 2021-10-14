@@ -63,9 +63,7 @@ typedef struct {
     const Instance *instance;
 } CplexCallbackData;
 
-static int32_t *num_connected_comps(Tour *tour) {
-    return &tour->num_connected_comps[0];
-}
+static int32_t *num_comps(Tour *tour) { return &tour->num_comps[0]; }
 
 static inline int32_t *succ(Tour *tour, int32_t i) {
     return tour_succ(tour, 0, i);
@@ -129,14 +127,13 @@ static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
 }
 
 static inline size_t get_y_mip_var_idx_offset(const Instance *instance) {
-    return get_x_mip_var_idx(instance, instance->num_customers - 1,
-                             instance->num_customers);
+    return hm_nentries(instance->num_customers + 1);
 }
 
 static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
 
     assert(i >= 0 && i < instance->num_customers + 1);
-    return (size_t)i + 1 + get_y_mip_var_idx_offset(instance);
+    return (size_t)i + get_y_mip_var_idx_offset(instance);
 }
 
 static bool validate_mip_vars_packing(const Instance *instance) {
@@ -157,6 +154,62 @@ static bool validate_mip_vars_packing(const Instance *instance) {
 #endif
     (void)instance;
     return true;
+}
+
+static void unpack_mip_solution(const Instance *instance, Solution *solution,
+                                double *mip_var_x,
+                                ATTRIB_MAYBE_UNUSED double *mip_var_y) {
+    log_trace("%s", __func__);
+
+    assert(instance->num_customers == solution->tour.num_customers);
+    assert(instance->num_vehicles == solution->tour.num_vehicles);
+
+    Tour *t = &solution->tour;
+    int32_t n = solution->tour.num_customers + 1;
+
+    for (int32_t start = 0; start < n; start++) {
+        if (*comp(t, start) >= 0)
+            continue; // node "start" was already visited, just skip it
+
+        // a new component is found
+        (*num_comps(t)) += 1;
+        int i = start;
+        bool done = false;
+        while (!done) {
+            *comp(t, i) = *num_comps(t) - 1;
+            done = true;
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j) {
+                    continue;
+                }
+                double v = mip_var_x[get_x_mip_var_idx(instance, i, j)];
+                if (v > 0.5 && *comp(t, j) < 0) {
+                    *succ(t, i) = j;
+                    i = j;
+                    done = false;
+                    break;
+                }
+            }
+        }
+        // Last edge to close the cycle
+        *succ(t, i) = start;
+    }
+
+#ifndef DEBUG
+    // Validate that the Y mip variable is consisten with what we find in the X
+    // MIP var
+
+    for (int32_t i = 0; i < n; i++) {
+        double v = mip_var_y[get_y_mip_var_idx(instance, i)];
+        if (i == 0 || v >= 0.5) {
+            assert(*comp(t, i) >= 0);
+            assert(*succ(t, i) >= 0);
+        } else {
+            assert(*comp(t, i) < 0);
+            assert(*succ(t, i) < 0);
+        }
+    }
+#endif
 }
 
 static bool add_degree_constraints(Solver *self, const Instance *instance) {
