@@ -112,8 +112,7 @@ Tour tour_copy(Tour const *other) {
     result.num_customers = other->num_customers;
     result.num_vehicles = other->num_vehicles;
 
-    result.num_comps =
-        veci32_copy(other->num_comps, result.num_vehicles);
+    result.num_comps = veci32_copy(other->num_comps, result.num_vehicles);
     result.succ =
         mati32_copy(other->succ, result.num_customers + 1, result.num_vehicles);
     result.comp =
@@ -161,7 +160,7 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
 static void log_solve_status(SolveStatus status, char *solver_name) {
     static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_UNFEASIBLE),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
@@ -175,10 +174,10 @@ static void postprocess_solver_solution(SolveStatus status, Solution *solution,
                                         char *solver_name) {
     switch (status) {
     case SOLVE_STATUS_ERR:
-    case SOLVE_STATUS_UNFEASIBLE:
+    case SOLVE_STATUS_INFEASIBLE:
     case SOLVE_STATUS_INVALID:
         solution_invalidate(solution);
-        if (status == SOLVE_STATUS_UNFEASIBLE) {
+        if (status == SOLVE_STATUS_INFEASIBLE) {
             solution->upper_bound = INFINITY;
             solution->lower_bound = INFINITY;
         }

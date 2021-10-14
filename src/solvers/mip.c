@@ -592,16 +592,24 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         goto terminate;
     }
 
-    // TODO: CPlex verify gap
-
-    // TODO: CPlex ask lower bound and upper bound
-
     // TODO: CPlex convert mip variables into usable solution
-
-    // TODO: Return solution
-
     todo();
-    // TODO: Change the return value here
+
+    switch (lpstat) {
+    case CPXMIP_OPTIMAL:
+    case CPXMIP_OPTIMAL_TOL:
+        result = SOLVE_STATUS_OPTIMAL;
+        break;
+
+    case CPXMIP_TIME_LIM_FEAS:
+    case CPXMIP_NODE_LIM_FEAS:
+        break;
+
+    default:
+        assert(!"Invalid code path");
+        result = SOLVE_STATUS_ERR;
+        break;
+    }
 
 terminate:
     free(vstar);

@@ -81,7 +81,7 @@ typedef struct SolverDescriptor {
 
 typedef enum SolveStatus {
     SOLVE_STATUS_ERR = -127,
-    SOLVE_STATUS_UNFEASIBLE = -1,
+    SOLVE_STATUS_INFEASIBLE = -1,
     SOLVE_STATUS_INVALID = 0,
     SOLVE_STATUS_FEASIBLE = 1,
     SOLVE_STATUS_OPTIMAL = 2,
