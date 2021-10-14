@@ -5,6 +5,8 @@
 .cache
 *.swp
 
+/*.lp
+
 a.out
 
 /tmp

@@ -51,6 +51,11 @@ typedef struct SolverData {
     CPXLPptr lp;
 } SolverData;
 
+static void show_lp_file(Solver *self) {
+    CPXXwriteprob(self->data->env, self->data->lp, "TEST.lp", NULL);
+    system("kitty -e nvim TEST.lp");
+}
+
 /// Struct that is used as a userhandle to be passed to the cplex generic
 /// callback
 typedef struct {
@@ -99,14 +104,12 @@ void mip_solver_destroy(Solver *self) {
     self->destroy = mip_solver_destroy;
 }
 
-static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
-                                       int32_t j) {
+static inline size_t get_x_mip_var_idx_impl(const Instance *instance, int32_t i,
+                                            int32_t j) {
     assert(i >= 0 && i < instance->num_customers + 1);
     assert(j >= 0 && j < instance->num_customers + 1);
 
-    if (i == j) {
-        log_fatal("%s :: Got i = %d, j = %d, which is invalid", __func__, i, j);
-    }
+    assert(i < j);
 
     size_t N = (size_t)instance->num_customers + 1;
     size_t d = ((size_t)(i + 1) * (size_t)(i + 2)) / 2;
@@ -114,75 +117,139 @@ static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
     return result;
 }
 
+static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
+                                       int32_t j) {
+    assert(i != j);
+    return get_x_mip_var_idx_impl(instance, MIN(i, j), MAX(i, j));
+}
+
+static inline size_t get_y_mip_var_idx_offset(const Instance *instance) {
+    return get_x_mip_var_idx(instance, instance->num_customers - 1,
+                             instance->num_customers);
+}
+
 static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
 
     assert(i >= 0 && i < instance->num_customers + 1);
-    return (size_t)i + get_x_mip_var_idx(instance, instance->num_customers,
-                                         instance->num_customers);
+    return (size_t)i + 1 + get_y_mip_var_idx_offset(instance);
+}
+
+static bool validate_mip_vars_packing(const Instance *instance) {
+#ifndef NDEBUG
+    size_t cnt = 0;
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+            assert(cnt == get_x_mip_var_idx(instance, i, j));
+            cnt++;
+        }
+    }
+
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        assert(cnt == get_y_mip_var_idx(instance, i));
+        cnt++;
+    }
+
+#endif
+    (void)instance;
+    return true;
 }
 
 static bool add_degree_constraints(Solver *self, const Instance *instance) {
-    CPXNNZ nnz = (instance->num_customers + 1) - 1;
+    bool result = true;
+    CPXNNZ nnz = instance->num_customers + 1;
 
-    double rhs[] = {0.0};
+    CPXNNZ rmatbeg[] = {0};
     CPXDIM *index = NULL;
     double *value = NULL;
     char cname[128];
     const char *pcname[] = {(const char *)cname};
 
+    double rhs[] = {0.0};
     char sense[] = {'E'};
-    CPXNNZ rmatbeg[] = {0};
 
-    index = calloc(nnz, sizeof(*index));
-    value = calloc(nnz, sizeof(*value));
+    index = malloc(nnz * sizeof(*index));
+    value = malloc(nnz * sizeof(*value));
 
     if (!index || !value) {
         log_fatal("%s :: Failed memory allocation", __func__);
-        return false;
+        result = false;
+        goto terminate;
     }
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
         snprintf(cname, ARRAY_LEN(cname), "deg(%d)", i);
-        memset(index, 0, nnz);
-        memset(value, 0, nnz);
         int32_t cnt = 0;
 
-        for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+        for (int32_t j = 0; j < instance->num_customers + 1; j++) {
             if (i == j) {
                 continue;
             }
 
             int32_t x_idx = get_x_mip_var_idx(instance, i, j);
             index[cnt] = x_idx;
-            value[cnt] = 1.0;
+            value[cnt] = +1.0;
             cnt++;
-            log_trace("%s :: x_idx = %d", __func__, x_idx);
+            // log_trace("%s :: x_idx = %d", __func__, x_idx);
         }
 
+        assert(cnt == instance->num_customers);
         int32_t y_idx = get_y_mip_var_idx(instance, i);
-        log_trace("%s :: y_idx = %d", __func__, y_idx);
         index[cnt] = y_idx;
         value[cnt] = -2.0;
         cnt++;
 
+        assert(cnt == nnz);
+
         if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
                         rmatbeg, index, value, NULL, pcname)) {
             log_fatal("%s :: CPXXaddrows failure", __func__);
-            return false;
-        } else {
+            result = false;
+            goto terminate;
         }
     }
 
-    return true;
+terminate:
+    free(index);
+    free(value);
+
+#if 0
+    if (result) {
+        show_lp_file(self);
+    }
+#endif
+
+    return result;
 }
 
 static bool add_depot_is_part_of_tour_constraint(Solver *self,
                                                  const Instance *instance) {
-    return true;
+    bool result = true;
+
+    CPXDIM indices[] = {get_y_mip_var_idx(instance, 0)};
+    char lu[] = {'L'};
+    double bd[] = {1.0};
+    if (CPXXchgbds(self->data->env, self->data->lp, 1, indices, lu, bd)) {
+        log_fatal("%s :: Cannot change bounds for the depot", __func__);
+        result = false;
+    }
+
+#if 0
+    if (result) {
+        show_lp_file(self);
+    }
+#endif
+
+    return result;
 }
 
 static bool add_capacity_constraint(Solver *self, const Instance *instance) {
-    return false;
+    bool result = true;
+#if 1
+    if (result) {
+        show_lp_file(self);
+    }
+#endif
+    return result;
 }
 
 bool build_mip_formulation(Solver *self, const Instance *instance) {
@@ -201,7 +268,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     char xctype[] = {'B'};
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+        for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
             if (i == j)
                 continue;
 
@@ -219,10 +286,17 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
         snprintf(cname, sizeof(cname), "y(%d)", i);
         obj[0] = -1.0 * profit(instance, i);
+
+        // NOTE: __EMAIL__ the professor
+        //           Should we add this line of code which ensures and enforces
+        //           that the profit acheived at the depot is 0.0
+
+#if 0
         if (i == 0) {
             // We are the depot, make sure that the obj factor is 0.0
             obj[0] = 0.0;
         }
+#endif
 
         if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub, xctype,
                         pcname)) {
@@ -234,6 +308,9 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
     // Now create the constraints (eg add the rows)
     //
+    //
+
+    validate_mip_vars_packing(instance);
 
     if (!add_degree_constraints(self, instance)) {
         log_fatal("%s :: add_degree_constraints failed", __func__);
