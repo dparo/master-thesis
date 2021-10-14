@@ -102,7 +102,11 @@ void mip_solver_destroy(Solver *self) {
 static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
                                        int32_t j) {
     assert(i >= 0 && i < instance->num_customers + 1);
-    assert(i >= 0 && j < instance->num_customers + 1);
+    assert(j >= 0 && j < instance->num_customers + 1);
+
+    if (i == j) {
+        log_fatal("%s :: Got i = %d, j = %d, which is invalid", __func__, i, j);
+    }
 
     size_t N = (size_t)instance->num_customers + 1;
     size_t d = ((size_t)(i + 1) * (size_t)(i + 2)) / 2;
@@ -115,6 +119,70 @@ static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
     assert(i >= 0 && i < instance->num_customers + 1);
     return (size_t)i + get_x_mip_var_idx(instance, instance->num_customers,
                                          instance->num_customers);
+}
+
+static bool add_degree_constraints(Solver *self, const Instance *instance) {
+    CPXNNZ nnz = (instance->num_customers + 1) - 1;
+
+    double rhs[] = {0.0};
+    CPXDIM *index = NULL;
+    double *value = NULL;
+    char cname[128];
+    const char *pcname[] = {(const char *)cname};
+
+    char sense[] = {'E'};
+    CPXNNZ rmatbeg[] = {0};
+
+    index = calloc(nnz, sizeof(*index));
+    value = calloc(nnz, sizeof(*value));
+
+    if (!index || !value) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        return false;
+    }
+
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        snprintf(cname, ARRAY_LEN(cname), "deg(%d)", i);
+        memset(index, 0, nnz);
+        memset(value, 0, nnz);
+        int32_t cnt = 0;
+
+        for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+            if (i == j) {
+                continue;
+            }
+
+            int32_t x_idx = get_x_mip_var_idx(instance, i, j);
+            index[cnt] = x_idx;
+            value[cnt] = 1.0;
+            cnt++;
+            log_trace("%s :: x_idx = %d", __func__, x_idx);
+        }
+
+        int32_t y_idx = get_y_mip_var_idx(instance, i);
+        log_trace("%s :: y_idx = %d", __func__, y_idx);
+        index[cnt] = y_idx;
+        value[cnt] = -2.0;
+        cnt++;
+
+        if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
+                        rmatbeg, index, value, NULL, pcname)) {
+            log_fatal("%s :: CPXXaddrows failure", __func__);
+            return false;
+        } else {
+        }
+    }
+
+    return true;
+}
+
+static bool add_depot_is_part_of_tour_constraint(Solver *self,
+                                                 const Instance *instance) {
+    return true;
+}
+
+static bool add_capacity_constraint(Solver *self, const Instance *instance) {
+    return false;
 }
 
 bool build_mip_formulation(Solver *self, const Instance *instance) {
@@ -166,6 +234,21 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
     // Now create the constraints (eg add the rows)
     //
+
+    if (!add_degree_constraints(self, instance)) {
+        log_fatal("%s :: add_degree_constraints failed", __func__);
+        return false;
+    }
+
+    if (!add_depot_is_part_of_tour_constraint(self, instance)) {
+        log_fatal("%s :: add_depot_is_part_of_tour_constraint failed",
+                  __func__);
+        return false;
+    }
+    if (!add_capacity_constraint(self, instance)) {
+        log_fatal("%s :: add_capacity_constraint failed", __func__);
+        return false;
+    }
 
     return result;
 }
