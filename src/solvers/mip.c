@@ -519,10 +519,8 @@ fail:
     return false;
 }
 
-static bool process_cplex_output(Solver *self, const Instance *instance,
-                                 Solution *solution, double *vstar,
-                                 int lpstat) {
-#define CHECKED(FUNC, __VA_ARGS__)                                             \
+static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
+#define CHECKED(FUNC, ...)                                                     \
     do {                                                                       \
         if (0 != __VA_ARGS__) {                                                \
             log_fatal("%s ::" #FUNC " failed", __func__);                      \
@@ -587,7 +585,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         goto terminate;
     }
 
-    if (!process_cplex_output(self, instance, solution, vstar, lpstat)) {
+    if (!process_cplex_output(self, solution, lpstat)) {
         log_fatal("%s :: process_cplex_output failed", __func__);
         goto terminate;
     }
