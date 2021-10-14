@@ -51,9 +51,12 @@ typedef struct SolverData {
     CPXLPptr lp;
 } SolverData;
 
-static void show_lp_file(Solver *self) {
+ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
+    (void)self;
+#ifndef CONTINOUS_INTEGRATION_ENABLED
     CPXXwriteprob(self->data->env, self->data->lp, "TEST.lp", NULL);
     system("kitty -e nvim TEST.lp");
+#endif
 }
 
 /// Struct that is used as a userhandle to be passed to the cplex generic
