@@ -86,6 +86,11 @@ static inline double profit(const Instance *instance, int32_t i) {
     return instance->duals[i];
 }
 
+static inline double demand(const Instance *instance, int32_t i) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    return instance->demands[i];
+}
+
 void mip_solver_destroy(Solver *self) {
 
     if (self->data) {
@@ -244,7 +249,40 @@ static bool add_depot_is_part_of_tour_constraint(Solver *self,
 
 static bool add_capacity_constraint(Solver *self, const Instance *instance) {
     bool result = true;
-#if 1
+
+    CPXNNZ rmatbeg[] = {0};
+    CPXDIM *index = NULL;
+    double *value = NULL;
+    char cname[128];
+    const char *pcname[] = {(const char *)cname};
+
+    double rhs[] = {instance->vehicle_cap};
+    char sense[] = {'L'};
+
+    int32_t nnz = instance->num_customers + 1;
+
+    index = malloc(nnz * sizeof(*index));
+    value = malloc(nnz * sizeof(*value));
+
+    for (int32_t i = 0; i < nnz; i++) {
+        index[i] = get_y_mip_var_idx(instance, i);
+        value[i] = demand(instance, i);
+    }
+
+    snprintf(cname, ARRAY_LEN(cname), "capacity");
+
+    if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
+                    rmatbeg, index, value, NULL, pcname)) {
+        log_fatal("%s :: CPXXaddrows failure", __func__);
+        result = false;
+        goto terminate;
+    }
+
+terminate:
+    free(index);
+    free(value);
+
+#if 0
     if (result) {
         show_lp_file(self);
     }
