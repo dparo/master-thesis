@@ -34,7 +34,7 @@ Solver mip_solver_create(const Instance *instance) {
             __FILE__);
     fflush(stderr);
     abort();
-    return (Solver){};
+    return (Solver){0};
 }
 #else
 
@@ -199,7 +199,7 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
         *succ(t, i) = start;
     }
 
-#ifndef DEBUG
+#ifndef NDEBUG
     // Validate that the Y mip variable is consisten with what we find in the X
     // MIP var
 
@@ -520,10 +520,44 @@ fail:
 }
 
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
+    SolveStatus result = SOLVE_STATUS_ERR;
     if (!on_solve_start(self, instance)) {
         return SOLVE_STATUS_ERR;
     }
     // TODO: CPlex solve here
+
+    if (CPXXmipopt(self->data->env, self->data->lp) != 0) {
+        log_fatal("%s :: CPXmipopt() error", __func__);
+        return SOLVE_STATUS_ERR;
+    }
+
+    assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
+
+    int lpstat = 0;
+    double *vstar = malloc(sizeof(*solution) *
+                           CPXXgetnumcols(self->data->env, self->data->lp));
+
+    if (CPXXsolution(self->data->env, self->data->lp, &lpstat,
+                     &solution->upper_bound, vstar, NULL, NULL, NULL) != 0) {
+        log_fatal("%s :: CPXXsolution failed [lpstat = %d]", __func__, lpstat);
+        goto terminate;
+    }
+
+    if (CPXXgetbestobjval(self->data->env, self->data->lp,
+                          &solution->lower_bound) != 0) {
+        log_fatal("%s :: CPXXgetbestobjval failed", __func__);
+        goto terminate;
+    }
+
+    if (CPXXgetobjval(self->data->env, self->data->lp,
+                      &solution->upper_bound) != 0) {
+        log_fatal("%s :: CPXXgetbestobjval failed", __func__);
+        goto terminate;
+    }
+
+    log_info(
+        "Cplex solution finished with cost in [%f, %f]       (lpstat = %d)",
+        solution->lower_bound, solution->upper_bound, lpstat);
 
     // TODO: CPlex verify gap
 
@@ -535,7 +569,10 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
 
     todo();
     // TODO: Change the return value here
-    return SOLVE_STATUS_ERR;
+
+terminate:
+    free(vstar);
+    return result;
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance) {
