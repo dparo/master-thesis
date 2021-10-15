@@ -427,27 +427,30 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
 static void add_gsec(Solver *self, const Instance *instance) {}
 
-static inline int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context,
-                                         Solver *solver,
-                                         const Instance *intsance) {
+static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
+                                  const Instance *intsance, CPXLONG threadid,
+                                  CPXLONG numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible integral solution satisfying
     //      all constraints
     return 0;
 }
 
-static inline int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
-                                          Solver *solver,
-                                          const Instance *intsance) {
+static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
+                                   Solver *solver, const Instance *intsance,
+                                   CPXLONG threadid, CPXLONG numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
     return 0;
 }
 
-static inline int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
-                                           Solver *solver,
-                                           const Instance *intsance) {
+static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
+                                    Solver *solver, const Instance *intsance) {
+
+    // NOTE: Global progress is inherently thread safe
+    //            See:
+    //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
     double obj, bound;
     CPXLONG num_processed_nodes, simplex_iterations;
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &obj);
@@ -462,6 +465,27 @@ static inline int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
+static int cplex_on_thread_activation(int activation,
+                                      CPXCALLBACKCONTEXTptr context,
+                                      Solver *solver, const Instance *instance,
+                                      CPXLONG threadid, CPXLONG numthreads) {
+    assert(activation == -1 || activation == 1);
+
+    if (activation > 0) {
+        log_info("cplex_callback allocated activated a thread :: threadid = "
+                 "%lld, numthreads = %lld",
+                 threadid, numthreads);
+    } else if (activation < 0) {
+        log_info(
+            "cplex_callback allocated deactivated an old thread :: threadid = "
+            "%lld, numthreads = %lld",
+            threadid, numthreads);
+    } else {
+        assert(!"Invalid code path");
+    }
+    return 0;
+}
+
 CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
                                     CPXLONG contextid, void *userhandle) {
     log_trace("Called %s", __func__);
@@ -469,21 +493,39 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
 
     int result = 0;
 
+    CPXLONG numthreads;
+    CPXLONG threadid;
+    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADS, &numthreads);
+    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADID, &threadid);
+    assert(threadid >= 0 && threadid < numthreads);
+
+    // NOTE:
+    //      Look at
+    //      https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
+    //      https://www.ibm.com/docs/en/icos/12.8.0.0?topic=c-cpxxcallbacksetfunc-cpxcallbacksetfunc
     switch (contextid) {
     case CPX_CALLBACKCONTEXT_CANDIDATE:
-        result = cplex_on_new_candidate(context, data->solver, data->instance);
+        result = cplex_on_new_candidate(context, data->solver, data->instance,
+                                        threadid, numthreads);
         break;
     case CPX_CALLBACKCONTEXT_RELAXATION:
-        result = cplex_on_new_relaxation(context, data->solver, data->instance);
+        result = cplex_on_new_relaxation(context, data->solver, data->instance,
+                                         threadid, numthreads);
         break;
     case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
+        // NOTE: Global progress is inherently thread safe
+        //            See:
+        //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
         result =
             cplex_on_global_progress(context, data->solver, data->instance);
         break;
     case CPX_CALLBACKCONTEXT_THREAD_UP:
-        break;
-    case CPX_CALLBACKCONTEXT_THREAD_DOWN:
-        break;
+    case CPX_CALLBACKCONTEXT_THREAD_DOWN: {
+        int activation = contextid == CPX_CALLBACKCONTEXT_THREAD_UP ? 1 : -1;
+        cplex_on_thread_activation(activation, context, data->solver,
+                                   data->instance, threadid, numthreads);
+    } break;
+
     default:
         assert(!"Invalid case");
         break;
