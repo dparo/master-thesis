@@ -435,17 +435,8 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
 static void add_gsec(Solver *self, const Instance *instance) {}
 
-static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
-                                  const Instance *intsance, CPXLONG threadid,
-                                  CPXLONG numthreads) {
-    // NOTE:
-    //      Called when cplex has a new feasible integral solution satisfying
-    //      all constraints
-    return 0;
-}
-
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
-                                   Solver *solver, const Instance *intsance,
+                                   Solver *solver, const Instance *instance,
                                    CPXLONG threadid, CPXLONG numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
@@ -453,8 +444,17 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
+static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
+                                  const Instance *instance, CPXLONG threadid,
+                                  CPXLONG numthreads) {
+    // NOTE:
+    //      Called when cplex has a new feasible integral solution satisfying
+    //      all constraints
+    return 0;
+}
+
 static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
-                                    Solver *solver, const Instance *intsance) {
+                                    Solver *solver, const Instance *instance) {
 
     // NOTE: Global progress is inherently thread safe
     //            See:
