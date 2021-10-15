@@ -50,6 +50,7 @@ Solver mip_solver_create(const Instance *instance) {
 typedef struct SolverData {
     CPXENVptr env;
     CPXLPptr lp;
+    int numcores;
 } SolverData;
 
 ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
@@ -60,12 +61,19 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 #endif
 }
 
+#define MAX_NUM_CORES 256
+
 /// Struct that is used as a userhandle to be passed to the cplex generic
 /// callback
 typedef struct {
     Solver *solver;
     const Instance *instance;
-} CplexCallbackData;
+
+    struct {
+        double *vstar;
+        Tour *tour;
+    } threadctx[MAX_NUM_CORES];
+} CplexCallbackCtx;
 
 static int32_t *num_comps(Tour *tour) { return &tour->num_comps[0]; }
 
@@ -489,7 +497,7 @@ static int cplex_on_thread_activation(int activation,
 CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
                                     CPXLONG contextid, void *userhandle) {
     log_trace("Called %s", __func__);
-    CplexCallbackData *data = (CplexCallbackData *)userhandle;
+    CplexCallbackCtx *data = (CplexCallbackCtx *)userhandle;
 
     int result = 0;
 
@@ -498,6 +506,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADS, &numthreads);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADID, &threadid);
     assert(threadid >= 0 && threadid < numthreads);
+    assert(numthreads == data->solver->data->numcores);
 
     // NOTE:
     //      Look at
@@ -539,7 +548,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
 }
 
 static bool on_solve_start(Solver *self, const Instance *instance) {
-    CplexCallbackData data = {0};
+    CplexCallbackCtx data = {0};
     data.solver = self;
     data.instance = instance;
 
@@ -682,6 +691,24 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
     if (status_p != 0 || !solver->data->lp) {
         log_fatal("CPXcreateprob FAILURE :: returned status_p: %d", status_p);
         goto fail;
+    }
+
+    // Clamp the number of available cores to MAX_NUM_CORES
+    {
+        if (CPXXgetnumcores(solver->data->env, &solver->data->numcores) != 0) {
+            log_fatal("CPXXgetnumcores failed");
+            goto fail;
+        }
+
+        log_info("%s :: CPXXgetnumcores returned numcores = %d", __func__,
+                 solver->data->numcores);
+
+        if (CPXXsetintparam(solver->data->env, CPX_PARAM_THREADS,
+                            MIN(MAX_NUM_CORES, solver->data->numcores) != 0)) {
+            log_fatal("%s :: CPXXsetintparam for CPX_PARAM_THREADS failed",
+                      __func__);
+            goto fail;
+        }
     }
 
     return true;
