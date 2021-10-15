@@ -531,8 +531,9 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     case CPX_CALLBACKCONTEXT_THREAD_UP:
     case CPX_CALLBACKCONTEXT_THREAD_DOWN: {
         int activation = contextid == CPX_CALLBACKCONTEXT_THREAD_UP ? 1 : -1;
-        cplex_on_thread_activation(activation, context, data->solver,
-                                   data->instance, threadid, numthreads);
+        result =
+            cplex_on_thread_activation(activation, context, data->solver,
+                                       data->instance, threadid, numthreads);
     } break;
 
     default:
