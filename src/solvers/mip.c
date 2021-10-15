@@ -208,7 +208,7 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
     }
 
 #ifndef NDEBUG
-    // Validate that the Y mip variable is consisten with what we find in the X
+    // Validate that the Y mip variable is consistent with what we find in the X
     // MIP var
 
     for (int32_t i = 0; i < n; i++) {
@@ -437,7 +437,7 @@ static void add_gsec(Solver *self, const Instance *instance) {}
 
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
-                                   CPXLONG threadid, CPXLONG numthreads) {
+                                   int32_t threadid, int32_t numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
@@ -445,8 +445,8 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
 }
 
 static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
-                                  const Instance *instance, CPXLONG threadid,
-                                  CPXLONG numthreads) {
+                                  const Instance *instance, int32_t threadid,
+                                  int32_t numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible integral solution satisfying
     //      all constraints
@@ -501,12 +501,15 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
 
     int result = 0;
 
-    CPXLONG numthreads;
-    CPXLONG threadid;
-    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADS, &numthreads);
-    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_THREADID, &threadid);
+    int32_t numthreads;
+    int32_t threadid;
+    CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_THREADS, &numthreads);
+    CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_THREADID, &threadid);
     assert(threadid >= 0 && threadid < numthreads);
-    assert(numthreads == data->solver->data->numcores);
+
+    log_trace("%s :: numthreads = %d, numcores = %d", __func__, numthreads,
+              data->solver->data->numcores);
+    assert(numthreads <= data->solver->data->numcores);
 
     // NOTE:
     //      Look at
@@ -548,18 +551,16 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     return result;
 }
 
-static bool on_solve_start(Solver *self, const Instance *instance) {
-    CplexCallbackCtx data = {0};
-    data.solver = self;
-    data.instance = instance;
+static bool on_solve_start(Solver *self, const Instance *instance,
+                           CplexCallbackCtx *callback_ctx) {
 
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_CANDIDATE | CPX_CALLBACKCONTEXT_RELAXATION |
         CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS | CPX_CALLBACKCONTEXT_THREAD_UP |
         CPX_CALLBACKCONTEXT_THREAD_DOWN;
 
-    if (!CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
-                             cplex_callback, (void *)&data)) {
+    if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
+                            cplex_callback, (void *)callback_ctx) != 0) {
         log_fatal(
             "%s :: Failed to setup generic callback (CPXXcallbacksetfunc)",
             __func__);
@@ -615,7 +616,12 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     SolveStatus result = SOLVE_STATUS_ERR;
-    if (!on_solve_start(self, instance)) {
+
+    CplexCallbackCtx callback_ctx = {0};
+    callback_ctx.solver = self;
+    callback_ctx.instance = instance;
+
+    if (!on_solve_start(self, instance, &callback_ctx)) {
         return SOLVE_STATUS_ERR;
     }
 
@@ -641,12 +647,10 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         goto terminate;
     }
 
-    // TODO: CPlex convert mip variables into usable solution
-    todo();
-
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetstat-cpxgetstat
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-specific-mip-in-cplex-callable-library-c-api
+
     switch (lpstat) {
     case CPXMIP_OPTIMAL:
     case CPXMIP_OPTIMAL_TOL:
@@ -666,6 +670,16 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         assert(!"Invalid code path");
         result = SOLVE_STATUS_ERR;
         break;
+    }
+
+    double *mip_var_x = vstar;
+    double *mip_var_y = vstar + get_y_mip_var_idx_offset(instance);
+
+    bool cplex_found_a_solution =
+        result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
+
+    if (cplex_found_a_solution) {
+        unpack_mip_solution(instance, solution, mip_var_x, mip_var_y);
     }
 
 terminate:

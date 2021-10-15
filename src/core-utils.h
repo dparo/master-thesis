@@ -48,6 +48,10 @@ static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
                          tour->num_customers + 1, tour->num_vehicles);
 }
 
+static inline int32_t *tour_num_comps(Tour *tour, int32_t vehicle_idx) {
+    return &tour->num_comps[vehicle_idx];
+}
+
 static inline bool tour_is_customer_served_from_vehicle(Tour *tour,
                                                         int32_t vehicle_idx,
                                                         int32_t customer_idx) {

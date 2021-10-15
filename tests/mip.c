@@ -34,6 +34,8 @@
 
 #include "parser.h"
 #include "solvers/mip.h"
+#include "core.h"
+#include "core-utils.h"
 
 static void test_mip_solver_create(void) {
     const char *filepath = "res/my.vrp";
@@ -46,6 +48,19 @@ static void test_mip_solver_create(void) {
     solver.destroy(&solver);
     instance_destroy(&instance);
 }
+
+static void test_mip_solver_solve(void) {
+    const char *filepath = "res/my.vrp";
+    Instance instance = parse(filepath);
+    SolverParams params = {0};
+    Solution solution = cptp_solve(&instance, "mip", &params);
+    TEST_ASSERT(solution.lower_bound != -INFINITY);
+    TEST_ASSERT(solution.upper_bound != +INFINITY);
+    TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
+    instance_destroy(&instance);
+    solution_destroy(&solution);
+}
+
 #endif
 
 int main(void) {
@@ -53,6 +68,7 @@ int main(void) {
 
 #if COMPILED_WITH_CPLEX
     RUN_TEST(test_mip_solver_create);
+    RUN_TEST(test_mip_solver_solve);
 #endif
 
     return UNITY_END();
