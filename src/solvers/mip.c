@@ -75,7 +75,7 @@ typedef struct {
     } threadctx[MAX_NUM_CORES];
 } CplexCallbackCtx;
 
-static int32_t *num_comps(Tour *tour) { return &tour->num_comps[0]; }
+static inline int32_t *num_comps(Tour *tour) { return tour_num_comps(tour, 0); }
 
 static inline int32_t *succ(Tour *tour, int32_t i) {
     return tour_succ(tour, 0, i);
@@ -169,8 +169,7 @@ static bool validate_mip_vars_packing(const Instance *instance) {
 }
 
 static void unpack_mip_solution(const Instance *instance, Solution *solution,
-                                double *mip_var_x,
-                                ATTRIB_MAYBE_UNUSED double *mip_var_y) {
+                                double *vstar) {
     log_trace("%s", __func__);
 
     assert(instance->num_customers == solution->tour.num_customers);
@@ -187,14 +186,17 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
         (*num_comps(t)) += 1;
         int i = start;
         bool done = false;
+
+        int32_t tour_length = 0;
         while (!done) {
             *comp(t, i) = *num_comps(t) - 1;
             done = true;
+            tour_length += 1;
             for (int32_t j = 0; j < n; j++) {
                 if (i == j) {
                     continue;
                 }
-                double v = mip_var_x[get_x_mip_var_idx(instance, i, j)];
+                double v = vstar[get_x_mip_var_idx(instance, i, j)];
                 if (v > 0.5 && *comp(t, j) < 0) {
                     *succ(t, i) = j;
                     i = j;
@@ -203,8 +205,18 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
                 }
             }
         }
+
         // Last edge to close the cycle
-        *succ(t, i) = start;
+        if (i != start) {
+            assert(tour_length > 1);
+            *succ(t, i) = start;
+        } else {
+            // Avoid closing cycle for single node tours. They should be left
+            // alone
+            assert(tour_length == 1);
+            (*num_comps(t)) -= 1;
+            *comp(t, i) = INT32_MIN;
+        }
     }
 
 #ifndef NDEBUG
@@ -212,7 +224,7 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
     // MIP var
 
     for (int32_t i = 0; i < n; i++) {
-        double v = mip_var_y[get_y_mip_var_idx(instance, i)];
+        double v = vstar[get_y_mip_var_idx(instance, i)];
         if (i == 0 || v >= 0.5) {
             assert(*comp(t, i) >= 0);
             assert(*succ(t, i) >= 0);
@@ -672,14 +684,11 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         break;
     }
 
-    double *mip_var_x = vstar;
-    double *mip_var_y = vstar + get_y_mip_var_idx_offset(instance);
-
     bool cplex_found_a_solution =
         result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
 
     if (cplex_found_a_solution) {
-        unpack_mip_solution(instance, solution, mip_var_x, mip_var_y);
+        unpack_mip_solution(instance, solution, vstar);
     }
 
 terminate:
