@@ -215,7 +215,7 @@ static void unpack_mip_solution(const Instance *instance, Solution *solution,
             // alone
             assert(tour_length == 1);
             (*num_comps(t)) -= 1;
-            *comp(t, i) = INT32_MIN;
+            *comp(t, i) = INT32_DEAD_VAL;
         }
     }
 

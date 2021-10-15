@@ -53,16 +53,14 @@ void tour_invalidate(Tour *tour) {
         veci32_set(tour->num_comps, tour->num_vehicles, 0);
     }
 
-    const int32_t DEAD_VAL = INT32_MIN >> 1;
-
     if (tour->succ) {
         mati32_set(tour->succ, tour->num_customers + 1, tour->num_vehicles,
-                   DEAD_VAL);
+                   INT32_DEAD_VAL);
     }
 
     if (tour->comp) {
         mati32_set(tour->comp, tour->num_customers + 1, tour->num_vehicles,
-                   DEAD_VAL);
+                   INT32_DEAD_VAL);
     }
 }
 

@@ -29,6 +29,8 @@ extern "C" {
 #include "types.h"
 #include "utils.h"
 
+#define INT32_DEAD_VAL (INT32_MIN >> 1)
+
 typedef struct Instance {
     char *name;
 
