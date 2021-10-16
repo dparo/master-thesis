@@ -570,7 +570,8 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
         result =
             cplex_on_thread_activation(activation, context, data->solver,
                                        data->instance, threadid, numthreads);
-    } break;
+        break;
+    }
 
     default:
         assert(!"Invalid case");
