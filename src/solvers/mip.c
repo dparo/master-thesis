@@ -471,17 +471,26 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     // NOTE: Global progress is inherently thread safe
     //            See:
     //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
-    double obj, bound;
+    double upper_bound, lower_bound;
     CPXLONG num_processed_nodes, simplex_iterations;
-    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &obj);
-    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &bound);
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &lower_bound);
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &upper_bound);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODECOUNT,
                             &num_processed_nodes);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
                             &simplex_iterations);
+
+    if (lower_bound <= -CPX_INFBOUND) {
+        lower_bound = -INFINITY;
+    }
+    if (upper_bound >= CPX_INFBOUND) {
+        upper_bound = INFINITY;
+    }
+
     log_info("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
-             "best_sol = %f, best_bound = %f\n",
-             __func__, num_processed_nodes, simplex_iterations, obj, bound);
+             "lower_bound = %f, upper_bound = %f\n",
+             __func__, num_processed_nodes, simplex_iterations, lower_bound,
+             upper_bound);
     return 0;
 }
 
@@ -492,14 +501,13 @@ static int cplex_on_thread_activation(int activation,
     assert(activation == -1 || activation == 1);
 
     if (activation > 0) {
-        log_info("cplex_callback allocated activated a thread :: threadid = "
+        log_info("cplex_callback activated a thread :: threadid = "
                  "%lld, numthreads = %lld",
                  threadid, numthreads);
     } else if (activation < 0) {
-        log_info(
-            "cplex_callback allocated deactivated an old thread :: threadid = "
-            "%lld, numthreads = %lld",
-            threadid, numthreads);
+        log_info("cplex_callback deactivated an old thread :: threadid = "
+                 "%lld, numthreads = %lld",
+                 threadid, numthreads);
     } else {
         assert(!"Invalid code path");
     }
