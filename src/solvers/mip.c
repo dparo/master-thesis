@@ -462,7 +462,20 @@ static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
     // NOTE:
     //      Called when cplex has a new feasible integral solution satisfying
     //      all constraints
+
+    double *vstar = malloc(sizeof(*vstar) *
+                           CPXXgetnumcols(solver->data->env, solver->data->lp));
+    if (!vstar) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        goto terminate;
+    }
+
+    free(vstar);
     return 0;
+
+terminate:
+    free(vstar);
+    return 1;
 }
 
 static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
@@ -653,7 +666,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
 
     int lpstat = 0;
-    double *vstar = malloc(sizeof(*solution) *
+    double *vstar = malloc(sizeof(*vstar) *
                            CPXXgetnumcols(self->data->env, self->data->lp));
 
     if (CPXXsolution(self->data->env, self->data->lp, &lpstat,
