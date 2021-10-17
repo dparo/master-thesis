@@ -51,6 +51,8 @@ typedef struct SolverData {
     CPXENVptr env;
     CPXLPptr lp;
     int numcores;
+    CPXDIM num_mip_vars;
+    CPXDIM num_mip_constraints;
 } SolverData;
 
 ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
@@ -193,6 +195,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
                     continue;
                 }
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
+                assert(v >= -1.0 && v <= 1.5);
                 if (v > 0.5 && *comp(t, j) < 0) {
                     *succ(t, i) = j;
                     i = j;
@@ -221,6 +224,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
 
     for (int32_t i = 0; i < n; i++) {
         double v = vstar[get_y_mip_var_idx(instance, i)];
+        assert(v >= -1.0 && v <= 1.5);
         if (i == 0 || v >= 0.5) {
             assert(*comp(t, i) >= 0);
             assert(*succ(t, i) >= 0);
@@ -452,16 +456,42 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
+static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
+                                   Solver *solver, const Instance *instance,
+                                   int32_t thread, int32_t numthreads) {
+
+    int32_t *num_of_nodes_in_each_comp =
+        calloc(*num_comps(tour), sizeof(*num_of_nodes_in_each_comp));
+
+    if (!num_of_nodes_in_each_comp) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        goto failure;
+    }
+
+    int32_t n = instance->num_customers + 1;
+
+    // Count the number of nodes in each component
+    for (int32_t i = 0; i < n; i++) {
+        assert(*comp(tour, i) < *num_comps(tour));
+        if (*comp(tour, i) >= 0) {
+            ++num_of_nodes_in_each_comp[*comp(tour, i)];
+        }
+    }
+
+    return true;
+failure:
+    return false;
+}
+
 static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
                                         Solver *solver,
                                         const Instance *instance,
                                         int32_t threadid, int32_t numthreads) {
     // NOTE:
-    //      Called when cplex has a new feasible integral solution satisfying
-    //      all constraints
+    //      Called when cplex has a new feasible integral solution
+    //      satisfying all constraints
 
-    double *vstar = malloc(sizeof(*vstar) *
-                           CPXXgetnumcols(solver->data->env, solver->data->lp));
+    double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto terminate;
@@ -473,15 +503,20 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
     }
 
     double obj_p;
-    if (CPXcallbackgetcandidatepoint(context, vstar, 0, CPXXgetnumcols(),
-                                     &obj_p)) {
-        FATAL("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
+    if (CPXXcallbackgetcandidatepoint(context, vstar, 0,
+                                      solver->data->num_mip_vars - 1, &obj_p)) {
+        log_fatal("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
+        goto terminate;
     }
 
     unpack_mip_solution(instance, &tour, vstar);
+
     if (*num_comps(&tour) > 1) {
-        log_info("%s :: num_comps of unpacked tour is greater than 1 (%d)",
+        log_info("%s :: num_comps of unpacked tour is %d -- rejecting "
+                 "candidate point...",
                  __func__, *num_comps(&tour));
+        reject_candidate_point(&tour, context, solver, instance, threadid,
+                               numthreads);
     }
 
     free(vstar);
@@ -510,17 +545,23 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
                             &simplex_iterations);
 
+    double incumbent = INFINITY;
+    CPXXcallbackgetincumbent(context, NULL, 0, 0, &incumbent);
+
     if (lower_bound <= -CPX_INFBOUND) {
         lower_bound = -INFINITY;
     }
     if (upper_bound >= CPX_INFBOUND) {
         upper_bound = INFINITY;
     }
+    if (incumbent >= CPX_INFBOUND) {
+        incumbent = INFINITY;
+    }
 
     log_info("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
-             "lower_bound = %f, upper_bound = %f\n",
+             "lower_bound = %f, upper_bound = %f, incumbent = %f\n",
              __func__, num_processed_nodes, simplex_iterations, lower_bound,
-             upper_bound);
+             incumbent, upper_bound);
     return 0;
 }
 
@@ -663,11 +704,11 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 
     assert(fcmp(gap, solution_relgap(solution), 1e-6));
 
-    log_info(
-        "Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
-        "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = %d",
-        lpstat, solution->lower_bound, solution->upper_bound, gap,
-        simplex_iterations, nodecnt, num_user_cuts);
+    log_info("Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
+             "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "
+             "%d",
+             lpstat, solution->lower_bound, solution->upper_bound, gap,
+             simplex_iterations, nodecnt, num_user_cuts);
 
 #undef CHECKED
     return true;
@@ -692,8 +733,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
 
     int lpstat = 0;
-    double *vstar = malloc(sizeof(*vstar) *
-                           CPXXgetnumcols(self->data->env, self->data->lp));
+    double *vstar = malloc(sizeof(*vstar) * self->data->num_mip_vars);
 
     if (CPXXsolution(self->data->env, self->data->lp, &lpstat,
                      &solution->upper_bound, vstar, NULL, NULL, NULL) != 0) {
@@ -809,6 +849,11 @@ Solver mip_solver_create(const Instance *instance) {
         log_fatal("%s : Failed to build mip formulation", __func__);
         goto fail;
     }
+
+    solver.data->num_mip_vars =
+        CPXXgetnumcols(solver.data->env, solver.data->lp);
+    solver.data->num_mip_constraints =
+        CPXXgetnumrows(solver.data->env, solver.data->lp);
 
     return solver;
 fail:

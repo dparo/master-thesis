@@ -4,6 +4,14 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
     string(APPEND CMAKE_C_FLAGS " ${WARN_FLAGS}")
     string(APPEND CMAKE_CXX_FLAGS " ${WARN_FLAGS}")
     string(APPEND CMAKE_LINKER_FLAGS " ${WARN_FLAGS}")
+
+
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(NOWARN_FLAGS "-Wno-unused-parameter")
+        string(APPEND CMAKE_C_FLAGS " ${NOWARN_FLAGS}")
+        string(APPEND CMAKE_CXX_FLAGS " ${NOWARN_FLAGS}")
+        string(APPEND CMAKE_LINKER_FLAGS " ${NOWARN_FLAGS}")
+    endif()
 endif()
 
 
