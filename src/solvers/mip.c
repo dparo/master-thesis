@@ -168,15 +168,11 @@ static bool validate_mip_vars_packing(const Instance *instance) {
     return true;
 }
 
-static void unpack_mip_solution(const Instance *instance, Solution *solution,
+static void unpack_mip_solution(const Instance *instance, Tour *t,
                                 double *vstar) {
     log_trace("%s", __func__);
 
-    assert(instance->num_customers == solution->tour.num_customers);
-    assert(instance->num_vehicles == solution->tour.num_vehicles);
-
-    Tour *t = &solution->tour;
-    int32_t n = solution->tour.num_customers + 1;
+    int32_t n = t->num_customers + 1;
 
     for (int32_t start = 0; start < n; start++) {
         if (*comp(t, start) >= 0)
@@ -456,9 +452,10 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
-static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
-                                  const Instance *instance, int32_t threadid,
-                                  int32_t numthreads) {
+static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
+                                        Solver *solver,
+                                        const Instance *instance,
+                                        int32_t threadid, int32_t numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible integral solution satisfying
     //      all constraints
@@ -470,10 +467,30 @@ static int cplex_on_new_candidate(CPXCALLBACKCONTEXTptr context, Solver *solver,
         goto terminate;
     }
 
+    Tour tour = tour_create(instance);
+    if (!tour.comp || !tour.succ) {
+        goto terminate;
+    }
+
+    double obj_p;
+    if (CPXcallbackgetcandidatepoint(context, vstar, 0, CPXXgetnumcols(),
+                                     &obj_p)) {
+        FATAL("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
+    }
+
+    unpack_mip_solution(instance, &tour, vstar);
+    if (*num_comps(&tour) > 1) {
+        log_info("%s :: num_comps of unpacked tour is greater than 1 (%d)",
+                 __func__, *num_comps(&tour));
+    }
+
     free(vstar);
+    tour_destroy(&tour);
     return 0;
 
 terminate:
+    log_fatal("%s :: Fatal termination error", __func__);
+    tour_destroy(&tour);
     free(vstar);
     return 1;
 }
@@ -549,10 +566,18 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     //      https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
     //      https://www.ibm.com/docs/en/icos/12.8.0.0?topic=c-cpxxcallbacksetfunc-cpxcallbacksetfunc
     switch (contextid) {
-    case CPX_CALLBACKCONTEXT_CANDIDATE:
-        result = cplex_on_new_candidate(context, data->solver, data->instance,
-                                        threadid, numthreads);
+    case CPX_CALLBACKCONTEXT_CANDIDATE: {
+        int is_point = false;
+        if (CPXXcallbackcandidateispoint(context, &is_point) != 0) {
+            result = 1;
+        }
+
+        if (is_point && result == 0) {
+            result = cplex_on_new_candidate_point(
+                context, data->solver, data->instance, threadid, numthreads);
+        }
         break;
+    }
     case CPX_CALLBACKCONTEXT_RELAXATION:
         result = cplex_on_new_relaxation(context, data->solver, data->instance,
                                          threadid, numthreads);
@@ -579,7 +604,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     }
 
     if (data->solver->should_terminate) {
-        result = -1;
+        CPXXcallbackabort(context);
     }
 
     return result;
@@ -695,6 +720,9 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     case CPXMIP_NODE_LIM_FEAS:
         break;
 
+    case CPXERR_CALLBACK:
+        result = SOLVE_STATUS_ERR;
+        break;
     case CPX_STAT_NUM_BEST:
         // Could not converge due to number difficulties
         result = SOLVE_STATUS_ERR;
@@ -710,7 +738,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
 
     if (cplex_found_a_solution) {
-        unpack_mip_solution(instance, solution, vstar);
+        unpack_mip_solution(instance, &solution->tour, vstar);
     }
 
 terminate:
