@@ -478,6 +478,33 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         }
     }
 
+    // Small sanity check
+#ifndef NDEBUG
+    {
+        for (int32_t i = 0; i < *num_comps(tour); i++) {
+            assert(num_of_nodes_in_each_comp[i] >= 2);
+        }
+    }
+#endif
+
+    // Create the cut to feed CPLEX
+    for (int32_t comp_idx = 0; comp_idx < *num_comps(tour); comp_idx++) {
+        double rhs = num_of_nodes_in_each_comp[comp_idx] - 1;
+        char sense = 'L'; // 'L' for less constraint
+
+        CPXNNZ nnz = 0;
+        CPXDIM *index = NULL;
+        double *value = NULL;
+
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = i + 1; j < n; j++) {
+                // if node i and j belong to the same component
+                if (*comp(tour, i) == comp_idx && *comp(tour, j) == comp_idx) {
+                }
+            }
+        }
+    }
+
     return true;
 failure:
     return false;
