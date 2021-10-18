@@ -36,9 +36,10 @@
 #include "solvers/mip.h"
 #include "core.h"
 #include "core-utils.h"
+#include "instances.h"
 
 static void test_mip_solver_create(void) {
-    const char *filepath = "res/my.vrp";
+    const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     instance_set_name(&instance, "test");
     Solver solver = mip_solver_create(&instance);
@@ -50,7 +51,7 @@ static void test_mip_solver_create(void) {
 }
 
 static void test_mip_solver_solve(void) {
-    const char *filepath = "res/my.vrp";
+    const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     SolverParams params = {0};
     Solution solution = cptp_solve(&instance, "mip", &params);

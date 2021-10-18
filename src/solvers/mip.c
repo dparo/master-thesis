@@ -150,7 +150,7 @@ static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
     return (size_t)i + get_y_mip_var_idx_offset(instance);
 }
 
-static bool validate_mip_vars_packing(const Instance *instance) {
+static void validate_mip_vars_packing(const Instance *instance) {
 #ifndef NDEBUG
     size_t cnt = 0;
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
@@ -165,15 +165,13 @@ static bool validate_mip_vars_packing(const Instance *instance) {
         cnt++;
     }
 
+#else
+    UNUSED_PARAM(instance);
 #endif
-    (void)instance;
-    return true;
 }
 
 static void unpack_mip_solution(const Instance *instance, Tour *t,
                                 double *vstar) {
-    log_trace("%s", __func__);
-
     int32_t n = t->num_customers + 1;
 
     for (int32_t start = 0; start < n; start++) {
@@ -509,7 +507,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         CPXNNZ nnz = 1 + num_of_nodes_in_each_comp[comp_idx] *
                              (n - num_of_nodes_in_each_comp[comp_idx]);
 
-        int32_t cnt = 0;
+        CPXNNZ cnt = 0;
         for (int32_t i = 0; i < n; i++) {
             for (int32_t j = 0; j < n; j++) {
                 if (i == j) {
@@ -527,25 +525,29 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         assert(cnt == nnz - 1);
 
         for (int32_t i = 0; i < n; i++) {
-            index[cnt] = get_y_mip_var_idx(instance, i);
-            value[cnt] = -2.0;
+            if (*comp(tour, i) == comp_idx) {
+                index[cnt] = get_y_mip_var_idx(instance, i);
+                value[cnt] = -2.0;
 
-            CPXNNZ rmatbeg = 0;
+                CPXNNZ rmatbeg = 0;
 
-            log_trace("%s :: Adding GSEC constraint %d, "
-                      "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                      __func__, i, comp_idx,
-                      num_of_nodes_in_each_comp[comp_idx], nnz);
+                log_trace(
+                    "%s :: Adding GSEC constraint for component %d vertex %d, "
+                    "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
+                    __func__, comp_idx, i, comp_idx,
+                    num_of_nodes_in_each_comp[comp_idx], nnz);
 
-            // NOTE::
-            //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
-            //  You can call this routine more than once in the same callback
-            //  invocation. CPLEX will accumulate the constraints from all such
-            //  calls.
-            if (CPXXcallbackrejectcandidate(context, 1, nnz, &rhs, &sense,
-                                            &rmatbeg, index, value) != 0) {
-                log_fatal("%s :: Failed CPXXcallbackrejectcandidate", __func__);
-                goto failure;
+                // NOTE::
+                //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
+                //  You can call this routine more than once in the same
+                //  callback invocation. CPLEX will accumulate the constraints
+                //  from all such calls.
+                if (CPXXcallbackrejectcandidate(context, 1, nnz, &rhs, &sense,
+                                                &rmatbeg, index, value) != 0) {
+                    log_fatal("%s :: Failed CPXXcallbackrejectcandidate",
+                              __func__);
+                    goto failure;
+                }
             }
         }
     }
@@ -668,7 +670,6 @@ static int cplex_on_thread_activation(int activation,
 
 CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
                                     CPXLONG contextid, void *userhandle) {
-    log_trace("Called %s", __func__);
     CplexCallbackCtx *data = (CplexCallbackCtx *)userhandle;
 
     int result = 0;
@@ -679,7 +680,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_THREADID, &threadid);
     assert(threadid >= 0 && threadid < numthreads);
 
-    log_trace("%s :: numthreads = %d, numcores = %d", __func__, numthreads,
+    log_debug("%s :: numthreads = %d, numcores = %d", __func__, numthreads,
               data->solver->data->numcores);
     assert(numthreads <= data->solver->data->numcores);
 

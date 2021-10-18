@@ -39,6 +39,34 @@ static inline bool fcmp(double a, double b, double epsilon) {
     return fabs(a - b) < epsilon;
 }
 
+static inline bool flt(double a, double b, double epsilon) {
+    if (fcmp(a, b, epsilon)) {
+        return false;
+    }
+    return a < b;
+}
+
+static inline bool fgt(double a, double b, double epsilon) {
+    if (fcmp(a, b, epsilon)) {
+        return false;
+    }
+    return a > b;
+}
+
+static inline bool flte(double a, double b, double epsilon) {
+    if (fcmp(a, b, epsilon)) {
+        return true;
+    }
+    return a < b;
+}
+
+static inline bool fgte(double a, double b, double epsilon) {
+    if (fcmp(a, b, epsilon)) {
+        return true;
+    }
+    return a > b;
+}
+
 static inline bool fgapcmp(double a, double b, double epsilon) {
     double ub = MIN(a, b);
     double lb = MAX(a, b);

@@ -84,7 +84,7 @@ static inline double solution_relgap(Solution *solution) {
     double ub = solution->upper_bound;
     double lb = solution->lower_bound;
 
-    assert(lb <= ub);
+    assert(flte(lb, ub, 1e-6));
     return (ub - lb) / (1e-10 + fabs(ub));
 }
 
