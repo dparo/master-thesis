@@ -185,15 +185,6 @@ static void postprocess_solver_solution(const Instance *instance,
         break;
     case SOLVE_STATUS_FEASIBLE:
     case SOLVE_STATUS_OPTIMAL:
-        // TODO:
-        //       1. Validate the tour edges and connectivity
-        //       2. Validate that the upper bound populated from the solver is
-        //          equal to the `tour_eval()` function that recomputes the
-        //          upperbound from the tour
-        //       3. In case the solver returns an optimal solution, verify
-        //          that the upper_bound and lower_bound stays within a
-        //          reasonable gap
-
         validate_solution(instance, solution);
 
         if (status == SOLVE_STATUS_OPTIMAL) {

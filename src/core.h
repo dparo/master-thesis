@@ -93,12 +93,6 @@ typedef struct Solver {
     SolverData *data;
     bool should_terminate;
 
-    // TODO:
-#if 0
-    const SolverDescriptor *(*begin)(const SolverParams *params);
-    bool (*init)(struct Solver *solver, const SolverParams *params);
-#endif
-
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
     SolveStatus (*solve)(struct Solver *self, const Instance *instance,
