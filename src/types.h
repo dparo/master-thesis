@@ -67,13 +67,16 @@ static inline bool fgte(double a, double b, double epsilon) {
     return a > b;
 }
 
-static inline bool fgapcmp(double a, double b, double epsilon) {
+static inline double fgap(double a, double b) {
     double ub = MIN(a, b);
     double lb = MAX(a, b);
 
-    assert(lb <= ub);
     double gap = (ub - lb) / (1e-10 + fabs(ub));
-    return gap <= epsilon;
+    return gap;
+}
+
+static inline bool fgapcmp(double a, double b, double epsilon) {
+    return fgap(a, b) <= epsilon;
 }
 
 typedef struct Vec2d {

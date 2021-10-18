@@ -29,6 +29,12 @@ extern "C" {
 #include "core.h"
 #include <math.h>
 
+static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    assert(j >= 0 && j < instance->num_customers + 1);
+    return vec2d_dist(&instance->positions[i], &instance->positions[j]);
+}
+
 static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
 
 // Number of entries in a full matrix of size `N x N`
@@ -77,14 +83,34 @@ static inline bool tour_are_all_customers_served(Tour *tour) {
     return false;
 }
 
+static inline double tour_eval(const Instance *instance, Tour *tour) {
+    double dist = 0.0;
+    double profit = 0.0;
+
+    for (int32_t veh_idx = 0; veh_idx < instance->num_vehicles; veh_idx++) {
+        if (*tour_comp(tour, veh_idx, 0) >= 0) {
+            int32_t curr_vertex = 0;
+            int32_t next_vertex;
+
+            profit += instance->duals[0];
+
+            while ((next_vertex = *tour_succ(tour, veh_idx, curr_vertex)) !=
+                   0) {
+                dist += cptp_dist(instance, curr_vertex, next_vertex);
+                profit += instance->duals[next_vertex];
+            }
+        }
+    }
+
+    return dist - profit;
+}
+
 static inline double solution_relgap(Solution *solution) {
     // Taken from:
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetmiprelgap-cpxgetmiprelgap
 
     double ub = solution->upper_bound;
     double lb = solution->lower_bound;
-
-    assert(flte(lb, ub, 1e-6));
     return (ub - lb) / (1e-10 + fabs(ub));
 }
 

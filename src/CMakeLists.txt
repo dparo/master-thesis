@@ -16,7 +16,11 @@ endif()
 
 
 
-add_library(libcptp types.c core.c parser.c
+add_library(libcptp
+    types.c
+    parser.c
+    core.c
+    validation.c
     solvers/stub.c
     solvers/mip.c
     )

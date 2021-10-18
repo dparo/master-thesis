@@ -28,6 +28,8 @@
 #include "solvers/mip.h"
 #include "core-utils.h"
 
+#include "validation.h"
+
 void instance_set_name(Instance *instance, const char *name) {
     if (instance->name) {
         free(instance->name);
@@ -168,7 +170,8 @@ static void log_solve_status(SolveStatus status, char *solver_name) {
              ENUM_TO_STR(SolveStatus, status));
 }
 
-static void postprocess_solver_solution(SolveStatus status, Solution *solution,
+static void postprocess_solver_solution(const Instance *instance,
+                                        SolveStatus status, Solution *solution,
                                         char *solver_name) {
     switch (status) {
     case SOLVE_STATUS_ERR:
@@ -182,7 +185,6 @@ static void postprocess_solver_solution(SolveStatus status, Solution *solution,
         break;
     case SOLVE_STATUS_FEASIBLE:
     case SOLVE_STATUS_OPTIMAL:
-        todo();
         // TODO:
         //       1. Validate the tour edges and connectivity
         //       2. Validate that the upper bound populated from the solver is
@@ -192,17 +194,24 @@ static void postprocess_solver_solution(SolveStatus status, Solution *solution,
         //          that the upper_bound and lower_bound stays within a
         //          reasonable gap
 
+        validate_solution(instance, solution);
+
         if (status == SOLVE_STATUS_OPTIMAL) {
-            todo_msg("upper_bound and lower_bound gap check");
+#ifndef NDEBUG
+            // If solution is optimal it should remain within a 6% optimal gap
+            double gap = solution_relgap(solution);
+            assert(fcmp(gap, 0.0, 6.0 / 100));
+#endif
         }
 
+        todo();
         break;
     }
 
     // TODO: Check solution, print some stuff, validate the solution...
 }
 
-Solution cptp_solve(Instance *instance, char *solver_name,
+Solution cptp_solve(const Instance *instance, char *solver_name,
                     const SolverParams *params) {
     Solution solution = solution_create(instance);
     const SolverLookup *lookup = lookup_solver(solver_name);
@@ -224,7 +233,7 @@ Solution cptp_solve(Instance *instance, char *solver_name,
     SolveStatus solve_status = solver.solve(&solver, instance, &solution);
     solver.destroy(&solver);
     log_solve_status(solve_status, solver_name);
-    postprocess_solver_solution(solve_status, &solution, solver_name);
+    postprocess_solver_solution(instance, solve_status, &solution, solver_name);
     return solution;
 
 fail:
