@@ -195,7 +195,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
                     continue;
                 }
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
-                assert(v >= -1.0 && v <= 1.5);
+                assert(v >= -0.5 && v <= 1.5);
                 if (v > 0.5 && *comp(t, j) < 0) {
                     *succ(t, i) = j;
                     i = j;
@@ -224,7 +224,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
 
     for (int32_t i = 0; i < n; i++) {
         double v = vstar[get_y_mip_var_idx(instance, i)];
-        assert(v >= -1.0 && v <= 1.5);
+        assert(v >= -0.5 && v <= 1.5);
         if (i == 0 || v >= 0.5) {
             assert(*comp(t, i) >= 0);
             assert(*succ(t, i) >= 0);
@@ -487,26 +487,74 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
     }
 #endif
 
+    double rhs = 0;
+    char sense = 'G';
+    CPXDIM *index = malloc(sizeof(*index) * (solver->data->num_mip_vars));
+    double *value = malloc(sizeof(*value) * (solver->data->num_mip_vars));
+
+    if (!index || !value) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        goto failure;
+    }
+
     // Create the cut to feed CPLEX
     for (int32_t comp_idx = 0; comp_idx < *num_comps(tour); comp_idx++) {
-        double rhs = num_of_nodes_in_each_comp[comp_idx] - 1;
-        char sense = 'L'; // 'L' for less constraint
+        if (num_of_nodes_in_each_comp[comp_idx] <= 1) {
+            continue;
+        }
 
-        CPXNNZ nnz = 0;
-        CPXDIM *index = NULL;
-        double *value = NULL;
+        log_trace("%s :: num_of_nodes_in_each_comp[%d] = %d hm_nentries = %ld",
+                  __func__, comp_idx, num_of_nodes_in_each_comp[comp_idx],
+                  hm_nentries(num_of_nodes_in_each_comp[comp_idx]));
+        CPXNNZ nnz = 1 + (hm_nentries(instance->num_customers + 1) -
+                          hm_nentries(num_of_nodes_in_each_comp[comp_idx]));
+
+        int32_t cnt = 0;
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j) {
+                    continue;
+                }
+                // if node i belongs to S and node j does NOT belong to S
+                if (*comp(tour, i) == comp_idx && *comp(tour, j) != comp_idx) {
+                    index[cnt] = get_x_mip_var_idx(instance, i, j);
+                    value[cnt] = +1.0;
+                    cnt++;
+                }
+            }
+        }
+
+        log_info("%s :: cnt = %d, nnz = %lld", __func__, cnt, nnz);
+        assert(cnt == nnz - 1);
 
         for (int32_t i = 0; i < n; i++) {
-            for (int32_t j = i + 1; j < n; j++) {
-                // if node i and j belong to the same component
-                if (*comp(tour, i) == comp_idx && *comp(tour, j) == comp_idx) {
-                }
+            index[cnt] = get_y_mip_var_idx(instance, i);
+            value[cnt] = -2.0;
+
+            CPXNNZ rmatbeg = 0;
+
+            log_trace("%s :: Adding GSEC constraint (nnz = %lld, rhs = %f)",
+                      __func__, nnz, rhs);
+
+            // NOTE::
+            //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
+            //  You can call this routine more than once in the same callback
+            //  invocation. CPLEX will accumulate the constraints from all such
+            //  calls.
+            if (CPXXcallbackrejectcandidate(context, 1, nnz, &rhs, &sense,
+                                            &rmatbeg, index, value) != 0) {
+                log_fatal("%s :: Failed CPXXcallbackrejectcandidate", __func__);
+                goto failure;
             }
         }
     }
 
+    free(index);
+    free(value);
     return true;
 failure:
+    free(index);
+    free(value);
     return false;
 }
 
