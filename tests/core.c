@@ -1,3 +1,4 @@
+
 /*
  * Copyright (c) 2021 Davide Paro
  *
@@ -20,24 +21,36 @@
  * SOFTWARE.
  */
 
-#pragma once
+#include <assert.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
-#if __cplusplus
-extern "C" {
-#endif
+#include <unity.h>
 
+#include "parser.h"
 #include "core.h"
+#include "core-utils.h"
 
-static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
-    "mip",
-    {
-        {false, "seed", "int", NULL},
-        {false, "install_callbacks", "bool", "true"},
-        {0},
-    }};
-
-Solver mip_solver_create(const Instance *instance);
-
-#if __cplusplus
+static void test_tour_create(void) {
+    const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
+    Instance instance = parse(filepath);
+    Tour tour = tour_create(&instance);
+    tour_destroy(&tour);
+    instance_destroy(&instance);
 }
-#endif
+
+int main(void) {
+    UNITY_BEGIN();
+    RUN_TEST(test_tour_create);
+    return UNITY_END();
+}
+
+/// Ran before each test
+void setUp(void) {}
+
+/// Ran after each test
+void tearDown(void) {}

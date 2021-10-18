@@ -27,8 +27,13 @@ extern "C" {
 #endif
 
 #include "types.h"
+#include "utils.h"
+
+#define INT32_DEAD_VAL (INT32_MIN >> 1)
 
 typedef struct Instance {
+    char *name;
+
     int32_t num_customers;
     int32_t num_vehicles;
     double vehicle_cap;
@@ -40,58 +45,82 @@ typedef struct Instance {
     };
 } Instance;
 
-typedef struct CostSolution {
-    double upper_bound;
-    double lower_bound;
-} CostSolution;
-
 typedef struct Tour {
     int32_t num_customers;
     int32_t num_vehicles;
-    int32_t *num_connected_comps;
+    int32_t *num_comps;
     int32_t *succ;
     int32_t *comp;
 } Tour;
 
 typedef struct Solution {
-    CostSolution cost;
+    double upper_bound;
+    double lower_bound;
     Tour tour;
 } Solution;
 
-void instance_destroy(Instance *instance);
-
-Tour tour_copy(Tour const *other);
-Tour tour_move(Tour *other);
-
-void tour_destroy(Tour *tour);
-
-static inline int32_t *tour_succ(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-    return mati32_access(tour->succ, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
-}
-
-static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-
-    return mati32_access(tour->comp, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
-}
-
 typedef struct SolverData SolverData;
 
-typedef struct SolverParams {
+#define MAX_NUM_SOLVER_PARAMS (256)
 
+typedef struct SolverParams {
+    int32_t num_params;
+    struct {
+        char *name;
+        char *value;
+    } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
+
+typedef struct SolverDescriptor {
+    char *name;
+    struct {
+        bool required;
+        char *name;
+        char *type;
+        char *default_value;
+    } params[];
+} SolverDescriptor;
+
+typedef enum SolveStatus {
+    SOLVE_STATUS_ERR = -127,
+    SOLVE_STATUS_INFEASIBLE = -1,
+    SOLVE_STATUS_INVALID = 0,
+    SOLVE_STATUS_FEASIBLE = 1,
+    SOLVE_STATUS_OPTIMAL = 2,
+} SolveStatus;
 
 typedef struct Solver {
     SolverData *data;
+    bool should_terminate;
+
+    // TODO:
+#if 0
+    const SolverDescriptor *(*begin)(const SolverParams *params);
+    bool (*init)(struct Solver *solver, const SolverParams *params);
+#endif
 
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
-    Solution (*solve)(struct Solver *self, const Instance *instance);
+    SolveStatus (*solve)(struct Solver *self, const Instance *instance,
+                         Solution *solution);
     void (*destroy)(struct Solver *self);
 } Solver;
+
+void instance_set_name(Instance *instance, const char *name);
+void instance_destroy(Instance *instance);
+
+Tour tour_create(const Instance *instance);
+void tour_destroy(Tour *tour);
+void tour_invalidate(Tour *tour);
+Tour tour_copy(Tour const *other);
+Tour tour_move(Tour *other);
+
+Solution solution_create(const Instance *instance);
+void solution_destroy(Solution *solution);
+void solution_invalidate(Solution *solution);
+
+SolveStatus cptp_solve(const Instance *instance, char *solver_name,
+                       const SolverParams *params, Solution *solution);
 
 #if __cplusplus
 }

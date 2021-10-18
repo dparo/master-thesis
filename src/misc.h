@@ -34,14 +34,18 @@ extern "C" {
 #define THREAD_LOCAL_STORAGE __declspec(thread)
 #endif
 
+#define UNUSED_PARAM(x) (void)(x)
+
 #ifdef __GNUC__
 #define ATTRIB_NORETURN __attribute__((noreturn))
+#define ATTRIB_ALWAYS_INLINE __attribute__((always_inline))
 #define ATTRIB_CONSTRUCT(func) __attribute__((constructor))
 #define ATTRIB_DESTRUCT(func) __attribute__((destructor))
 #define ATTRIB_DEPRECATED __attribute__((deprecated))
 #define ATTRIB_PURE __attribute__((pure))
 #define ATTRIB_CONST __attribute__((const))
 #define ATTRIB_WEAK __attribute__((weak))
+#define ATTRIB_NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
 #define ATTRIB_MAYBE_UNUSED __attribute__((unused))
 #define ATTRIB_NODISCARD __attribute__((warn_unused_result))
 #define ATTRIB_PRINTF(STRING_INDEX, FIRST_TO_CHECK)                            \
@@ -78,7 +82,7 @@ extern "C" {
 #define ARRAY_LEN(arr)                                                         \
     (sizeof(arr) / sizeof((arr)[0]) +                                          \
      sizeof(typeof(int[1 - 2 * !!__builtin_types_compatible_p(                 \
-                                   typeof(arr), typeof(&arr[0]))])) *          \
+                                   typeof(arr), typeof(&(arr)[0]))])) *        \
          0)
 #else
 #define ARRAY_LEN(A)                                                           \
@@ -101,6 +105,9 @@ extern "C" {
 #define offsetof(type, member) ((size_t) & (((type *)0)->member))
 #endif
 #endif
+
+#define todo(...) assert(!"!!!TODO!!!")
+#define todo_msg(msg) assert(!(msg))
 
 #if __cplusplus
 }
