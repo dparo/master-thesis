@@ -76,7 +76,7 @@ static inline double fgap(double a, double b) {
 }
 
 static inline bool fgapcmp(double a, double b, double epsilon) {
-    return fgap(a, b) <= epsilon;
+    return fabs(fgap(a, b)) <= epsilon;
 }
 
 typedef struct Vec2d {

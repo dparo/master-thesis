@@ -88,9 +88,7 @@ static inline int32_t *comp(Tour *tour, int32_t i) {
 }
 
 static inline double cost(const Instance *instance, int32_t i, int32_t j) {
-    assert(i >= 0 && i < instance->num_customers + 1);
-    assert(j >= 0 && j < instance->num_customers + 1);
-    return vec2d_dist(&instance->positions[i], &instance->positions[j]);
+    return cptp_dist(instance, i, j);
 }
 
 static inline double profit(const Instance *instance, int32_t i) {
@@ -552,10 +550,12 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         }
     }
 
+    free(num_of_nodes_in_each_comp);
     free(index);
     free(value);
     return true;
 failure:
+    free(num_of_nodes_in_each_comp);
     free(index);
     free(value);
     return false;

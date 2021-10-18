@@ -28,7 +28,7 @@ extern "C" {
 
 #include "types.h"
 
-#if 1
+#if 0
 const char *SMALL_TEST_INSTANCE = "res/my.vrp";
 #else
 const char *SMALL_TEST_INSTANCE = "res/ESPPRC - Test Instances/F-n45-k4_a.vrp";

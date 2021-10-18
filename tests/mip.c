@@ -50,7 +50,7 @@ static void test_mip_solver_create(void) {
     instance_destroy(&instance);
 }
 
-static void test_mip_solver_solve(void) {
+static void test_mip_solver_solve_on_small_test_instance(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     SolverParams params = {0};
@@ -62,6 +62,19 @@ static void test_mip_solver_solve(void) {
     solution_destroy(&solution);
 }
 
+static void test_mip_solver_solve_on_all_instances(void) {
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
+        Instance instance = parse(G_TEST_INSTANCES[i].filepath);
+        SolverParams params = {0};
+        Solution solution = cptp_solve(&instance, "mip", &params);
+        TEST_ASSERT(solution.lower_bound != -INFINITY);
+        TEST_ASSERT(solution.upper_bound != +INFINITY);
+        TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
+        instance_destroy(&instance);
+        solution_destroy(&solution);
+    }
+}
+
 #endif
 
 int main(void) {
@@ -69,7 +82,8 @@ int main(void) {
 
 #if COMPILED_WITH_CPLEX
     RUN_TEST(test_mip_solver_create);
-    RUN_TEST(test_mip_solver_solve);
+    RUN_TEST(test_mip_solver_solve_on_small_test_instance);
+    RUN_TEST(test_mip_solver_solve_on_all_instances);
 #endif
 
     return UNITY_END();

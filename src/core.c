@@ -204,7 +204,6 @@ static void postprocess_solver_solution(const Instance *instance,
 #endif
         }
 
-        todo();
         break;
     }
 

@@ -96,9 +96,12 @@ static inline double tour_eval(const Instance *instance, Tour *tour) {
 
             while ((next_vertex = *tour_succ(tour, veh_idx, curr_vertex)) !=
                    0) {
+                assert(next_vertex != curr_vertex);
                 dist += cptp_dist(instance, curr_vertex, next_vertex);
                 profit += instance->duals[next_vertex];
+                curr_vertex = next_vertex;
             }
+            dist += cptp_dist(instance, curr_vertex, 0);
         }
     }
 
