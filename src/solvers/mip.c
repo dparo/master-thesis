@@ -441,8 +441,6 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
-static void add_gsec(Solver *self, const Instance *instance) {}
-
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
                                    int32_t threadid, int32_t numthreads) {
@@ -899,8 +897,12 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
         log_info("%s :: CPXXgetnumcores returned numcores = %d", __func__,
                  solver->data->numcores);
 
+        int32_t num_threads = MIN(MAX_NUM_CORES, solver->data->numcores);
+        log_info("%s :: Setting the maximum number of threads that CPLEX can "
+                 "use to %d",
+                 __func__, num_threads);
         if (CPXXsetintparam(solver->data->env, CPX_PARAM_THREADS,
-                            MIN(MAX_NUM_CORES, solver->data->numcores) != 0)) {
+                            num_threads) != 0) {
             log_fatal("%s :: CPXXsetintparam for CPX_PARAM_THREADS failed",
                       __func__);
             goto fail;

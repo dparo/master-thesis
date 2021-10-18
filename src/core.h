@@ -119,8 +119,8 @@ Solution solution_create(const Instance *instance);
 void solution_destroy(Solution *solution);
 void solution_invalidate(Solution *solution);
 
-Solution cptp_solve(const Instance *instance, char *solver_name,
-                    const SolverParams *params);
+SolveStatus cptp_solve(const Instance *instance, char *solver_name,
+                       const SolverParams *params, Solution *solution);
 
 #if __cplusplus
 }

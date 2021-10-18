@@ -210,9 +210,9 @@ static void postprocess_solver_solution(const Instance *instance,
     // TODO: Check solution, print some stuff, validate the solution...
 }
 
-Solution cptp_solve(const Instance *instance, char *solver_name,
-                    const SolverParams *params) {
-    Solution solution = solution_create(instance);
+SolveStatus cptp_solve(const Instance *instance, char *solver_name,
+                       const SolverParams *params, Solution *solution) {
+    SolveStatus status = SOLVE_STATUS_ERR;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
     if (lookup == NULL) {
@@ -229,13 +229,13 @@ Solution cptp_solve(const Instance *instance, char *solver_name,
     }
 
     Solver solver = lookup->create_fn(instance);
-    SolveStatus solve_status = solver.solve(&solver, instance, &solution);
+    status = solver.solve(&solver, instance, solution);
     solver.destroy(&solver);
-    log_solve_status(solve_status, solver_name);
-    postprocess_solver_solution(instance, solve_status, &solution, solver_name);
-    return solution;
+    log_solve_status(status, solver_name);
+    postprocess_solver_solution(instance, status, solution, solver_name);
+    return status;
 
 fail:
-    solution_invalidate(&solution);
-    return solution;
+    solution_invalidate(solution);
+    return status;
 }

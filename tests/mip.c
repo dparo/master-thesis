@@ -54,7 +54,10 @@ static void test_mip_solver_solve_on_small_test_instance(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     SolverParams params = {0};
-    Solution solution = cptp_solve(&instance, "mip", &params);
+    Solution solution = solution_create(&instance);
+    SolveStatus status = cptp_solve(&instance, "mip", &params, &solution);
+    TEST_ASSERT(status == SOLVE_STATUS_FEASIBLE ||
+                status == SOLVE_STATUS_OPTIMAL);
     TEST_ASSERT(solution.lower_bound != -INFINITY);
     TEST_ASSERT(solution.upper_bound != +INFINITY);
     TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
@@ -62,16 +65,22 @@ static void test_mip_solver_solve_on_small_test_instance(void) {
     solution_destroy(&solution);
 }
 
-static void test_mip_solver_solve_on_all_instances(void) {
+static void test_mip_solver_solve_on_some_instances(void) {
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
-        Instance instance = parse(G_TEST_INSTANCES[i].filepath);
-        SolverParams params = {0};
-        Solution solution = cptp_solve(&instance, "mip", &params);
-        TEST_ASSERT(solution.lower_bound != -INFINITY);
-        TEST_ASSERT(solution.upper_bound != +INFINITY);
-        TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
-        instance_destroy(&instance);
-        solution_destroy(&solution);
+        if (G_TEST_INSTANCES[i].expected_num_customers <= 71) {
+            Instance instance = parse(G_TEST_INSTANCES[i].filepath);
+            SolverParams params = {0};
+            Solution solution = solution_create(&instance);
+            SolveStatus status =
+                cptp_solve(&instance, "mip", &params, &solution);
+            TEST_ASSERT(status == SOLVE_STATUS_FEASIBLE ||
+                        status == SOLVE_STATUS_OPTIMAL);
+            TEST_ASSERT(solution.lower_bound != -INFINITY);
+            TEST_ASSERT(solution.upper_bound != +INFINITY);
+            TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
+            instance_destroy(&instance);
+            solution_destroy(&solution);
+        }
     }
 }
 
@@ -83,7 +92,7 @@ int main(void) {
 #if COMPILED_WITH_CPLEX
     RUN_TEST(test_mip_solver_create);
     RUN_TEST(test_mip_solver_solve_on_small_test_instance);
-    RUN_TEST(test_mip_solver_solve_on_all_instances);
+    RUN_TEST(test_mip_solver_solve_on_some_instances);
 #endif
 
     return UNITY_END();

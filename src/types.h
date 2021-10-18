@@ -36,7 +36,7 @@ extern "C" {
 #include "utils.h"
 
 static inline bool fcmp(double a, double b, double epsilon) {
-    return fabs(a - b) < epsilon;
+    return fabs(a - b) <= epsilon;
 }
 
 static inline bool flt(double a, double b, double epsilon) {
