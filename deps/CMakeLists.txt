@@ -79,6 +79,12 @@ fetchgitsubmodule("${DEPS_DIR}/Unity")
 add_library(logc STATIC "${CMAKE_SOURCE_DIR}/deps/log.c/src/log.c")
 target_include_directories(logc PUBLIC "${CMAKE_SOURCE_DIR}/deps/log.c/src")
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_DEBUG")
+elseif(CMAKE_BUILD_TYPE STREQUAL "Relase")
+    target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_INFO")
+endif()
+
 # Customize argparse
 target_include_directories(argparse PUBLIC "${CMAKE_SOURCE_DIR}/deps/argparse")
 
