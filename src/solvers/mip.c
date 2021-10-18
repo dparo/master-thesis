@@ -460,10 +460,15 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
                                    int32_t thread, int32_t numthreads) {
 
+    assert(*num_comps(tour) != 1);
+
     int32_t *num_of_nodes_in_each_comp =
         calloc(*num_comps(tour), sizeof(*num_of_nodes_in_each_comp));
 
-    if (!num_of_nodes_in_each_comp) {
+    CPXDIM *index = NULL;
+    double *value = NULL;
+
+    if (num_of_nodes_in_each_comp == NULL) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto failure;
     }
@@ -489,8 +494,8 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
     double rhs = 0;
     char sense = 'G';
-    CPXDIM *index = malloc(sizeof(*index) * (solver->data->num_mip_vars));
-    double *value = malloc(sizeof(*value) * (solver->data->num_mip_vars));
+    index = malloc(sizeof(*index) * (solver->data->num_mip_vars + 1));
+    value = malloc(sizeof(*value) * (solver->data->num_mip_vars + 1));
 
     if (!index || !value) {
         log_fatal("%s :: Failed memory allocation", __func__);
@@ -499,15 +504,10 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
     // Create the cut to feed CPLEX
     for (int32_t comp_idx = 0; comp_idx < *num_comps(tour); comp_idx++) {
-        if (num_of_nodes_in_each_comp[comp_idx] <= 1) {
-            continue;
-        }
+        assert(num_of_nodes_in_each_comp[comp_idx] >= 2);
 
-        log_trace("%s :: num_of_nodes_in_each_comp[%d] = %d hm_nentries = %ld",
-                  __func__, comp_idx, num_of_nodes_in_each_comp[comp_idx],
-                  hm_nentries(num_of_nodes_in_each_comp[comp_idx]));
-        CPXNNZ nnz = 1 + (hm_nentries(instance->num_customers + 1) -
-                          hm_nentries(num_of_nodes_in_each_comp[comp_idx]));
+        CPXNNZ nnz = 1 + num_of_nodes_in_each_comp[comp_idx] *
+                             (n - num_of_nodes_in_each_comp[comp_idx]);
 
         int32_t cnt = 0;
         for (int32_t i = 0; i < n; i++) {
@@ -524,7 +524,6 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
             }
         }
 
-        log_info("%s :: cnt = %d, nnz = %lld", __func__, cnt, nnz);
         assert(cnt == nnz - 1);
 
         for (int32_t i = 0; i < n; i++) {
@@ -533,8 +532,10 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
             CPXNNZ rmatbeg = 0;
 
-            log_trace("%s :: Adding GSEC constraint (nnz = %lld, rhs = %f)",
-                      __func__, nnz, rhs);
+            log_trace("%s :: Adding GSEC constraint %d, "
+                      "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
+                      __func__, i, comp_idx,
+                      num_of_nodes_in_each_comp[comp_idx], nnz);
 
             // NOTE::
             //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
@@ -592,6 +593,11 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
                  __func__, *num_comps(&tour));
         reject_candidate_point(&tour, context, solver, instance, threadid,
                                numthreads);
+    } else {
+
+        log_info("%s :: num_comps of unpacked tour is %d -- accepting "
+                 "candidate point...",
+                 __func__, *num_comps(&tour));
     }
 
     free(vstar);

@@ -30,11 +30,22 @@ extern "C" {
 #include <stdint.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <math.h>
+
 #include "misc.h"
-#include "math.h"
+#include "utils.h"
 
 static inline bool fcmp(double a, double b, double epsilon) {
     return fabs(a - b) < epsilon;
+}
+
+static inline bool fgapcmp(double a, double b, double epsilon) {
+    double ub = MIN(a, b);
+    double lb = MAX(a, b);
+
+    assert(lb <= ub);
+    double gap = (ub - lb) / (1e-10 + fabs(ub));
+    return gap <= epsilon;
 }
 
 typedef struct Vec2d {
