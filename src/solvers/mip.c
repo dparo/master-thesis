@@ -505,15 +505,17 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
         CPXNNZ cnt = 0;
         for (int32_t i = 0; i < n; i++) {
-            for (int32_t j = 0; j < n; j++) {
-                if (i == j) {
-                    continue;
-                }
-                // if node i belongs to S and node j does NOT belong to S
-                if (*comp(tour, i) == comp_idx && *comp(tour, j) != comp_idx) {
-                    index[cnt] = get_x_mip_var_idx(instance, i, j);
-                    value[cnt] = +1.0;
-                    cnt++;
+            if (*comp(tour, i) == comp_idx) {
+                for (int32_t j = 0; j < n; j++) {
+                    if (i == j) {
+                        continue;
+                    }
+                    // if node i belongs to S and node j does NOT belong to S
+                    if (*comp(tour, j) != comp_idx) {
+                        index[cnt] = get_x_mip_var_idx(instance, i, j);
+                        value[cnt] = +1.0;
+                        cnt++;
+                    }
                 }
             }
         }
@@ -522,8 +524,8 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == comp_idx) {
-                index[cnt] = get_y_mip_var_idx(instance, i);
-                value[cnt] = -2.0;
+                index[nnz - 1] = get_y_mip_var_idx(instance, i);
+                value[nnz - 1] = -2.0;
 
                 CPXNNZ rmatbeg = 0;
 
@@ -617,8 +619,9 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     // NOTE: Global progress is inherently thread safe
     //            See:
     //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
-    double upper_bound, lower_bound;
-    CPXLONG num_processed_nodes, simplex_iterations;
+    double upper_bound = INFINITY, lower_bound = -INFINITY;
+
+    CPXLONG num_processed_nodes = 0, simplex_iterations = 0;
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &lower_bound);
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &upper_bound);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODECOUNT,
