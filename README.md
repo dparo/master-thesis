@@ -14,8 +14,8 @@ This project studies and compares various MIP formulations and cuts separation t
 ## Core Technical Concepts/Inspiration
 
 The CPTP is a subproblem that appears in the column generation procedure of the commonly known [Vehicle Routing Problem](https://en.wikipedia.org/wiki/Vehicle_routing_problem) (**VRP**).
-Current state-of-the art solution for CPTP are based on dynamic programming paradigms.
-Substantial literature was devoted as studying the use of a MIP solver for solving the pricing problem in VRP [[1]](#Jepsen2014) [[2]](#baldacci2008exact) [[3]](#baldacci2011new).
+Current state-of-the art solutions for CPTP are based on dynamic programming paradigms.
+Substantial literature was devoted at studying the use of a MIP solver for solving the pricing problem in VRP [[1]](#Jepsen2014) [[2]](#baldacci2008exact) [[3]](#baldacci2011new).
 
 In particular, in 2014, Jepsen [[1]](#Jepsen2014) studied extensively this problem by employing a MIP solver.
 Almost ten years have passed, and commercial MIP solvers have made extensive progress.
