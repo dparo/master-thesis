@@ -139,7 +139,7 @@ static const struct SolverLookup {
 
 typedef struct SolverLookup SolverLookup;
 
-static const SolverLookup *lookup_solver(char *solver_name) {
+static const SolverLookup *lookup_solver(const char *solver_name) {
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); i++) {
         if (0 ==
@@ -157,7 +157,7 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
     return true;
 }
 
-static void log_solve_status(SolveStatus status, char *solver_name) {
+static void log_solve_status(SolveStatus status, const char *solver_name) {
     static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
@@ -172,7 +172,7 @@ static void log_solve_status(SolveStatus status, char *solver_name) {
 
 static void postprocess_solver_solution(const Instance *instance,
                                         SolveStatus status, Solution *solution,
-                                        char *solver_name) {
+                                        const char *solver_name) {
     switch (status) {
     case SOLVE_STATUS_ERR:
     case SOLVE_STATUS_INFEASIBLE:
@@ -201,7 +201,7 @@ static void postprocess_solver_solution(const Instance *instance,
     // TODO: Check solution, print some stuff, validate the solution...
 }
 
-SolveStatus cptp_solve(const Instance *instance, char *solver_name,
+SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution) {
     SolveStatus status = SOLVE_STATUS_ERR;
     const SolverLookup *lookup = lookup_solver(solver_name);

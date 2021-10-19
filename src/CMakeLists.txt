@@ -15,6 +15,34 @@ if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
 endif()
 
 
+find_package(Git REQUIRED)
+
+execute_process(COMMAND
+  "${GIT_EXECUTABLE}" describe --match=NeVeRmAtCh --always --abbrev=40 --dirty
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GIT_SHA1
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# the date of the commit
+execute_process(COMMAND
+  "${GIT_EXECUTABLE}" log -1 --format=%ad --date=local
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GIT_DATE
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# the subject of the commit
+execute_process(COMMAND
+  "${GIT_EXECUTABLE}" log -1 --format=%s
+  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  OUTPUT_VARIABLE GIT_COMMIT_SUBJECT
+  ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# generate version.c
+configure_file("${CMAKE_SOURCE_DIR}/src/version.c.in" "${CMAKE_BINARY_DIR}/src/version.c" @ONLY)
+
 
 add_library(libcptp
     types.c
@@ -37,5 +65,9 @@ if (CPLEX_FOUND)
     target_compile_definitions(libcptp PUBLIC COMPILED_WITH_CPLEX=1)
 endif()
 
-add_executable(cptp main.c)
-target_link_libraries(cptp PRIVATE libcptp argtable3)
+add_executable(cptp
+    "${CMAKE_BINARY_DIR}/src/version.c"
+    main.c
+    )
+target_link_libraries(cptp PRIVATE libcptp argtable3::argtable3)
+target_include_directories(cptp PRIVATE "${DEPS_DIR}/argtable3/src")
