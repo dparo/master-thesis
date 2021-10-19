@@ -836,12 +836,26 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
         result = SOLVE_STATUS_OPTIMAL;
         break;
 
+    case CPX_STAT_FEASIBLE:
     case CPXMIP_TIME_LIM_FEAS:
     case CPXMIP_NODE_LIM_FEAS:
+        result = SOLVE_STATUS_FEASIBLE;
+        break;
+
+    case CPX_STAT_INFEASIBLE:
+    case CPXMIP_INFEASIBLE:
+        result = SOLVE_STATUS_INFEASIBLE;
         break;
 
     case CPXERR_CALLBACK:
         result = SOLVE_STATUS_ERR;
+        break;
+
+    case CPX_STAT_UNBOUNDED:
+    case CPXMIP_UNBOUNDED:
+        log_fatal("%s :: CPXXsolution lpstat -- Solution to problem has "
+                  "an unbounded ray",
+                  __func__);
         break;
     case CPX_STAT_NUM_BEST:
         // Could not converge due to number difficulties
