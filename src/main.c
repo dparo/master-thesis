@@ -18,56 +18,80 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <stdlib.h>
+#include <stdio.h>
+
 #include <log.h>
 #include "misc.h"
 #include "version.h"
+#include "types.h"
 #include <argtable3.h>
+#include "core.h"
+#include "parser.h"
 
-int mymain(int l, int R, int k, const char **defines, int ndefines,
-           const char *outfile, int v, const char **infiles, int ninfiles) {
-    int i;
+static void print_brief_description(const char *progname);
+static void print_version(void);
+static void print_use_help_for_more_information(const char *progname);
 
-    if (l > 0)
-        printf("list files (-l)\n");
-    if (R > 0)
-        printf("recurse through directories (-R)\n");
-    if (v > 0)
-        printf("verbose is enabled (-v)\n");
-    printf("scalar k=%d\n", k);
-    printf("output is \"%s\"\n", outfile);
+static int main2(const char *instance_filepath, const char *solver,
+                 double timelimit, const char **defines, int32_t num_defines) {
 
-    for (i = 0; i < ndefines; i++)
-        printf("user defined macro \"%s\"\n", defines[i]);
+    const char *filepath = instance_filepath;
+    Instance instance = parse(filepath);
+    if (instance.num_customers > 0) {
+        SolverParams params = {0};
+        Solution solution = solution_create(&instance);
+        SolveStatus status =
+            cptp_solve(&instance, solver ? solver : "mip", &params, &solution);
 
-    for (i = 0; i < ninfiles; i++)
-        printf("infile[%d]=\"%s\"\n", i, infiles[i]);
+        printf("\n\n###\n###    Terminating with solution cost in "
+               "[%f, %f]\n###\n\n",
+               solution.lower_bound, solution.upper_bound);
+        instance_destroy(&instance);
+        solution_destroy(&solution);
+        bool success =
+            status == SOLVE_STATUS_OPTIMAL || status == SOLVE_STATUS_FEASIBLE;
 
-    return 0;
+        return success ? EXIT_SUCCESS : EXIT_FAILURE;
+    } else {
+        fprintf(stderr, "%s: Failed to parse file\n", instance_filepath);
+        return EXIT_FAILURE;
+    }
 }
+
+enum {
+    MAX_NUMBER_OF_ERRORS_TO_DISPLAY = 16,
+};
 
 int main(int argc, char **argv) {
     const char *progname = argv[0];
 
-    struct arg_lit *list = arg_lit0("lL", NULL, "list files");
-    struct arg_lit *recurse =
-        arg_lit0("R", NULL, "recurse through subdirectories");
-    struct arg_int *repeat =
-        arg_int0("k", "scalar", NULL, "define scalar value k (default is 3)");
+    if (argc == 1) {
+        print_brief_description(progname);
+        print_version();
+        printf("\n");
+        print_use_help_for_more_information(progname);
+        return EXIT_FAILURE;
+    }
+
+    struct arg_dbl *timelimit = arg_dbl0(
+        "t", "timelimit", NULL,
+        "define the maximum timelimit in seconds (default 10 minutes)");
     struct arg_str *defines =
-        arg_strn("D", "define", "MACRO", 0, argc + 2, "macro definitions");
-    struct arg_file *outfile =
-        arg_file0("o", NULL, "<output>", "output file (default is \"-\")");
+        arg_strn("D", "define", "KEY=VALUE", 0, argc + 2, "define parameters");
+    struct arg_str *solver =
+        arg_str0("S", "solver", "SOLVER", "solver to use (default \"mip\")");
     struct arg_lit *verbose =
         arg_lit0("v", "verbose,debug", "verbose messages");
     struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
     struct arg_lit *version =
         arg_lit0(NULL, "version", "print version information and exit");
-    struct arg_file *infiles =
-        arg_filen(NULL, NULL, NULL, 1, argc + 2, "input file(s)");
-    struct arg_end *end = arg_end(256);
+    struct arg_file *instance =
+        arg_file1("i", "instance", NULL, "input instance file");
+    struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {list,    recurse, repeat,  defines, outfile,
-                        verbose, help,    version, infiles, end};
+    void *argtable[] = {help,    version,  verbose, timelimit,
+                        defines, instance, solver,  end};
 
     int nerrors;
     int exitcode = 0;
@@ -80,30 +104,26 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    /* set any command line default values prior to parsing */
-    repeat->ival[0] = 3;
-    outfile->filename[0] = "-";
+    // Default time limit of 10 minutes
+    timelimit->dval[0] = 10.0 * 60.0;
+    // Default solver
+    solver->sval[0] = "mip";
 
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc, argv, argtable);
 
     /* special case: '--help' takes precedence over error reporting */
     if (help->count > 0) {
+        print_brief_description(progname);
         printf("Usage: %s", progname);
         arg_print_syntax(stdout, argtable, "\n");
-        printf("This program demonstrates the use of the argtable2 library\n");
-        printf("for parsing command line arguments.\n");
-        arg_print_glossary(stdout, argtable, "  %-25s %s\n");
+        arg_print_glossary(stdout, argtable, "  %-32s %s\n");
         exitcode = 0;
         goto exit;
     }
 
     /* special case: '--version' takes precedence error reporting */
     if (version->count > 0) {
-        printf("'%s' example program for the \"argtable\" command line "
-               "argument parser.\n",
-               progname);
-
         printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
         exitcode = 0;
         goto exit;
@@ -113,26 +133,36 @@ int main(int argc, char **argv) {
     if (nerrors > 0) {
         /* Display the error details contained in the arg_end struct.*/
         arg_print_errors(stdout, end, progname);
-        printf("Try '%s --help' for more information.\n", progname);
+        print_use_help_for_more_information(progname);
         exitcode = 1;
         goto exit;
     }
 
-    /* special case: uname with no command line options induces brief help */
-    if (argc == 1) {
-        printf("Try '%s --help' for more information.\n", progname);
-        exitcode = 0;
-        goto exit;
+    if (verbose->count > 0) {
+        log_set_level(LOG_INFO);
+    } else {
+        log_set_level(LOG_WARN);
     }
 
     /* normal case: take the command line options at face value */
-    exitcode = mymain(list->count, recurse->count, repeat->ival[0],
-                      defines->sval, defines->count, outfile->filename[0],
-                      verbose->count, infiles->filename, infiles->count);
+    exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
+                     defines->sval, defines->count);
 
 exit:
     /* deallocate each non-null entry in argtable[] */
-    arg_freetable(argtable, sizeof(argtable) / sizeof(argtable[0]));
+    arg_freetable(argtable, ARRAY_LEN(argtable));
 
     return exitcode;
+}
+
+static void print_brief_description(const char *progname) {
+    printf("The Capacitated Profitable Tour Problem (CPTP) solver\n");
+}
+
+static void print_version(void) {
+    printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
+}
+
+static void print_use_help_for_more_information(const char *progname) {
+    printf("Try '%s --help' for more information.\n", progname);
 }
