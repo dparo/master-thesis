@@ -81,8 +81,8 @@ fetchgitsubmodule("${DEPS_DIR}/argtable3")
 
 
 # Customize logc
-add_library(logc STATIC "${CMAKE_SOURCE_DIR}/deps/log.c/src/log.c")
-target_include_directories(logc PUBLIC "${CMAKE_SOURCE_DIR}/deps/log.c/src")
+add_library(logc STATIC "${DEPS_DIR}/log.c/src/log.c")
+target_include_directories(logc PUBLIC "${DEPS_DIR}/log.c/src")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_DEBUG")
@@ -93,6 +93,7 @@ endif()
 # Customize argtable3
 
 # Customize unity
+
 target_compile_definitions(unity PUBLIC UNITY_INCLUDE_PRINT_FORMATTED "UNITY_EXCLUDE_SETJMP_H=1" "UNITY_USE_FLUSH_STDOUT=1")
 if (MSVC)
     target_compile_definitions(unity PUBLIC "UNITY_NORETURN=__declspec(noreturn)")
