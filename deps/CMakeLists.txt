@@ -70,9 +70,14 @@ function(FetchArchiveConfigureAndMakeAndInstall name url)
 endfunction()
 
 
+
+set(ARGTABLE3_ENABLE_CONAN OFF CACHE BOOL "Enable Conan dependency manager")
+set(ARGTABLE3_ENABLE_TESTS OFF CACHE BOOL "Enable unit tests")
+set(ARGTABLE3_ENABLE_EXAMPLES OFF CACHE BOOL "Enable examples")
+
 fetchgitsubmodule("${DEPS_DIR}/log.c")
-fetchgitsubmodule("${DEPS_DIR}/argparse")
 fetchgitsubmodule("${DEPS_DIR}/Unity")
+fetchgitsubmodule("${DEPS_DIR}/argtable3")
 
 
 # Customize logc
@@ -85,8 +90,7 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Relase")
     target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_INFO")
 endif()
 
-# Customize argparse
-target_include_directories(argparse PUBLIC "${CMAKE_SOURCE_DIR}/deps/argparse")
+# Customize argtable3
 
 # Customize unity
 target_compile_definitions(unity PUBLIC UNITY_INCLUDE_PRINT_FORMATTED "UNITY_EXCLUDE_SETJMP_H=1" "UNITY_USE_FLUSH_STDOUT=1")

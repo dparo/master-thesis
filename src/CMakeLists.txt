@@ -38,4 +38,4 @@ if (CPLEX_FOUND)
 endif()
 
 add_executable(cptp main.c)
-target_link_libraries(cptp PRIVATE libcptp argparse)
+target_link_libraries(cptp PRIVATE libcptp argtable3)
