@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 
     /* special case: '--version' takes precedence error reporting */
     if (version->count > 0) {
-        printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
+        print_version();
         exitcode = 0;
         goto exit;
     }
@@ -183,6 +183,8 @@ static void print_brief_description(const char *progname) {
 
 static void print_version(void) {
     printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
+    printf("Compiled with %s v%s (%s)\n", C_COMPILER_ID, C_COMPILER_VERSION,
+           C_COMPILER_ABI);
 }
 
 static void print_use_help_for_more_information(const char *progname) {
