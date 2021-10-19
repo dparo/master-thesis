@@ -65,6 +65,7 @@ enum {
 
 int main(int argc, char **argv) {
     const char *progname = argv[0];
+    FILE *log_file_handle = NULL;
 
     if (argc == 1) {
         print_brief_description(progname);
@@ -83,6 +84,10 @@ int main(int argc, char **argv) {
         arg_str0("S", "solver", "SOLVER", "solver to use (default \"mip\")");
     struct arg_lit *verbose =
         arg_lit0("v", "verbose,debug", "verbose messages");
+    struct arg_file *logfile =
+        arg_file0("l", "log", NULL,
+                  "specify an additional file where log informations would be "
+                  "stored (default none)");
     struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
     struct arg_lit *version =
         arg_lit0(NULL, "version", "print version information and exit");
@@ -90,7 +95,7 @@ int main(int argc, char **argv) {
         arg_file1("i", "instance", NULL, "input instance file");
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,    version,  verbose, timelimit,
+    void *argtable[] = {help,    version,  verbose, logfile, timelimit,
                         defines, instance, solver,  end};
 
     int nerrors;
@@ -108,6 +113,8 @@ int main(int argc, char **argv) {
     timelimit->dval[0] = 10.0 * 60.0;
     // Default solver
     solver->sval[0] = "mip";
+    // No logging file by default
+    logfile->filename[0] = NULL;
 
     /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc, argv, argtable);
@@ -144,6 +151,16 @@ int main(int argc, char **argv) {
         log_set_level(LOG_WARN);
     }
 
+    if (logfile->count > 0) {
+        log_file_handle = fopen(logfile->filename[0], "w");
+        if (log_file_handle) {
+            log_add_fp(log_file_handle, LOG_INFO);
+        } else {
+            fprintf(stderr, "%s: Failed to open for logging\n",
+                    logfile->filename[0]);
+        }
+    }
+
     /* normal case: take the command line options at face value */
     exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
                      defines->sval, defines->count);
@@ -151,6 +168,11 @@ int main(int argc, char **argv) {
 exit:
     /* deallocate each non-null entry in argtable[] */
     arg_freetable(argtable, ARRAY_LEN(argtable));
+
+    if (log_file_handle) {
+        fclose(log_file_handle);
+        log_file_handle = NULL;
+    }
 
     return exitcode;
 }
