@@ -11,7 +11,7 @@ A Mixed Integer Programming (MIP) based solution for the CPTP.
 This project studies and compares various MIP formulations and cuts separation techniques for the CPTP.
 
 
-### Core Technical Concepts/Inspiration
+## Core Technical Concepts/Inspiration
 
 The CPTP is a subproblem that appears in the column generation procedure of the commonly known [Vehicle Routing Problem](https://en.wikipedia.org/wiki/Vehicle_routing_problem) (**VRP**).
 Current state-of-the art solution for CPTP are based on dynamic programming paradigms.
