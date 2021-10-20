@@ -28,6 +28,7 @@
 #include <argtable3.h>
 #include "core.h"
 #include "parser.h"
+#include "timing.h"
 
 static void print_brief_description(const char *progname);
 static void print_version(void);
