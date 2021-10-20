@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # -*- coding: utf-8 -*-
 
-cd "$(dirname "$0")" || exit
+cd "$(dirname "$0")" || exit 1
 
 set -x
+
+# Cd into latest VRP directory
+cd "$(find ./ -mindepth 1 -maxdepth 1 -type d | grep -E 'vrpsolver.*' | sort -n | head -n 1)" || exit 1
 
 INPUT_IMG="bapdock.img.backup"
 OUTPUT_IMG="bapdock.img"
