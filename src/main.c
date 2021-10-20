@@ -104,7 +104,6 @@ int main(int argc, char **argv) {
 
     /* verify the argtable[] entries were allocated sucessfully */
     if (arg_nullcheck(argtable) != 0) {
-        /* NULL entries were detected, some allocations must have failed */
         printf("%s: insufficient memory\n", progname);
         exitcode = 1;
         goto exit;
@@ -117,7 +116,6 @@ int main(int argc, char **argv) {
     // No logging file by default
     logfile->filename[0] = NULL;
 
-    /* Parse the command line as defined by argtable[] */
     nerrors = arg_parse(argc, argv, argtable);
 
     /* special case: '--help' takes precedence over error reporting */
@@ -139,7 +137,6 @@ int main(int argc, char **argv) {
 
     /* If the parser returned any errors then display them and exit */
     if (nerrors > 0) {
-        /* Display the error details contained in the arg_end struct.*/
         arg_print_errors(stdout, end, progname);
         print_use_help_for_more_information(progname);
         exitcode = 1;
@@ -162,12 +159,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    /* normal case: take the command line options at face value */
     exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
                      defines->sval, defines->count);
 
 exit:
-    /* deallocate each non-null entry in argtable[] */
     arg_freetable(argtable, ARRAY_LEN(argtable));
 
     if (log_file_handle) {
