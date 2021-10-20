@@ -36,6 +36,7 @@
 #include <time.h>
 #include <unistd.h>
 #elif defined _WIN64
+#include <windows.h>
 #include <profileapi.h>
 #else
 #error "Unsupported platform"
