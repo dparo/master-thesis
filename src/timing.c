@@ -83,7 +83,7 @@ usecs_t os_get_usecs(void) {
     LARGE_INTEGER ticks = {0};
     QueryPerformanceCounter(&ticks);
     return (usecs_t)((double)ticks.QuadPart * 1000.0 /
-                     (double)Frequency.QuadPart);
+                     (double)frequency.QuadPart);
 
 #else
 #error "Unsupported platform"
