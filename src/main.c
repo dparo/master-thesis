@@ -70,16 +70,16 @@ static int main2(const char *instance_filepath, const char *solver,
             printf("\n\n###\n###\n###\n\n");
 
             if (success) {
-                printf("OBJ: [%f, %f]\n", solution.lower_bound,
+                printf("%-12s [%f, %f]\n", "OBJ:", solution.lower_bound,
                        solution.upper_bound);
                 print_tour(&solution.tour);
             } else {
-                printf("ERR: Could not solve\n");
+                printf("%-12s Could not solve\n", "ERR:");
             }
 
-            printf("STARTED: %s", ctime(&started));
-            printf("ENDED: %s", ctime(&ended));
-            printf("TOOK: ");
+            printf("%-12s %s", "STARTED:", ctime(&started));
+            printf("%-12s %s", "ENDED:", ctime(&ended));
+            printf("%-12s ", "TOOK:");
 
             TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
             print_timerepr(stdout, &solve_time_repr);
@@ -223,7 +223,7 @@ static void print_use_help_for_more_information(const char *progname) {
 }
 
 static void print_tour(Tour *t) {
-    printf("TOUR: ");
+    printf("%-12s ", "TOUR:");
 
     int32_t curr_vertex = 0;
     int32_t next_vertex = curr_vertex;
