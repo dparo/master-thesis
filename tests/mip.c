@@ -60,7 +60,7 @@ static void test_mip_solver_solve_on_small_test_instance(void) {
     Solution solution = solution_create(&instance);
     SolveStatus status =
         cptp_solve(&instance, "mip", &params, &solution, TIMELIMIT, RANDOMSEED);
-    TEST_ASSERT(cptp_solve_found_tour_solution(status));
+    TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
     TEST_ASSERT(status == SOLVE_STATUS_FEASIBLE ||
                 status == SOLVE_STATUS_OPTIMAL);
     TEST_ASSERT(solution.lower_bound != -INFINITY);
@@ -78,7 +78,7 @@ static void test_mip_solver_solve_on_some_instances(void) {
             Solution solution = solution_create(&instance);
             SolveStatus status = cptp_solve(&instance, "mip", &params,
                                             &solution, TIMELIMIT, RANDOMSEED);
-            TEST_ASSERT(cptp_solve_found_tour_solution(status));
+            TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
             TEST_ASSERT(solution.lower_bound != -INFINITY);
             TEST_ASSERT(solution.upper_bound != +INFINITY);
             TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);

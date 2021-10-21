@@ -59,7 +59,7 @@ static int main2(const char *instance_filepath, const char *solver,
                 cptp_solve(&instance, solver ? solver : "mip", &params,
                            &solution, timelimit, randomseed);
 
-            success = cptp_solve_found_tour_solution(status);
+            success = cptp_solve_did_found_tour_solution(status);
 
             time_t ended = time(NULL);
             usecs_t solve_time = os_get_usecs() - begin_solve_time;

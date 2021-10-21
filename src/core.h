@@ -148,7 +148,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed);
 
-static inline bool cptp_solve_found_tour_solution(SolveStatus status) {
+static inline bool cptp_solve_did_found_tour_solution(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_OPTIMAL;

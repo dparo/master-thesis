@@ -28,13 +28,10 @@ extern "C" {
 
 #include "core.h"
 
-static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
-    "mip",
-    {
-        {false, "seed", "int", NULL},
-        {false, "install_callbacks", "bool", "true"},
-        {0},
-    }};
+static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {"mip",
+                                                       {
+                                                           {0},
+                                                       }};
 
 Solver mip_solver_create(const Instance *instance, double timelimit,
                          int32_t seed);
