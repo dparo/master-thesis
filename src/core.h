@@ -67,8 +67,8 @@ typedef struct SolverData SolverData;
 typedef struct SolverParams {
     int32_t num_params;
     struct {
-        char *name;
-        char *value;
+        const char *name;
+        const char *value;
     } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
 
@@ -101,10 +101,10 @@ typedef struct SolverTypedParams {
 typedef struct SolverDescriptor {
     char *name;
     struct {
-        bool required;
-        char *name;
+        const char *name;
         SolverParamType type;
-        char *default_value;
+        const char *default_value;
+        const char *glossary;
     } params[];
 } SolverDescriptor;
 

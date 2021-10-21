@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 #include "misc.h"
 #include "version.h"
@@ -40,13 +41,44 @@ static void print_version(void);
 static void print_use_help_for_more_information(const char *progname);
 static void print_tour(Tour *t);
 
+static inline SolverParams
+make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
+    SolverParams result = {0};
+    if (num_defines > MAX_NUM_SOLVER_PARAMS) {
+        fprintf(stderr,
+                "Too many parameters definitions, %d max, got %d instead",
+                MAX_NUM_SOLVER_PARAMS, num_defines);
+        fflush(stderr);
+        abort();
+    }
+
+    for (int32_t i = 0; i < MIN(MAX_NUM_SOLVER_PARAMS, num_defines); i++) {
+        const char *name = defines[i];
+        const char *value;
+        char *equal = strchr(defines[i], '=');
+        if (equal) {
+            *equal = 0;
+            value = equal + 1;
+        } else {
+            value = defines[i] + strlen(defines[i]);
+        }
+
+        result.params[i].name = name;
+        result.params[i].value = value;
+        result.num_params++;
+    }
+
+    return result;
+}
+
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, int32_t randomseed, const char **defines,
                  int32_t num_defines) {
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
     if (instance.num_customers > 0) {
-        SolverParams params = {0};
+        SolverParams params =
+            make_solver_params_from_cmdline(defines, num_defines);
         Solution solution = solution_create(&instance);
 
         bool success = false;
@@ -166,6 +198,10 @@ int main(int argc, char **argv) {
         printf("Usage: %s", progname);
         arg_print_syntax(stdout, argtable, "\n");
         arg_print_glossary(stdout, argtable, "  %-32s %s\n");
+
+        // TODO: Print solvers and their associated parameters
+        //      by exposing an api from the core
+
         exitcode = 0;
         goto exit;
     }

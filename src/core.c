@@ -155,8 +155,46 @@ static const SolverLookup *lookup_solver(const char *solver_name) {
 
 static bool verify_solver_params(const SolverDescriptor *descriptor,
                                  const SolverParams *params) {
-    log_warn("TODO!");
-    return true;
+    bool result = true;
+    assert(params->num_params <= MAX_NUM_SOLVER_PARAMS);
+
+#ifndef NDEBUG
+    // Validate that the solver descriptor lists param names which are unique
+    for (int32_t i = 0; descriptor->params[i].name != NULL; i++) {
+        const char *name1 = descriptor->params[i].name;
+
+        for (int32_t j = 0; descriptor->params[j].name != NULL; j++) {
+            if (i == j) {
+                continue;
+            }
+            const char *name2 = descriptor->params[j].name;
+            log_fatal("%s :: Solver desciptor lists duplicate param `%s`",
+                      __func__, name1);
+            assert(strcmp(name1, name2) != 0);
+        }
+    }
+#endif
+
+    // Check that user supplied params are all listed in the descriptor
+    for (int32_t i = 0; i < MIN(MAX_NUM_SOLVER_PARAMS, params->num_params);
+         i++) {
+        const char *user_param_name = params->params[i].name;
+        bool found_match = false;
+        for (int32_t j = 0; descriptor->params[j].name != NULL; j++) {
+            const char *descr_param_name = descriptor->params[i].name;
+            if (strcmp(user_param_name, descr_param_name) == 0) {
+                found_match = true;
+                break;
+            }
+        }
+        if (!found_match) {
+            log_fatal("%s :: Solver `%s` does not accept param `%s`", __func__,
+                      descriptor->name, user_param_name);
+            result = false;
+        }
+    }
+
+    return result;
 }
 
 static void log_solve_status(SolveStatus status, const char *solver_name) {
@@ -203,7 +241,8 @@ static void postprocess_solver_solution(const Instance *instance,
 
         if (status == SOLVE_STATUS_OPTIMAL) {
 #ifndef NDEBUG
-            // If solution is optimal it should remain within a 6% optimal gap
+            // If solution is optimal it should remain within a 6% optimal
+            // gap
             double gap = solution_relgap(solution);
             assert(fcmp(gap, 0.0, 6.0 / 100));
 #endif
