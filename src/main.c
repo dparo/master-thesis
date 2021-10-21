@@ -62,8 +62,8 @@ static int main2(const char *instance_filepath, const char *solver,
             SolveStatus status = cptp_solve(&instance, solver ? solver : "mip",
                                             &params, &solution);
 
-            success = status == SOLVE_STATUS_OPTIMAL ||
-                      status == SOLVE_STATUS_FEASIBLE;
+            success = cptp_solve_found_tour_solution(status);
+
             time_t ended = time(NULL);
             usecs_t solve_time = os_get_usecs() - begin_solve_time;
 
@@ -213,6 +213,7 @@ exit:
 }
 
 static void print_brief_description(const char *progname) {
+    UNUSED_PARAM(progname);
     printf("The Capacitated Profitable Tour Problem (CPTP) solver\n");
 }
 

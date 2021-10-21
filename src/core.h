@@ -83,10 +83,14 @@ typedef struct SolverDescriptor {
 
 typedef enum SolveStatus {
     SOLVE_STATUS_ERR = -127,
-    SOLVE_STATUS_INFEASIBLE = -1,
+    SOLVE_STATUS_ABORTED_ERR = -63,
+    // Greater or equal than 0
     SOLVE_STATUS_INVALID = 0,
-    SOLVE_STATUS_FEASIBLE = 1,
-    SOLVE_STATUS_OPTIMAL = 2,
+    SOLVE_STATUS_ABORTED_INVALID,
+    SOLVE_STATUS_INFEASIBLE,
+    SOLVE_STATUS_FEASIBLE,
+    SOLVE_STATUS_ABORTED_FEASIBLE,
+    SOLVE_STATUS_OPTIMAL,
 } SolveStatus;
 
 typedef struct Solver {
@@ -115,6 +119,12 @@ void solution_invalidate(Solution *solution);
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution);
+
+
+static inline cptp_solve_found_tour_solution(SolveStatus status)
+{
+    return status == SOLVE_STATUS_FEASIBLE || status == SOLVE_STATUS_ABORTED_FEASIBLE || status == SOLVE_STATUS_OPTIMAL;
+}
 
 #if __cplusplus
 }

@@ -29,6 +29,7 @@
 #include "core-utils.h"
 
 #include "validation.h"
+#include <signal.h>
 
 void instance_set_name(Instance *instance, const char *name) {
     if (instance->name) {
@@ -160,9 +161,12 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
 static void log_solve_status(SolveStatus status, const char *solver_name) {
     static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_ERR),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INVALID),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
+        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_FEASIBLE),
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
     };
 
@@ -175,14 +179,23 @@ static void postprocess_solver_solution(const Instance *instance,
                                         const char *solver_name) {
     switch (status) {
     case SOLVE_STATUS_ERR:
-    case SOLVE_STATUS_INFEASIBLE:
+    case SOLVE_STATUS_ABORTED_ERR:
     case SOLVE_STATUS_INVALID:
+    case SOLVE_STATUS_ABORTED_INVALID:
         solution_invalidate(solution);
         if (status == SOLVE_STATUS_INFEASIBLE) {
             solution->upper_bound = INFINITY;
             solution->lower_bound = INFINITY;
         }
         break;
+
+    case SOLVE_STATUS_INFEASIBLE:
+        solution_invalidate(solution);
+        solution->upper_bound = INFINITY;
+        solution->lower_bound = INFINITY;
+        break;
+
+    case SOLVE_STATUS_ABORTED_FEASIBLE:
     case SOLVE_STATUS_FEASIBLE:
     case SOLVE_STATUS_OPTIMAL:
         validate_solution(instance, solution);
@@ -197,13 +210,29 @@ static void postprocess_solver_solution(const Instance *instance,
 
         break;
     }
+}
 
-    // TODO: Check solution, print some stuff, validate the solution...
+static Solver *sighandler_ctx_solver_ptr;
+
+void sighandler(int signum) {
+    switch (signum) {
+    case SIGTERM:
+        log_warn("Received SIGINT");
+        break;
+    case SIGINT:
+        log_warn("Received SIGTERM");
+        break;
+    default:
+        break;
+    }
+    if (signum == SIGTERM || signum == SIGINT) {
+        sighandler_ctx_solver_ptr->should_terminate = true;
+    }
 }
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution) {
-    SolveStatus status = SOLVE_STATUS_ERR;
+    SolveStatus status = SOLVE_STATUS_INVALID;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
     if (lookup == NULL) {
@@ -220,7 +249,34 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     }
 
     Solver solver = lookup->create_fn(instance);
-    status = solver.solve(&solver, instance, solution);
+    sighandler_ctx_solver_ptr = &solver;
+
+    {
+        // Setup signals
+        signal(SIGTERM, sighandler);
+        signal(SIGINT, sighandler);
+        status = solver.solve(&solver, instance, solution);
+        // Resets the signals
+        signal(SIGTERM, SIG_DFL);
+        signal(SIGINT, SIG_DFL);
+        sighandler_ctx_solver_ptr = NULL;
+    }
+
+    if (solver.should_terminate) {
+        switch (status) {
+        case SOLVE_STATUS_ERR:
+            status = SOLVE_STATUS_ABORTED_ERR;
+            break;
+        case SOLVE_STATUS_INVALID:
+            status = SOLVE_STATUS_ABORTED_INVALID;
+            break;
+        case SOLVE_STATUS_FEASIBLE:
+            status = SOLVE_STATUS_ABORTED_FEASIBLE;
+        default:
+            break;
+        }
+    }
+
     solver.destroy(&solver);
     log_solve_status(status, solver_name);
     postprocess_solver_solution(instance, status, solution, solver_name);

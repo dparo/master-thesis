@@ -731,6 +731,17 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
         CPXXcallbackabort(context);
     }
 
+    // NOTE:
+    // from
+    // https://www.ibm.com/docs/en/cofz/12.10.0?topic=manual-cpxcallbackfunc
+    //  The routine returns 0 (zero) if successful and nonzero if an error
+    //  occurs. Any value different from zero will result in an ungraceful exit
+    //  of CPLEX (usually with CPXERR_CALLBACK). Note that the actual value
+    //  returned is not propagated up the call stack. The only thing that CPLEX
+    //  checks is whether the returned value is zero or not.
+    // Do not use a non-zero return value to stop optimization in case there is
+    // no error. Use CPXXcallbackabort and CPXcallbackabort for that purpose.
+
     return result;
 }
 
@@ -842,11 +853,13 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
     case CPX_STAT_FEASIBLE:
     case CPXMIP_TIME_LIM_FEAS:
     case CPXMIP_NODE_LIM_FEAS:
+    case CPXMIP_ABORT_FEAS:
         result = SOLVE_STATUS_FEASIBLE;
         break;
 
     case CPX_STAT_INFEASIBLE:
     case CPXMIP_INFEASIBLE:
+    case CPXMIP_ABORT_INFEAS:
         result = SOLVE_STATUS_INFEASIBLE;
         break;
 
