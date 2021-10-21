@@ -51,6 +51,8 @@ void os_sleep(usecs_t usecs);
 usecs_t os_get_usecs(void);
 TimeRepr timerepr_from_usecs(usecs_t usecs);
 
+double elapsed_seconds_since(usecs_t begin);
+
 void print_timerepr(FILE *f, const TimeRepr *repr);
 
 #if __cplusplus

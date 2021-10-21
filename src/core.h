@@ -120,10 +120,10 @@ void solution_invalidate(Solution *solution);
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution);
 
-
-static inline cptp_solve_found_tour_solution(SolveStatus status)
-{
-    return status == SOLVE_STATUS_FEASIBLE || status == SOLVE_STATUS_ABORTED_FEASIBLE || status == SOLVE_STATUS_OPTIMAL;
+static inline bool cptp_solve_found_tour_solution(SolveStatus status) {
+    return status == SOLVE_STATUS_FEASIBLE ||
+           status == SOLVE_STATUS_ABORTED_FEASIBLE ||
+           status == SOLVE_STATUS_OPTIMAL;
 }
 
 #if __cplusplus

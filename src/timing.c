@@ -90,6 +90,12 @@ usecs_t os_get_usecs(void) {
 #endif
 }
 
+double elapsed_seconds_since(usecs_t begin) {
+    usecs_t now = os_get_usecs();
+    usecs_t diff = now - begin;
+    return (double)diff / (double)NUM_USECS_IN_A_SEC;
+}
+
 TimeRepr timerepr_from_usecs(usecs_t usecs) {
     TimeRepr result = {0};
 
