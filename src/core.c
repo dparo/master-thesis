@@ -231,7 +231,8 @@ void sighandler(int signum) {
 }
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
-                       const SolverParams *params, Solution *solution) {
+                       const SolverParams *params, Solution *solution,
+                       double timelimit) {
     SolveStatus status = SOLVE_STATUS_INVALID;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
@@ -255,7 +256,9 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         // Setup signals
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
-        status = solver.solve(&solver, instance, solution);
+        usecs_t begin_time = os_get_usecs();
+        status =
+            solver.solve(&solver, instance, solution, timelimit, begin_time);
         // Resets the signals
         signal(SIGTERM, SIG_DFL);
         signal(SIGINT, SIG_DFL);

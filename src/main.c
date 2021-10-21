@@ -55,7 +55,7 @@ static int main2(const char *instance_filepath, const char *solver,
             time_t started = time(NULL);
             usecs_t begin_solve_time = os_get_usecs();
             SolveStatus status = cptp_solve(&instance, solver ? solver : "mip",
-                                            &params, &solution);
+                                            &params, &solution, timelimit);
 
             success = cptp_solve_found_tour_solution(status);
 

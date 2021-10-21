@@ -48,6 +48,8 @@ Solver mip_solver_create(const Instance *instance) {
 #include "log.h"
 
 typedef struct SolverData {
+    double timelimit;
+    usecs_t begin_time;
     CPXENVptr env;
     CPXLPptr lp;
     int numcores;
@@ -808,7 +810,15 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
     return true;
 }
 
-SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
+SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
+                  double timelimit, usecs_t begin_time) {
+    self->data->timelimit = timelimit;
+    self->data->begin_time = begin_time;
+
+    log_warn("%s :: CPXXsetdbl -- Setting TIMELIMIT to %f", __func__,
+             timelimit);
+    CPXXsetdblparam(self->data->env, CPX_PARAM_TILIM, timelimit);
+
     SolveStatus result = SOLVE_STATUS_ERR;
 
     CplexCallbackCtx callback_ctx = {0};
@@ -859,6 +869,8 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution) {
 
     case CPX_STAT_INFEASIBLE:
     case CPXMIP_INFEASIBLE:
+    case CPXMIP_TIME_LIM_INFEAS:
+    case CPXMIP_NODE_LIM_INFEAS:
     case CPXMIP_ABORT_INFEAS:
         result = SOLVE_STATUS_INFEASIBLE;
         break;

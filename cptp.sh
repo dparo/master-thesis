@@ -51,12 +51,12 @@ elif [ -x "./build/Debug/src/cptp" ]; then
 fi
 
 # 5% more of timeout before sending SIGINT signal
-timeout_timelimit="$(echo "$timelimit * 1.05" | bc)"
+timeout_timelimit="$(echo "$timelimit * 1.05 + 2.0" | bc)"
 
 if [ "$timelimit_found" -eq 1 ]; then
 	set -x
-	exec timeout -k 10s "${timeout_timelimit}s" "${CPTP_EXECUTABLE}" "$@"
+	exec timeout -k 5s "${timeout_timelimit}s" "${CPTP_EXECUTABLE}" "$@"
 else
 	set -x
-	exec timeout -k 10s "${timeout_timelimit}s" "${CPTP_EXECUTABLE}" --timelimit "$timelimit" "$@"
+	exec timeout -k 5s "${timeout_timelimit}s" "${CPTP_EXECUTABLE}" --timelimit "$timelimit" "$@"
 fi

@@ -28,6 +28,7 @@ extern "C" {
 
 #include "types.h"
 #include "utils.h"
+#include "timing.h"
 
 #define INT32_DEAD_VAL (INT32_MIN >> 1)
 
@@ -100,7 +101,8 @@ typedef struct Solver {
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
     SolveStatus (*solve)(struct Solver *self, const Instance *instance,
-                         Solution *solution);
+                         Solution *solution, double timelimit,
+                         usecs_t begin_time);
     void (*destroy)(struct Solver *self);
 } Solver;
 
@@ -118,7 +120,8 @@ void solution_destroy(Solution *solution);
 void solution_invalidate(Solution *solution);
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
-                       const SolverParams *params, Solution *solution);
+                       const SolverParams *params, Solution *solution,
+                       double timelimit);
 
 static inline bool cptp_solve_found_tour_solution(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
