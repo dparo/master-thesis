@@ -42,11 +42,6 @@ static void print_tour(Tour *t);
 
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, const char **defines, int32_t num_defines) {
-
-    if (timelimit <= 0.0) {
-        timelimit = DEFAULT_TIME_LIMIT;
-    }
-
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
     if (instance.num_customers > 0) {
@@ -69,9 +64,9 @@ static int main2(const char *instance_filepath, const char *solver,
 
             printf("\n\n###\n###\n###\n\n");
 
-            printf("%-12s %s\n", "INPUT:", instance_filepath);
             printf("%-12s %s\n", "SOLVER:", solver);
             printf("%-12s %f\n", "TIMELIM:", timelimit);
+            printf("%-12s %s\n", "INPUT:", instance_filepath);
 
             if (success) {
                 printf("%-12s [%f, %f]\n", "OBJ:", solution.lower_bound,
