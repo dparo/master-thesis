@@ -114,3 +114,29 @@ TimeRepr timerepr_from_usecs(usecs_t usecs) {
 
     return result;
 }
+
+void print_timerepr(FILE *f, const TimeRepr *repr) {
+    if (repr->days > 0) {
+        fprintf(f, "%d day(s), ", repr->days);
+    }
+
+    if (repr->hours > 0) {
+        fprintf(f, "%d hour(s), ", repr->hours);
+    }
+
+    if (repr->minutes > 0) {
+        fprintf(f, "%d minute(s), ", repr->minutes);
+    }
+
+    if (repr->seconds > 0) {
+        fprintf(f, "%d second(s), ", repr->seconds);
+    }
+
+    if (repr->milliseconds > 0) {
+        fprintf(f, "%d msec(s), ", repr->milliseconds);
+    }
+
+    if (repr->microseconds > 0) {
+        fprintf(f, "%d usec(s)", repr->microseconds);
+    }
+}

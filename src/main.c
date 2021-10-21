@@ -29,10 +29,13 @@
 #include "core.h"
 #include "parser.h"
 #include "timing.h"
+#include <time.h>
+#include "core-utils.h"
 
 static void print_brief_description(const char *progname);
 static void print_version(void);
 static void print_use_help_for_more_information(const char *progname);
+static void print_tour(Tour *t);
 
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, const char **defines, int32_t num_defines) {
@@ -42,16 +45,42 @@ static int main2(const char *instance_filepath, const char *solver,
     if (instance.num_customers > 0) {
         SolverParams params = {0};
         Solution solution = solution_create(&instance);
-        SolveStatus status =
-            cptp_solve(&instance, solver ? solver : "mip", &params, &solution);
 
-        printf("\n\n###\n###    Terminating with solution cost in "
-               "[%f, %f]\n###\n\n",
-               solution.lower_bound, solution.upper_bound);
+        bool success = false;
+
+        // Solve, timing and printing of final solution
+        {
+            time_t started = time(NULL);
+            usecs_t begin_solve_time = os_get_usecs();
+            SolveStatus status = cptp_solve(&instance, solver ? solver : "mip",
+                                            &params, &solution);
+
+            success = status == SOLVE_STATUS_OPTIMAL ||
+                      status == SOLVE_STATUS_FEASIBLE;
+            time_t ended = time(NULL);
+            usecs_t solve_time = os_get_usecs() - begin_solve_time;
+
+            printf("\n\n###\n###\n###\n\n");
+
+            if (success) {
+                printf("OBJ: [%f, %f]\n", solution.lower_bound,
+                       solution.upper_bound);
+                print_tour(&solution.tour);
+            } else {
+                printf("ERR: Could not solve\n");
+            }
+
+            printf("STARTED: %s", ctime(&started));
+            printf("ENDED: %s", ctime(&ended));
+            printf("TOOK: ");
+
+            TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
+            print_timerepr(stdout, &solve_time_repr);
+            printf("\n");
+        }
+
         instance_destroy(&instance);
         solution_destroy(&solution);
-        bool success =
-            status == SOLVE_STATUS_OPTIMAL || status == SOLVE_STATUS_FEASIBLE;
 
         return success ? EXIT_SUCCESS : EXIT_FAILURE;
     } else {
@@ -185,4 +214,24 @@ static void print_version(void) {
 
 static void print_use_help_for_more_information(const char *progname) {
     printf("Try '%s --help' for more information.\n", progname);
+}
+
+static void print_tour(Tour *t) {
+    printf("TOUR: ");
+
+    int32_t curr_vertex = 0;
+    int32_t next_vertex = curr_vertex;
+
+    while ((next_vertex = *tour_succ(t, 0, curr_vertex)) != 0) {
+        if (next_vertex == 0) {
+            // Do not put the space for cleanliness if is the last vertex to be
+            // printed
+            printf("%d", curr_vertex);
+        } else {
+            printf("%d ", curr_vertex);
+        }
+        curr_vertex = next_vertex;
+    }
+
+    printf("\n");
 }
