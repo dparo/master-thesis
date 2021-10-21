@@ -72,12 +72,38 @@ typedef struct SolverParams {
     } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
 
+typedef enum {
+    SOLVER_TYPED_PARAM_DOUBLE,
+    SOLVER_TYPED_PARAM_FLOAT,
+    SOLVER_TYPED_PARAM_INT32,
+    SOLVER_TYPED_PARAM_USIZE,
+    SOLVER_TYPED_PARAM_STR,
+} SolverParamType;
+
+typedef struct SolverTypedParam {
+    int32_t count;
+    char *name;
+    SolverParamType type;
+    union {
+        double dval;
+        float fval;
+        int32_t ival;
+        size_t sizeval;
+        char *sval;
+    };
+} SolverTypedParam;
+
+typedef struct SolverTypedParams {
+    int32_t num_params;
+    SolverTypedParam *params;
+} SolverTypedParams;
+
 typedef struct SolverDescriptor {
     char *name;
     struct {
         bool required;
         char *name;
-        char *type;
+        SolverParamType type;
         char *default_value;
     } params[];
 } SolverDescriptor;

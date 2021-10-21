@@ -43,7 +43,7 @@ Solver mip_solver_create(const Instance *instance, double timelimit,
 #else
 
 // NOTE:
-//       cplexx is the 64 bit version of the API, while clex (one x) is the 32
+//       cplexx is the 64 bit version of the API, while cplex (one x) is the 32
 //       bit version of the API.
 #include <ilcplex/cplexx.h>
 #include <ilcplex/cpxconst.h>
