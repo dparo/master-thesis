@@ -20,17 +20,20 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 
-#include <log.h>
 #include "misc.h"
 #include "version.h"
 #include "types.h"
-#include <argtable3.h>
 #include "core.h"
 #include "parser.h"
 #include "timing.h"
-#include <time.h>
 #include "core-utils.h"
+
+#include <log.h>
+#include <argtable3.h>
+
+#define DEFAULT_TIME_LIMIT ((double)600.0) // 10 minutes
 
 static void print_brief_description(const char *progname);
 static void print_version(void);
@@ -39,6 +42,10 @@ static void print_tour(Tour *t);
 
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, const char **defines, int32_t num_defines) {
+
+    if (timelimit <= 0.0) {
+        timelimit = DEFAULT_TIME_LIMIT;
+    }
 
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
@@ -112,8 +119,7 @@ int main(int argc, char **argv) {
         arg_strn("D", "define", "KEY=VALUE", 0, argc + 2, "define parameters");
     struct arg_str *solver =
         arg_str0("S", "solver", "SOLVER", "solver to use (default \"mip\")");
-    struct arg_lit *verbose =
-        arg_lit0("v", "verbose,debug", "verbose messages");
+    struct arg_lit *verbose = arg_lit0("v", "verbose", "verbose messages");
     struct arg_file *logfile =
         arg_file0("l", "log", NULL,
                   "specify an additional file where log informations would be "
@@ -138,8 +144,8 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    // Default time limit of 10 minutes
-    timelimit->dval[0] = 10.0 * 60.0;
+    // Default time limit
+    timelimit->dval[0] = DEFAULT_TIME_LIMIT;
     // Default solver
     solver->sval[0] = "mip";
     // No logging file by default
@@ -208,8 +214,8 @@ static void print_brief_description(const char *progname) {
 
 static void print_version(void) {
     printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
-    printf("Compiled with %s v%s (%s)\n", C_COMPILER_ID, C_COMPILER_VERSION,
-           C_COMPILER_ABI);
+    printf("Compiled with %s v%s (%s), %s build\n", C_COMPILER_ID,
+           C_COMPILER_VERSION, C_COMPILER_ABI, BUILD_TYPE);
 }
 
 static void print_use_help_for_more_information(const char *progname) {

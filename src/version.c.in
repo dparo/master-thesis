@@ -22,6 +22,7 @@
 
 #include "version.h"
 
+const char *BUILD_TYPE = "@CMAKE_BUILD_TYPE@";
 const char *C_COMPILER_ID = "@CMAKE_C_COMPILER_ID@";
 const char *C_COMPILER_ABI = "@CMAKE_C_COMPILER_ABI@";
 const char *C_COMPILER_VERSION = "@CMAKE_C_COMPILER_VERSION@";
