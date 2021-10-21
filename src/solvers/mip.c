@@ -26,8 +26,12 @@
 #include "core-utils.h"
 
 #ifndef COMPILED_WITH_CPLEX
-Solver mip_solver_create(const Instance *instance) {
+
+Solver mip_solver_create(const Instance *instance, double timelimit,
+                         int32_t randomseed) {
     UNUSED_PARAM(instance);
+    UNUSED_PARAM(timelimit);
+    UNUSED_PARAM(randomseed);
     fprintf(stderr,
             "%s: Cannot use mip solver as the program was not compiled with "
             "CPLEX\n",
