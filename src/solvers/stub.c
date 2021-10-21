@@ -24,14 +24,16 @@
 
 static SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
                          ATTRIB_MAYBE_UNUSED const Instance *instance,
-                         Solution *solution, double timelimit,
-                         usecs_t begin_time) {
+                         Solution *solution, usecs_t begin_time) {
     return SOLVE_STATUS_INVALID;
 }
 
 static void destroy(ATTRIB_MAYBE_UNUSED Solver *self) {}
 
-Solver stub_solver_create(ATTRIB_MAYBE_UNUSED const Instance *instance) {
+Solver stub_solver_create(ATTRIB_MAYBE_UNUSED const Instance *instance,
+                          double timelimit, int32_t randomseed) {
+    UNUSED_PARAM(timelimit);
+    UNUSED_PARAM(randomseed);
     Solver solver = {0};
     solver.solve = solve;
     solver.destroy = destroy;

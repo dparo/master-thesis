@@ -41,7 +41,8 @@ static void print_use_help_for_more_information(const char *progname);
 static void print_tour(Tour *t);
 
 static int main2(const char *instance_filepath, const char *solver,
-                 double timelimit, const char **defines, int32_t num_defines) {
+                 double timelimit, int32_t randomseed, const char **defines,
+                 int32_t num_defines) {
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
     if (instance.num_customers > 0) {
@@ -54,8 +55,9 @@ static int main2(const char *instance_filepath, const char *solver,
         {
             time_t started = time(NULL);
             usecs_t begin_solve_time = os_get_usecs();
-            SolveStatus status = cptp_solve(&instance, solver ? solver : "mip",
-                                            &params, &solution, timelimit);
+            SolveStatus status =
+                cptp_solve(&instance, solver ? solver : "mip", &params,
+                           &solution, timelimit, randomseed);
 
             success = cptp_solve_found_tour_solution(status);
 
@@ -114,6 +116,10 @@ int main(int argc, char **argv) {
     struct arg_dbl *timelimit = arg_dbl0(
         "t", "timelimit", NULL,
         "define the maximum timelimit in seconds (default 10 minutes)");
+    struct arg_int *randomseed =
+        arg_int0("s", "seed", NULL,
+                 "define the random seed to use (default is 0, eg compute it "
+                 "from the current time)");
     struct arg_str *defines =
         arg_strn("D", "define", "KEY=VALUE", 0, argc + 2, "define parameters");
     struct arg_str *solver =
@@ -130,8 +136,8 @@ int main(int argc, char **argv) {
         arg_file1("i", "instance", NULL, "input instance file");
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,    version,  verbose, logfile, timelimit,
-                        defines, instance, solver,  end};
+    void *argtable[] = {help,       version, verbose,  logfile, timelimit,
+                        randomseed, defines, instance, solver,  end};
 
     int nerrors;
     int exitcode = 0;
@@ -145,6 +151,8 @@ int main(int argc, char **argv) {
 
     // Default time limit
     timelimit->dval[0] = DEFAULT_TIME_LIMIT;
+    // Default random seed
+    randomseed->ival[0] = 0;
     // Default solver
     solver->sval[0] = "mip";
     // No logging file by default
@@ -194,7 +202,7 @@ int main(int argc, char **argv) {
     }
 
     exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
-                     defines->sval, defines->count);
+                     randomseed->ival[0], defines->sval, defines->count);
 
 exit:
     arg_freetable(argtable, ARRAY_LEN(argtable));

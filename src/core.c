@@ -128,7 +128,8 @@ Tour tour_move(Tour *other) {
     return result;
 }
 
-typedef Solver (*SolverCreateFn)(const Instance *instance);
+typedef Solver (*SolverCreateFn)(const Instance *instance, double timelimit,
+                                 int32_t randomseed);
 
 static const struct SolverLookup {
     const SolverDescriptor *descriptor;
@@ -232,7 +233,7 @@ void sighandler(int signum) {
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
-                       double timelimit) {
+                       double timelimit, int32_t randomseed) {
     SolveStatus status = SOLVE_STATUS_INVALID;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
@@ -249,7 +250,13 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         goto fail;
     }
 
-    Solver solver = lookup->create_fn(instance);
+    if (randomseed == 0) {
+        srand(time(NULL));
+    } else {
+        srand(randomseed);
+    }
+
+    Solver solver = lookup->create_fn(instance, timelimit, randomseed);
     sighandler_ctx_solver_ptr = &solver;
 
     {
@@ -257,8 +264,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
         usecs_t begin_time = os_get_usecs();
-        status =
-            solver.solve(&solver, instance, solution, timelimit, begin_time);
+        status = solver.solve(&solver, instance, solution, begin_time);
         // Resets the signals
         signal(SIGTERM, SIG_DFL);
         signal(SIGINT, SIG_DFL);

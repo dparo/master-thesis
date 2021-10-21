@@ -28,12 +28,13 @@ extern "C" {
 
 #include "core.h"
 
-static SolverDescriptor STUB_SOLVER_DESCRIPTOR = {"stub",
-                                                  {
-                                                      {0},
-                                                  }};
+static const SolverDescriptor STUB_SOLVER_DESCRIPTOR = {"stub",
+                                                        {
+                                                            {0},
+                                                        }};
 
-Solver stub_solver_create(const Instance *instance);
+Solver stub_solver_create(const Instance *instance, double timelimit,
+                          int32_t randomseed);
 
 #if __cplusplus
 }

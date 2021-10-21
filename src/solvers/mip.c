@@ -48,7 +48,6 @@ Solver mip_solver_create(const Instance *instance) {
 #include "log.h"
 
 typedef struct SolverData {
-    double timelimit;
     usecs_t begin_time;
     CPXENVptr env;
     CPXLPptr lp;
@@ -811,13 +810,8 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 }
 
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
-                  double timelimit, usecs_t begin_time) {
-    self->data->timelimit = timelimit;
+                  usecs_t begin_time) {
     self->data->begin_time = begin_time;
-
-    log_warn("%s :: CPXXsetdbl -- Setting TIMELIMIT to %f", __func__,
-             timelimit);
-    CPXXsetdblparam(self->data->env, CPX_PARAM_TILIM, timelimit);
 
     SolveStatus result = SOLVE_STATUS_ERR;
 
@@ -958,13 +952,17 @@ fail:
     return false;
 }
 
-Solver mip_solver_create(const Instance *instance) {
+Solver mip_solver_create(const Instance *instance, double timelimit,
+                         int32_t randomseed) {
     log_trace("%s", __func__);
 
     Solver solver = {0};
     solver.solve = solve;
     solver.destroy = mip_solver_destroy;
     solver.data = calloc(1, sizeof(*solver.data));
+    if (!solver.data) {
+        goto fail;
+    }
 
     if (!cplex_setup(&solver, instance)) {
         log_fatal("%s : Failed to initialize cplex", __func__);
@@ -980,6 +978,24 @@ Solver mip_solver_create(const Instance *instance) {
         CPXXgetnumcols(solver.data->env, solver.data->lp);
     solver.data->num_mip_constraints =
         CPXXgetnumrows(solver.data->env, solver.data->lp);
+
+    log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,
+             timelimit);
+    if (CPXXsetdblparam(solver.data->env, CPX_PARAM_TILIM, timelimit) != 0) {
+        log_fatal("%s :: CPXXsetdbparam -- Failed to setup CPX_PARAM_TILIM "
+                  "(timelimit) to value %f",
+                  __func__, timelimit);
+        goto fail;
+    }
+
+    log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
+             randomseed);
+    if (CPXXsetintparam(solver.data->env, CPX_PARAM_RANDOMSEED, randomseed) !=
+        0) {
+        log_fatal("%s :: CPXXsetintparam -- Faield to setup "
+                  "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
+                  __func__, randomseed);
+    }
 
     return solver;
 fail:

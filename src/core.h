@@ -101,8 +101,7 @@ typedef struct Solver {
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
     SolveStatus (*solve)(struct Solver *self, const Instance *instance,
-                         Solution *solution, double timelimit,
-                         usecs_t begin_time);
+                         Solution *solution, usecs_t begin_time);
     void (*destroy)(struct Solver *self);
 } Solver;
 
@@ -121,7 +120,7 @@ void solution_invalidate(Solution *solution);
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
-                       double timelimit);
+                       double timelimit, int32_t randomseed);
 
 static inline bool cptp_solve_found_tour_solution(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||

@@ -36,7 +36,8 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {0},
     }};
 
-Solver mip_solver_create(const Instance *instance);
+Solver mip_solver_create(const Instance *instance, double timelimit,
+                         int32_t seed);
 
 #if __cplusplus
 }
