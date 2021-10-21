@@ -69,6 +69,10 @@ static int main2(const char *instance_filepath, const char *solver,
 
             printf("\n\n###\n###\n###\n\n");
 
+            printf("%-12s %s\n", "INPUT:", instance_filepath);
+            printf("%-12s %s\n", "SOLVER:", solver);
+            printf("%-12s %f\n", "TIMELIM:", timelimit);
+
             if (success) {
                 printf("%-12s [%f, %f]\n", "OBJ:", solution.lower_bound,
                        solution.upper_bound);
