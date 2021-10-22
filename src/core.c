@@ -252,6 +252,19 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
     return result;
 }
 
+static SolverTypedParams resolve_params(const SolverParams *params,
+                                        const SolverDescriptor *desc) {
+    SolverTypedParams result = {0};
+
+    for (int32_t pi = 0; pi < MIN(MAX_NUM_SOLVER_PARAMS, params->num_params);
+         pi++) {
+        for (int32_t di = 0; desc->params[di].name != 0; di++) {
+        }
+    }
+
+    return result;
+}
+
 static void log_solve_status(SolveStatus status, const char *solver_name) {
     static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
         ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
@@ -328,6 +341,8 @@ void sighandler(int signum) {
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed) {
+
+    prova();
     SolveStatus status = SOLVE_STATUS_INVALID;
     const SolverLookup *lookup = lookup_solver(solver_name);
 

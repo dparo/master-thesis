@@ -96,8 +96,12 @@ typedef struct SolverTypedParam {
 } SolverTypedParam;
 
 typedef struct SolverTypedParams {
-    int32_t num_params;
-    SolverTypedParam *params;
+
+    // NOTE: Hashtable use <stb_ds.h> : shput(), shget() and alike
+    struct {
+        char *key;
+        SolverTypedParam value;
+    } * __sm;
 } SolverTypedParams;
 
 typedef struct SolverDescriptor {
