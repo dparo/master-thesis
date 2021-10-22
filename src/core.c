@@ -275,13 +275,16 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
         }
     }
 
-    // TODO: Check that the descriptor default value (if any) can be parsed
-    // correctly
-
-    for (int32_t i = 0; descriptor->params[i].name != NULL; i++) {
-        const char *default_val = descriptor->params[i].default_value;
-        switch (descriptor->params[i].type) {}
-    }
+    // FIXME:
+    // Should we bother about this? Or is it overengineering/complication for
+    // little value?
+    //   - Check that the descriptor default value (if any) can be parsed.
+    // Note that the default value is constantly and statically known and
+    // determined, and cannot change... So shall we bother...? This would allows
+    // to achieve: mistakes are catched earliar in one centrailzed place and
+    // across all params, a wrong default value is catched here, even if is
+    // unused. Otherwise we would catch the error later, and only if we try to
+    // unpack the default value (lazy evaluation)
 
     return result;
 }
