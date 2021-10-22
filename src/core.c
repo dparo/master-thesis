@@ -139,6 +139,49 @@ static const struct SolverLookup {
     {&MIP_SOLVER_DESCRIPTOR, &mip_solver_create},
 };
 
+const char *param_type_as_str(SolverParamType type) {
+    switch (type) {
+    case SOLVER_TYPED_PARAM_DOUBLE:
+        return "DOUBLE";
+    case SOLVER_TYPED_PARAM_FLOAT:
+        return "FLOAT";
+    case SOLVER_TYPED_PARAM_BOOL:
+        return "BOOL";
+    case SOLVER_TYPED_PARAM_INT32:
+        return "INT32";
+    case SOLVER_TYPED_PARAM_USIZE:
+        return "USIZE";
+    case SOLVER_TYPED_PARAM_STR:
+        return "STR";
+    }
+
+    assert(!"Invalid code path");
+    return "<UNKNOWN>";
+}
+
+void cptp_print_list_of_solvers_and_params(void) {
+    for (int32_t solver_idx = 0;
+         solver_idx < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); solver_idx++) {
+        const SolverDescriptor *d = SOLVERS_LOOKUP_TABLE[solver_idx].descriptor;
+        const char *solver_name = d->name;
+        if (solver_name != NULL && *solver_name != '\0') {
+            printf("%s\n", solver_name);
+            for (int32_t j = 0; d->params[j].name != NULL; j++) {
+                if (d->params[j].default_value != NULL &&
+                    *d->params[j].default_value != '\0') {
+                    printf("   %-20s  (%s, default: %s)\n", d->params[j].name,
+                           param_type_as_str(d->params[j].type),
+                           d->params->default_value);
+                } else {
+                    printf("   %-20s  (%s)\n", d->params[j].name,
+                           param_type_as_str(d->params[j].type));
+                }
+                printf("%32s\n", d->params->glossary);
+            }
+        }
+    }
+}
+
 typedef struct SolverLookup SolverLookup;
 
 static const SolverLookup *lookup_solver(const char *solver_name) {

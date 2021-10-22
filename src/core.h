@@ -75,6 +75,7 @@ typedef struct SolverParams {
 typedef enum {
     SOLVER_TYPED_PARAM_DOUBLE,
     SOLVER_TYPED_PARAM_FLOAT,
+    SOLVER_TYPED_PARAM_BOOL,
     SOLVER_TYPED_PARAM_INT32,
     SOLVER_TYPED_PARAM_USIZE,
     SOLVER_TYPED_PARAM_STR,
@@ -147,6 +148,8 @@ void solution_invalidate(Solution *solution);
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed);
+
+void cptp_print_list_of_solvers_and_params(void);
 
 static inline bool cptp_solve_did_found_tour_solution(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||

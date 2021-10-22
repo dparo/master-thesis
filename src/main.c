@@ -198,10 +198,7 @@ int main(int argc, char **argv) {
         printf("Usage: %s", progname);
         arg_print_syntax(stdout, argtable, "\n");
         arg_print_glossary(stdout, argtable, "  %-32s %s\n");
-
-        // TODO: Print solvers and their associated parameters
-        //      by exposing an api from the core
-
+        cptp_print_list_of_solvers_and_params();
         exitcode = 0;
         goto exit;
     }
