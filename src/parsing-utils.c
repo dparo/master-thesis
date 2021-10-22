@@ -156,7 +156,7 @@ bool str_to_double(const char *string, double *out) {
     char *endptr = NULL;
 
     errno = 0;
-    float conv_ret_val = strtod(string, &endptr);
+    double conv_ret_val = strtod(string, &endptr);
 
     bool out_of_range = (errno == ERANGE);
     bool failed =
