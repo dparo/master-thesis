@@ -166,10 +166,10 @@ void cptp_print_list_of_solvers_and_params(void) {
     for (int32_t solver_idx = 0;
          solver_idx < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); solver_idx++) {
         const SolverDescriptor *d = SOLVERS_LOOKUP_TABLE[solver_idx].descriptor;
-        const char *solver_name = d->name;
-        if (solver_name != NULL && *solver_name != '\0') {
-            printf("  - %s:\n", solver_name);
-            for (int32_t j = 0; d->params[j].name != NULL; j++) {
+        if (d->name != NULL && *d->name != '\0') {
+            printf("  - %s:\n", d->name);
+            int32_t j;
+            for (j = 0; d->params[j].name != NULL; j++) {
                 if (d->params[j].default_value != NULL &&
                     *d->params[j].default_value != '\0') {
                     printf("      - %-20s  (%s, default: %s)\n",
@@ -185,6 +185,9 @@ void cptp_print_list_of_solvers_and_params(void) {
                     *d->params[j].glossary != '\0') {
                     printf("        %s\n", d->params[j].glossary);
                 }
+            }
+            if (j == 0) {
+                printf("      <NO PARAMS AVAILABLE>");
             }
             printf("\n");
         }
