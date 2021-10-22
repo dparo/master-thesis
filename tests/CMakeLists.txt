@@ -2,6 +2,7 @@ set(
     TEST_SOURCES_LIST
     "misc.c"
     "parser.c"
+    "parsing-utils.c"
     "core.c"
 )
 if (CPLEX_FOUND)

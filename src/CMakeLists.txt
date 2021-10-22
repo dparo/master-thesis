@@ -47,6 +47,7 @@ configure_file("${CMAKE_SOURCE_DIR}/src/version.c.in" "${CMAKE_BINARY_DIR}/src/v
 add_library(libcptp
     types.c
     parser.c
+    parsing-utils.c
     core.c
     timing.c
     validation.c
