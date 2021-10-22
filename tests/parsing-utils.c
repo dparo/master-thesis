@@ -51,13 +51,31 @@ static struct {
     S(0b01),
     S(-0xff),
     S(0x7fffffff),
-
-    // TODO: Double check why this fails
-    // S(-0x80000000),
+    S(-0x80000000),
+    S(-0b1010101),
+    S(+0b1010101),
+    S(0b1010101),
 
     // Expect failures here
+    // Suffixes do not pass yey
+    F("0x"),
+    F("-"),
+    F("-0x"),
+
+    F("0b"),
+    F("-0b"),
+    F("-0xasd"),
+    F("-0bx10"),
+    F("-0xffu"),
+    F("-0xfful"),
+    F("-1.0"),
+    F("+1.0"),
+    // OUT of range
     F("0xffffffff"),
+    // Text string
     F("asdadsads"),
+
+    // Computations are not allowed
     F("3 * 2"),
 };
 

@@ -55,6 +55,7 @@ bool str_to_int32(const char *string, int32_t *out) {
     char *endptr = NULL;
     errno = 0;
     long conv_ret_val = strtol(string, &endptr, base);
+    conv_ret_val *= is_negated ? -1 : +1;
 
     bool out_of_range = (errno == ERANGE) || (conv_ret_val < INT32_MIN) ||
                         (conv_ret_val > INT32_MAX);
@@ -64,11 +65,7 @@ bool str_to_int32(const char *string, int32_t *out) {
     bool result = !failed && *endptr == '\0';
 
     if (result) {
-        if (is_negated) {
-            *out = -conv_ret_val;
-        } else {
-            *out = conv_ret_val;
-        }
+        *out = conv_ret_val;
     } else {
         *out = INT32_MIN;
     }
@@ -114,11 +111,7 @@ bool str_to_usize(const char *string, size_t *out) {
     bool result = !failed && *endptr == '\0';
 
     if (result) {
-        if (is_negated) {
-            *out = -conv_ret_val;
-        } else {
-            *out = conv_ret_val;
-        }
+        *out = conv_ret_val;
     } else {
         *out = 0;
     }
