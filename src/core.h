@@ -29,6 +29,7 @@ extern "C" {
 #include "types.h"
 #include "utils.h"
 #include "timing.h"
+#include <stb_ds.h>
 
 #define INT32_DEAD_VAL (INT32_MIN >> 1)
 
