@@ -91,7 +91,7 @@ typedef struct SolverTypedParam {
         float fval;
         int32_t ival;
         size_t sizeval;
-        char *sval;
+        const char *sval;
     };
 } SolverTypedParam;
 

@@ -23,13 +23,13 @@
 #include "core.h"
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 
 #include "solvers/stub.h"
 #include "solvers/mip.h"
 #include "core-utils.h"
-
+#include "parsing-utils.h"
 #include "validation.h"
-#include <signal.h>
 
 void instance_set_name(Instance *instance, const char *name) {
     if (instance->name) {
@@ -208,6 +208,32 @@ static const SolverLookup *lookup_solver(const char *solver_name) {
     return NULL;
 }
 
+bool parse_solver_param_val(SolverTypedParam *out, const char *val,
+                            SolverParamType type) {
+    SolverTypedParam local = {0};
+    if (out == NULL) {
+        out = &local;
+    }
+
+    switch (type) {
+    case SOLVER_TYPED_PARAM_BOOL:
+        break;
+
+    case SOLVER_TYPED_PARAM_INT32:
+        break;
+
+    case SOLVER_TYPED_PARAM_USIZE:
+        break;
+    case SOLVER_TYPED_PARAM_DOUBLE:
+        break;
+    case SOLVER_TYPED_PARAM_FLOAT:
+        break;
+    case SOLVER_TYPED_PARAM_STR:
+        out->sval = val;
+        break;
+    }
+}
+
 static bool verify_solver_params(const SolverDescriptor *descriptor,
                                  const SolverParams *params) {
     bool result = true;
@@ -247,6 +273,14 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
                       descriptor->name, user_param_name);
             result = false;
         }
+    }
+
+    // TODO: Check that the descriptor default value (if any) can be parsed
+    // correctly
+
+    for (int32_t i = 0; descriptor->params[i].name != NULL; i++) {
+        const char *default_val = descriptor->params[i].default_value;
+        switch (descriptor->params[i].type) {}
     }
 
     return result;
@@ -341,8 +375,6 @@ void sighandler(int signum) {
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed) {
-
-    prova();
     SolveStatus status = SOLVE_STATUS_INVALID;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
