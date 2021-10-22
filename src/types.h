@@ -119,8 +119,10 @@ typedef struct EnumToStrMapping {
     const char *name;
 } EnumToStrMapping;
 
-#define ENUM_TO_STR_TABLE_FIELD(x)                                             \
-    { (x), #x }
+#define ENUM_TO_STR_TABLE_FIELD_CUSTOM(x, STR)                                 \
+    { (x), STR }
+
+#define ENUM_TO_STR_TABLE_FIELD(x) ENUM_TO_STR_TABLE_FIELD_CUSTOM(x, #x)
 
 #define ENUM_TO_STR_TABLE_DECL(ENUM_TYPE)                                      \
     const EnumToStrMapping ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE[]
