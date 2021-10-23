@@ -293,9 +293,12 @@ static SolverTypedParams resolve_params(const SolverParams *params,
                                         const SolverDescriptor *desc) {
     SolverTypedParams result = {0};
 
-    for (int32_t pi = 0; pi < MIN(MAX_NUM_SOLVER_PARAMS, params->num_params);
-         pi++) {
-        for (int32_t di = 0; desc->params[di].name != 0; di++) {
+    for (int32_t di = 0; desc->params[di].name != 0; di++) {
+        for (int32_t pi = 0;
+             pi < MIN(MAX_NUM_SOLVER_PARAMS, params->num_params); pi++) {
+            // TODO:
+            //      Check if the user defined the same parameter twice, abort
+            //      in that case
         }
     }
 
