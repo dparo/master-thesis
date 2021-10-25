@@ -90,6 +90,7 @@ typedef struct SolverTypedParam {
         float fval;
         int32_t ival;
         size_t sizeval;
+        bool bval;
         const char *sval;
     };
 } SolverTypedParam;

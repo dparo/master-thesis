@@ -215,25 +215,31 @@ bool parse_solver_param_val(SolverTypedParam *out, const char *val,
         out = &local;
     }
 
+    bool parse_success = false;
+
     switch (type) {
-    case SOLVER_TYPED_PARAM_BOOL:
-        break;
-
-    case SOLVER_TYPED_PARAM_INT32:
-        break;
-
-    case SOLVER_TYPED_PARAM_USIZE:
-        break;
-    case SOLVER_TYPED_PARAM_DOUBLE:
-        break;
-    case SOLVER_TYPED_PARAM_FLOAT:
-        break;
     case SOLVER_TYPED_PARAM_STR:
         out->sval = val;
+        parse_success = true;
+        break;
+    case SOLVER_TYPED_PARAM_BOOL:
+        parse_success = str_to_bool(val, &out->bval);
+        break;
+    case SOLVER_TYPED_PARAM_INT32:
+        parse_success = str_to_int32(val, &out->ival);
+        break;
+    case SOLVER_TYPED_PARAM_USIZE:
+        parse_success = str_to_usize(val, &out->sizeval);
+        break;
+    case SOLVER_TYPED_PARAM_DOUBLE:
+        parse_success = str_to_double(val, &out->dval);
+        break;
+    case SOLVER_TYPED_PARAM_FLOAT:
+        parse_success = str_to_float(val, &out->fval);
         break;
     }
 
-    return false;
+    return parse_success;
 }
 
 static bool verify_solver_params(const SolverDescriptor *descriptor,
@@ -302,7 +308,7 @@ static bool resolve_params(const SolverParams *params,
                            const SolverDescriptor *desc,
                            SolverTypedParams *out) {
     solver_typed_params_destroy(out);
-    bool result = false;
+    bool result = true;
 
     for (int32_t di = 0; desc->params[di].name != 0; di++) {
         const char *value = NULL;
@@ -313,6 +319,7 @@ static bool resolve_params(const SolverParams *params,
                     fprintf(stderr,
                             "ERROR: parameter `%s` specified twice or more.\n",
                             params->params[pi].name);
+                    result = false;
                     goto terminate;
                 }
                 value = params->params[pi].value;
@@ -335,12 +342,19 @@ static bool resolve_params(const SolverParams *params,
             t.count = 0;
         } else {
             t.count = 1;
+
+            fprintf(stderr, "%s :: Setting `%s` (%s) to value `%s`\n", __func__,
+                    desc->params[di].name,
+                    param_type_as_str(desc->params[di].type), value);
+
             if (!parse_solver_param_val(&t, value, desc->params[di].type)) {
                 fprintf(
                     stderr,
                     "ERROR: Failed to parse param `%s=%s` required as a %s\n",
                     desc->params[di].name, value,
                     param_type_as_str(desc->params[di].type));
+                result = false;
+                goto terminate;
             }
         }
 
