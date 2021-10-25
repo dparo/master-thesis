@@ -232,6 +232,8 @@ bool parse_solver_param_val(SolverTypedParam *out, const char *val,
         out->sval = val;
         break;
     }
+
+    return false;
 }
 
 static bool verify_solver_params(const SolverDescriptor *descriptor,
@@ -262,7 +264,7 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
         const char *user_param_name = params->params[i].name;
         bool found_match = false;
         for (int32_t j = 0; descriptor->params[j].name != NULL; j++) {
-            const char *descr_param_name = descriptor->params[i].name;
+            const char *descr_param_name = descriptor->params[j].name;
             if (strcmp(user_param_name, descr_param_name) == 0) {
                 found_match = true;
                 break;
@@ -309,7 +311,7 @@ static bool resolve_params(const SolverParams *params,
             if (0 == strcmp(params->params[pi].name, desc->params[di].name)) {
                 if (value) {
                     fprintf(stderr,
-                            "Error: parameter `%s` specified twice or more.\n",
+                            "ERROR: parameter `%s` specified twice or more.\n",
                             params->params[pi].name);
                     goto terminate;
                 }
@@ -323,7 +325,8 @@ static bool resolve_params(const SolverParams *params,
             value = desc->params[di].default_value;
         }
 
-        // NOTE: The descriptor may not contain a default_value: therefore
+        // NOTE:
+        // The descriptor may not contain a default_value: therefore
         // `value` may still be NULL
         SolverTypedParam t = {0};
         t.type = desc->params[di].type;
@@ -332,7 +335,13 @@ static bool resolve_params(const SolverParams *params,
             t.count = 0;
         } else {
             t.count = 1;
-            // TODO: Populate the value here
+            if (!parse_solver_param_val(&t, value, desc->params[di].type)) {
+                fprintf(
+                    stderr,
+                    "ERROR: Failed to parse param `%s=%s` required as a %s\n",
+                    desc->params[di].name, value,
+                    param_type_as_str(desc->params[di].type));
+            }
         }
 
         shput(out->__sm, desc->params[di].name, t);
@@ -432,15 +441,23 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                  solver_name);
     }
 
-    if (!verify_solver_params(lookup->descriptor, params)) {
-        log_fatal("%s :: Failed to veriy params", __func__);
-        goto fail;
-    }
-
     if (randomseed == 0) {
         srand(time(NULL));
     } else {
         srand(randomseed);
+    }
+
+    if (!verify_solver_params(lookup->descriptor, params)) {
+        fprintf(stderr, "ERROR: %s :: Failed to verify params", __func__);
+        goto fail;
+    }
+
+    SolverTypedParams tparams = {0};
+
+    if (!resolve_params(params, lookup->descriptor, &tparams)) {
+        fprintf(stderr, "ERROR: %s :: Failed to resolve parameters\n",
+                __func__);
+        goto fail;
     }
 
     Solver solver = lookup->create_fn(instance, timelimit, randomseed);
@@ -476,6 +493,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     solver.destroy(&solver);
     log_solve_status(status, solver_name);
     postprocess_solver_solution(instance, status, solution, solver_name);
+    solver_typed_params_destroy(&tparams);
     return status;
 
 fail:
