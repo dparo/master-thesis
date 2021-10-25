@@ -84,7 +84,6 @@ typedef enum {
 
 typedef struct SolverTypedParam {
     int32_t count;
-    char *name;
     SolverParamType type;
     union {
         double dval;

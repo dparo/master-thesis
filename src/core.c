@@ -289,19 +289,59 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
     return result;
 }
 
-static SolverTypedParams resolve_params(const SolverParams *params,
-                                        const SolverDescriptor *desc) {
-    SolverTypedParams result = {0};
+static void solver_typed_params_destroy(SolverTypedParams *params) {
+    if (params->__sm) {
+        shfree(params->__sm);
+    }
+    memset(params, 0, sizeof(*params));
+}
+
+static bool resolve_params(const SolverParams *params,
+                           const SolverDescriptor *desc,
+                           SolverTypedParams *out) {
+    solver_typed_params_destroy(out);
+    bool result = false;
 
     for (int32_t di = 0; desc->params[di].name != 0; di++) {
+        const char *value = NULL;
         for (int32_t pi = 0;
              pi < MIN(MAX_NUM_SOLVER_PARAMS, params->num_params); pi++) {
-            // TODO:
-            //      Check if the user defined the same parameter twice, abort
-            //      in that case
+            if (0 == strcmp(params->params[pi].name, desc->params[di].name)) {
+                if (value) {
+                    fprintf(stderr,
+                            "Error: parameter `%s` specified twice or more.\n",
+                            params->params[pi].name);
+                    goto terminate;
+                }
+                value = params->params[pi].value;
+            }
         }
+
+        // If the user didn't specify any value get the default value from the
+        // descriptor
+        if (!value) {
+            value = desc->params[di].default_value;
+        }
+
+        // NOTE: The descriptor may not contain a default_value: therefore
+        // `value` may still be NULL
+        SolverTypedParam t = {0};
+        t.type = desc->params[di].type;
+
+        if (!value) {
+            t.count = 0;
+        } else {
+            t.count = 1;
+            // TODO: Populate the value here
+        }
+
+        shput(out->__sm, desc->params[di].name, t);
     }
 
+terminate:
+    if (!result) {
+        solver_typed_params_destroy(out);
+    }
     return result;
 }
 
