@@ -51,6 +51,7 @@ add_library(libcptp
     core.c
     timing.c
     validation.c
+    visualization.c
     solvers/stub.c
     solvers/mip.c
     )

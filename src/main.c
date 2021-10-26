@@ -30,6 +30,7 @@
 #include "parser.h"
 #include "timing.h"
 #include "core-utils.h"
+#include "visualization.h"
 
 #include <log.h>
 #include <argtable3.h>
@@ -73,7 +74,7 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
 
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, int32_t randomseed, const char **defines,
-                 int32_t num_defines) {
+                 int32_t num_defines, const char *vis_path) {
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
     if (instance.num_customers > 0) {
@@ -117,6 +118,10 @@ static int main2(const char *instance_filepath, const char *solver,
             TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
             print_timerepr(stdout, &solve_time_repr);
             printf("\n");
+
+            if (vis_path) {
+                tour_plot(vis_path, &instance, &solution.tour, NULL);
+            }
         }
 
         instance_destroy(&instance);
@@ -166,10 +171,15 @@ int main(int argc, char **argv) {
         arg_lit0(NULL, "version", "print version information and exit");
     struct arg_file *instance =
         arg_file1("i", "instance", NULL, "input instance file");
+
+    struct arg_file *vis_path =
+        arg_file0(NULL, "visualize", NULL, "tour visualization output file");
+
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,       version, verbose,  logfile, timelimit,
-                        randomseed, defines, instance, solver,  end};
+    void *argtable[] = {help,      version,    verbose, logfile,
+                        timelimit, randomseed, defines, instance,
+                        vis_path,  solver,     end};
 
     int nerrors;
     int exitcode = 0;
@@ -189,6 +199,8 @@ int main(int argc, char **argv) {
     solver->sval[0] = "mip";
     // No logging file by default
     logfile->filename[0] = NULL;
+    // No tour visualization file by default
+    vis_path->filename[0] = NULL;
 
     nerrors = arg_parse(argc, argv, argtable);
 
@@ -235,7 +247,8 @@ int main(int argc, char **argv) {
     }
 
     exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
-                     randomseed->ival[0], defines->sval, defines->count);
+                     randomseed->ival[0], defines->sval, defines->count,
+                     vis_path->filename[0]);
 
 exit:
     arg_freetable(argtable, ARRAY_LEN(argtable));
