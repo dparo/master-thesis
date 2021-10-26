@@ -267,7 +267,7 @@ static void print_brief_description(const char *progname) {
 }
 
 static void print_version(void) {
-    printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
+    printf("%s (revision: %s)\n", GIT_DATE, GIT_SHA1);
     printf("Compiled with %s v%s (%s), %s build\n", C_COMPILER_ID,
            C_COMPILER_VERSION, C_COMPILER_ABI, BUILD_TYPE);
 }
