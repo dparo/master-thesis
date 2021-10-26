@@ -150,6 +150,10 @@ Solution solution_create(const Instance *instance);
 void solution_destroy(Solution *solution);
 void solution_invalidate(Solution *solution);
 
+void solver_typed_params_destroy(SolverTypedParams *params);
+bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
+                    SolverTypedParams *out);
+
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed);

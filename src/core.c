@@ -128,7 +128,8 @@ Tour tour_move(Tour *other) {
     return result;
 }
 
-typedef Solver (*SolverCreateFn)(const Instance *instance, double timelimit,
+typedef Solver (*SolverCreateFn)(const Instance *instance,
+                                 SolverTypedParams *tparams, double timelimit,
                                  int32_t randomseed);
 
 static const struct SolverLookup {
@@ -297,16 +298,15 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
     return result;
 }
 
-static void solver_typed_params_destroy(SolverTypedParams *params) {
+void solver_typed_params_destroy(SolverTypedParams *params) {
     if (params->__sm) {
         shfree(params->__sm);
     }
     memset(params, 0, sizeof(*params));
 }
 
-static bool resolve_params(const SolverParams *params,
-                           const SolverDescriptor *desc,
-                           SolverTypedParams *out) {
+bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
+                    SolverTypedParams *out) {
     solver_typed_params_destroy(out);
     bool result = true;
 
@@ -474,7 +474,8 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         goto fail;
     }
 
-    Solver solver = lookup->create_fn(instance, timelimit, randomseed);
+    Solver solver =
+        lookup->create_fn(instance, &tparams, timelimit, randomseed);
     sighandler_ctx_solver_ptr = &solver;
 
     {

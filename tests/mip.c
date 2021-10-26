@@ -45,12 +45,18 @@ static void test_mip_solver_create(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     instance_set_name(&instance, "test");
-    Solver solver = mip_solver_create(&instance, TIMELIMIT, RANDOMSEED);
+    SolverParams params = {0};
+    SolverTypedParams tparams = {0};
+    bool resolved = resolve_params(&params, &MIP_SOLVER_DESCRIPTOR, &tparams);
+    TEST_ASSERT(resolved == true);
+    Solver solver =
+        mip_solver_create(&instance, &tparams, TIMELIMIT, RANDOMSEED);
     TEST_ASSERT_NOT_NULL(solver.solve);
     TEST_ASSERT_NOT_NULL(solver.destroy);
     TEST_ASSERT_NOT_NULL(solver.data);
     solver.destroy(&solver);
     instance_destroy(&instance);
+    solver_typed_params_destroy(&tparams);
 }
 
 static void test_mip_solver_solve_on_small_test_instance(void) {

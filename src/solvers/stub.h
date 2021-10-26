@@ -33,8 +33,8 @@ static const SolverDescriptor STUB_SOLVER_DESCRIPTOR = {"stub",
                                                             {0},
                                                         }};
 
-Solver stub_solver_create(const Instance *instance, double timelimit,
-                          int32_t randomseed);
+Solver stub_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                          double timelimit, int32_t randomseed);
 
 #if __cplusplus
 }

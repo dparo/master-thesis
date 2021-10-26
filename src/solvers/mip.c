@@ -27,8 +27,8 @@
 
 #ifndef COMPILED_WITH_CPLEX
 
-Solver mip_solver_create(const Instance *instance, double timelimit,
-                         int32_t randomseed) {
+Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                         double timelimit, int32_t randomseed) {
     UNUSED_PARAM(instance);
     UNUSED_PARAM(timelimit);
     UNUSED_PARAM(randomseed);
@@ -423,7 +423,6 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 
     //
     // Now create the constraints (eg add the rows)
-    //
     //
 
     validate_mip_vars_packing(instance);
@@ -956,8 +955,8 @@ fail:
     return false;
 }
 
-Solver mip_solver_create(const Instance *instance, double timelimit,
-                         int32_t randomseed) {
+Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                         double timelimit, int32_t randomseed) {
     log_trace("%s", __func__);
 
     Solver solver = {0};
