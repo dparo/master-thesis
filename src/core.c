@@ -51,39 +51,30 @@ void instance_destroy(Instance *instance) {
 }
 
 void tour_invalidate(Tour *tour) {
-
-    if (tour->num_comps) {
-        veci32_set(tour->num_comps, tour->num_vehicles, 0);
-    }
+    tour->num_comps = 0;
 
     if (tour->succ) {
-        mati32_set(tour->succ, tour->num_customers + 1, tour->num_vehicles,
-                   INT32_DEAD_VAL);
+        veci32_set(tour->succ, tour->num_customers + 1, INT32_DEAD_VAL);
     }
 
     if (tour->comp) {
-        mati32_set(tour->comp, tour->num_customers + 1, tour->num_vehicles,
-                   INT32_DEAD_VAL);
+        veci32_set(tour->comp, tour->num_customers + 1, INT32_DEAD_VAL);
     }
 }
 
 Tour tour_create(const Instance *instance) {
     Tour result = {0};
     result.num_customers = instance->num_customers;
-    result.num_vehicles = instance->num_vehicles;
 
-    result.num_comps = veci32_create(instance->num_vehicles);
-    result.succ =
-        mati32_create(instance->num_customers + 1, instance->num_vehicles);
-    result.comp =
-        mati32_create(instance->num_customers + 1, instance->num_vehicles);
+    result.num_comps = 0;
+    result.succ = veci32_create(instance->num_customers + 1);
+    result.comp = veci32_create(instance->num_customers + 1);
 
     tour_invalidate(&result);
     return result;
 }
 
 void tour_destroy(Tour *tour) {
-    free(tour->num_comps);
     free(tour->succ);
     free(tour->comp);
     memset(tour, 0, sizeof(*tour));
@@ -111,13 +102,10 @@ void solution_destroy(Solution *solution) {
 Tour tour_copy(Tour const *other) {
     Tour result = {0};
     result.num_customers = other->num_customers;
-    result.num_vehicles = other->num_vehicles;
 
-    result.num_comps = veci32_copy(other->num_comps, result.num_vehicles);
-    result.succ =
-        mati32_copy(other->succ, result.num_customers + 1, result.num_vehicles);
-    result.comp =
-        mati32_copy(other->comp, result.num_customers + 1, result.num_vehicles);
+    result.num_comps = other->num_comps;
+    result.succ = veci32_copy(other->succ, result.num_customers + 1);
+    result.comp = veci32_copy(other->comp, result.num_customers + 1);
     return result;
 }
 

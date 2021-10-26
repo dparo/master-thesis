@@ -269,7 +269,7 @@ static void print_tour(Tour *t) {
     int32_t curr_vertex = 0;
     int32_t next_vertex = curr_vertex;
 
-    while ((next_vertex = *tour_succ(t, 0, curr_vertex)) != 0) {
+    while ((next_vertex = *tsucc(t, curr_vertex)) != 0) {
         if (next_vertex == 0) {
             // Do not put the space for cleanliness if is the last vertex to be
             // printed

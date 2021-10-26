@@ -49,8 +49,7 @@ typedef struct Instance {
 
 typedef struct Tour {
     int32_t num_customers;
-    int32_t num_vehicles;
-    int32_t *num_comps;
+    int32_t num_comps;
     int32_t *succ;
     int32_t *comp;
 } Tour;

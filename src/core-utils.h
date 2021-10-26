@@ -41,68 +41,31 @@ static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
 // Eg N**2 - num_entries(diagonal)
 static inline int64_t fm_nentries(int32_t n) { return (n * n) - n; }
 
-static inline int32_t *tour_succ(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-    return mati32_access(tour->succ, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
+static inline int32_t *tsucc(Tour *tour, int32_t customer_idx) {
+    return veci32_access(tour->succ, customer_idx, tour->num_customers + 1);
 }
 
-static inline int32_t *tour_comp(Tour *tour, int32_t vehicle_idx,
-                                 int32_t customer_idx) {
-
-    return mati32_access(tour->comp, vehicle_idx, customer_idx,
-                         tour->num_customers + 1, tour->num_vehicles);
-}
-
-static inline int32_t *tour_num_comps(Tour *tour, int32_t vehicle_idx) {
-    return &tour->num_comps[vehicle_idx];
-}
-
-static inline bool tour_is_customer_served_from_vehicle(Tour *tour,
-                                                        int32_t vehicle_idx,
-                                                        int32_t customer_idx) {
-    return *tour_comp(tour, vehicle_idx, customer_idx) != -1;
-}
-
-static inline bool
-tour_is_customer_served_from_any_vehicle(Tour *tour, int32_t customer_idx) {
-    for (int32_t i = 0; i < tour->num_vehicles; i++) {
-        if (tour_is_customer_served_from_vehicle(tour, i, customer_idx)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static inline bool tour_are_all_customers_served(Tour *tour) {
-    for (int32_t i = 1; i < tour->num_customers + 1; i++) {
-        if (tour_is_customer_served_from_any_vehicle(tour, i)) {
-            return true;
-        }
-    }
-    return false;
+static inline int32_t *tcomp(Tour *tour, int32_t customer_idx) {
+    return veci32_access(tour->comp, customer_idx, tour->num_customers + 1);
 }
 
 static inline double tour_eval(const Instance *instance, Tour *tour) {
     double dist = 0.0;
     double profit = 0.0;
 
-    for (int32_t veh_idx = 0; veh_idx < instance->num_vehicles; veh_idx++) {
-        if (*tour_comp(tour, veh_idx, 0) >= 0) {
-            int32_t curr_vertex = 0;
-            int32_t next_vertex;
+    if (*tcomp(tour, 0) >= 0) {
+        int32_t curr_vertex = 0;
+        int32_t next_vertex;
 
-            profit += instance->duals[0];
+        profit += instance->duals[0];
 
-            while ((next_vertex = *tour_succ(tour, veh_idx, curr_vertex)) !=
-                   0) {
-                assert(next_vertex != curr_vertex);
-                dist += cptp_dist(instance, curr_vertex, next_vertex);
-                profit += instance->duals[next_vertex];
-                curr_vertex = next_vertex;
-            }
-            dist += cptp_dist(instance, curr_vertex, 0);
+        while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
+            assert(next_vertex != curr_vertex);
+            dist += cptp_dist(instance, curr_vertex, next_vertex);
+            profit += instance->duals[next_vertex];
+            curr_vertex = next_vertex;
         }
+        dist += cptp_dist(instance, curr_vertex, 0);
     }
 
     return dist - profit;
