@@ -27,8 +27,8 @@
 
 #ifndef COMPILED_WITH_CPLEX
 
-Solver mip_solver_create(const Instance *instance, double timelimit,
-                         int32_t randomseed) {
+Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                         double timelimit, int32_t randomseed) {
     UNUSED_PARAM(instance);
     UNUSED_PARAM(timelimit);
     UNUSED_PARAM(randomseed);
@@ -43,7 +43,7 @@ Solver mip_solver_create(const Instance *instance, double timelimit,
 #else
 
 // NOTE:
-//       cplexx is the 64 bit version of the API, while clex (one x) is the 32
+//       cplexx is the 64 bit version of the API, while cplex (one x) is the 32
 //       bit version of the API.
 #include <ilcplex/cplexx.h>
 #include <ilcplex/cpxconst.h>
@@ -82,15 +82,9 @@ typedef struct {
     } threadctx[MAX_NUM_CORES];
 } CplexCallbackCtx;
 
-static inline int32_t *num_comps(Tour *tour) { return tour_num_comps(tour, 0); }
+static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
 
-static inline int32_t *succ(Tour *tour, int32_t i) {
-    return tour_succ(tour, 0, i);
-}
-
-static inline int32_t *comp(Tour *tour, int32_t i) {
-    return tour_comp(tour, 0, i);
-}
+static inline int32_t *comp(Tour *tour, int32_t i) { return tcomp(tour, i); }
 
 static inline double cost(const Instance *instance, int32_t i, int32_t j) {
     return cptp_dist(instance, i, j);
@@ -182,13 +176,13 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
             continue; // node "start" was already visited, just skip it
 
         // a new component is found
-        (*num_comps(t)) += 1;
+        t->num_comps += 1;
         int i = start;
         bool done = false;
 
         int32_t tour_length = 0;
         while (!done) {
-            *comp(t, i) = *num_comps(t) - 1;
+            *comp(t, i) = t->num_comps - 1;
             done = true;
             tour_length += 1;
             for (int32_t j = 0; j < n; j++) {
@@ -214,7 +208,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
             // Avoid closing cycle for single node tours. They should be left
             // alone
             assert(tour_length == 1);
-            (*num_comps(t)) -= 1;
+            t->num_comps -= 1;
             *comp(t, i) = INT32_DEAD_VAL;
         }
     }
@@ -424,7 +418,6 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
     // Now create the constraints (eg add the rows)
     //
-    //
 
     validate_mip_vars_packing(instance);
 
@@ -459,10 +452,10 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
                                    int32_t thread, int32_t numthreads) {
 
-    assert(*num_comps(tour) != 1);
+    assert(tour->num_comps != 1);
 
     int32_t *num_of_nodes_in_each_comp =
-        calloc(*num_comps(tour), sizeof(*num_of_nodes_in_each_comp));
+        calloc(tour->num_comps, sizeof(*num_of_nodes_in_each_comp));
 
     CPXDIM *index = NULL;
     double *value = NULL;
@@ -476,7 +469,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
     // Count the number of nodes in each component
     for (int32_t i = 0; i < n; i++) {
-        assert(*comp(tour, i) < *num_comps(tour));
+        assert(*comp(tour, i) < tour->num_comps);
         if (*comp(tour, i) >= 0) {
             ++num_of_nodes_in_each_comp[*comp(tour, i)];
         }
@@ -485,7 +478,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
     // Small sanity check
 #ifndef NDEBUG
     {
-        for (int32_t i = 0; i < *num_comps(tour); i++) {
+        for (int32_t i = 0; i < tour->num_comps; i++) {
             assert(num_of_nodes_in_each_comp[i] >= 2);
         }
     }
@@ -502,7 +495,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
     }
 
     // Create the cut to feed CPLEX
-    for (int32_t comp_idx = 0; comp_idx < *num_comps(tour); comp_idx++) {
+    for (int32_t comp_idx = 0; comp_idx < tour->num_comps; comp_idx++) {
         assert(num_of_nodes_in_each_comp[comp_idx] >= 2);
 
         CPXNNZ nnz = 1 + num_of_nodes_in_each_comp[comp_idx] *
@@ -594,17 +587,17 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
 
     unpack_mip_solution(instance, &tour, vstar);
 
-    if (*num_comps(&tour) > 1) {
+    if (tour.num_comps > 1) {
         log_info("%s :: num_comps of unpacked tour is %d -- rejecting "
                  "candidate point...",
-                 __func__, *num_comps(&tour));
+                 __func__, tour.num_comps);
         reject_candidate_point(&tour, context, solver, instance, threadid,
                                numthreads);
     } else {
 
         log_info("%s :: num_comps of unpacked tour is %d -- accepting "
                  "candidate point...",
-                 __func__, *num_comps(&tour));
+                 __func__, tour.num_comps);
     }
 
     free(vstar);
@@ -956,8 +949,8 @@ fail:
     return false;
 }
 
-Solver mip_solver_create(const Instance *instance, double timelimit,
-                         int32_t randomseed) {
+Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                         double timelimit, int32_t randomseed) {
     log_trace("%s", __func__);
 
     Solver solver = {0};

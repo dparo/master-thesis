@@ -26,15 +26,14 @@
 extern "C" {
 #endif
 
-#include "core.h"
+#include "types.h"
+#include "misc.h"
 
-static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {"mip",
-                                                       {
-                                                           {0},
-                                                       }};
-
-Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
-                         double timelimit, int32_t seed);
+bool str_to_int32(const char *string, int32_t *out);
+bool str_to_double(const char *string, double *out);
+bool str_to_float(const char *string, float *out);
+bool str_to_bool(const char *string, bool *out);
+bool str_to_usize(const char *string, size_t *out);
 
 #if __cplusplus
 }

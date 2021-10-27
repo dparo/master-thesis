@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <time.h>
+#include <string.h>
 
 #include "misc.h"
 #include "version.h"
@@ -29,6 +30,7 @@
 #include "parser.h"
 #include "timing.h"
 #include "core-utils.h"
+#include "visualization.h"
 
 #include <log.h>
 #include <argtable3.h>
@@ -40,13 +42,44 @@ static void print_version(void);
 static void print_use_help_for_more_information(const char *progname);
 static void print_tour(Tour *t);
 
+static inline SolverParams
+make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
+    SolverParams result = {0};
+    if (num_defines > MAX_NUM_SOLVER_PARAMS) {
+        fprintf(stderr,
+                "Too many parameters definitions, %d max, got %d instead",
+                MAX_NUM_SOLVER_PARAMS, num_defines);
+        fflush(stderr);
+        abort();
+    }
+
+    for (int32_t i = 0; i < MIN(MAX_NUM_SOLVER_PARAMS, num_defines); i++) {
+        const char *name = defines[i];
+        const char *value;
+        char *equal = strchr(defines[i], '=');
+        if (equal) {
+            *equal = 0;
+            value = equal + 1;
+        } else {
+            value = defines[i] + strlen(defines[i]);
+        }
+
+        result.params[i].name = name;
+        result.params[i].value = value;
+        result.num_params++;
+    }
+
+    return result;
+}
+
 static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, int32_t randomseed, const char **defines,
-                 int32_t num_defines) {
+                 int32_t num_defines, const char *vis_path) {
     const char *filepath = instance_filepath;
     Instance instance = parse(filepath);
     if (instance.num_customers > 0) {
-        SolverParams params = {0};
+        SolverParams params =
+            make_solver_params_from_cmdline(defines, num_defines);
         Solution solution = solution_create(&instance);
 
         bool success = false;
@@ -59,7 +92,7 @@ static int main2(const char *instance_filepath, const char *solver,
                 cptp_solve(&instance, solver ? solver : "mip", &params,
                            &solution, timelimit, randomseed);
 
-            success = cptp_solve_found_tour_solution(status);
+            success = cptp_solve_did_found_tour_solution(status);
 
             time_t ended = time(NULL);
             usecs_t solve_time = os_get_usecs() - begin_solve_time;
@@ -85,6 +118,10 @@ static int main2(const char *instance_filepath, const char *solver,
             TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
             print_timerepr(stdout, &solve_time_repr);
             printf("\n");
+
+            if (vis_path) {
+                tour_plot(vis_path, &instance, &solution.tour, NULL);
+            }
         }
 
         instance_destroy(&instance);
@@ -134,10 +171,15 @@ int main(int argc, char **argv) {
         arg_lit0(NULL, "version", "print version information and exit");
     struct arg_file *instance =
         arg_file1("i", "instance", NULL, "input instance file");
+
+    struct arg_file *vis_path =
+        arg_file0(NULL, "visualize", NULL, "tour visualization output file");
+
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,       version, verbose,  logfile, timelimit,
-                        randomseed, defines, instance, solver,  end};
+    void *argtable[] = {help,      version,    verbose, logfile,
+                        timelimit, randomseed, defines, instance,
+                        vis_path,  solver,     end};
 
     int nerrors;
     int exitcode = 0;
@@ -157,6 +199,8 @@ int main(int argc, char **argv) {
     solver->sval[0] = "mip";
     // No logging file by default
     logfile->filename[0] = NULL;
+    // No tour visualization file by default
+    vis_path->filename[0] = NULL;
 
     nerrors = arg_parse(argc, argv, argtable);
 
@@ -166,6 +210,7 @@ int main(int argc, char **argv) {
         printf("Usage: %s", progname);
         arg_print_syntax(stdout, argtable, "\n");
         arg_print_glossary(stdout, argtable, "  %-32s %s\n");
+        cptp_print_list_of_solvers_and_params();
         exitcode = 0;
         goto exit;
     }
@@ -202,7 +247,8 @@ int main(int argc, char **argv) {
     }
 
     exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
-                     randomseed->ival[0], defines->sval, defines->count);
+                     randomseed->ival[0], defines->sval, defines->count,
+                     vis_path->filename[0]);
 
 exit:
     arg_freetable(argtable, ARRAY_LEN(argtable));
@@ -221,7 +267,7 @@ static void print_brief_description(const char *progname) {
 }
 
 static void print_version(void) {
-    printf("%s (GIT SHA: %s)\n", GIT_DATE, GIT_SHA1);
+    printf("%s (revision: %s)\n", GIT_DATE, GIT_SHA1);
     printf("Compiled with %s v%s (%s), %s build\n", C_COMPILER_ID,
            C_COMPILER_VERSION, C_COMPILER_ABI, BUILD_TYPE);
 }
@@ -236,7 +282,7 @@ static void print_tour(Tour *t) {
     int32_t curr_vertex = 0;
     int32_t next_vertex = curr_vertex;
 
-    while ((next_vertex = *tour_succ(t, 0, curr_vertex)) != 0) {
+    while ((next_vertex = *tsucc(t, curr_vertex)) != 0) {
         if (next_vertex == 0) {
             // Do not put the space for cleanliness if is the last vertex to be
             // printed

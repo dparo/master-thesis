@@ -29,6 +29,7 @@ extern "C" {
 #include "types.h"
 #include "utils.h"
 #include "timing.h"
+#include <stb_ds.h>
 
 #define INT32_DEAD_VAL (INT32_MIN >> 1)
 
@@ -48,8 +49,7 @@ typedef struct Instance {
 
 typedef struct Tour {
     int32_t num_customers;
-    int32_t num_vehicles;
-    int32_t *num_comps;
+    int32_t num_comps;
     int32_t *succ;
     int32_t *comp;
 } Tour;
@@ -67,18 +67,49 @@ typedef struct SolverData SolverData;
 typedef struct SolverParams {
     int32_t num_params;
     struct {
-        char *name;
-        char *value;
+        const char *name;
+        const char *value;
     } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
+
+typedef enum {
+    SOLVER_TYPED_PARAM_DOUBLE,
+    SOLVER_TYPED_PARAM_FLOAT,
+    SOLVER_TYPED_PARAM_BOOL,
+    SOLVER_TYPED_PARAM_INT32,
+    SOLVER_TYPED_PARAM_USIZE,
+    SOLVER_TYPED_PARAM_STR,
+} SolverParamType;
+
+typedef struct SolverTypedParam {
+    int32_t count;
+    SolverParamType type;
+    union {
+        double dval;
+        float fval;
+        int32_t ival;
+        size_t sizeval;
+        bool bval;
+        const char *sval;
+    };
+} SolverTypedParam;
+
+typedef struct SolverTypedParams {
+
+    // NOTE: Hashtable use <stb_ds.h> : shput(), shget() and alike
+    struct {
+        char *key;
+        SolverTypedParam value;
+    } * __sm;
+} SolverTypedParams;
 
 typedef struct SolverDescriptor {
     char *name;
     struct {
-        bool required;
-        char *name;
-        char *type;
-        char *default_value;
+        const char *name;
+        SolverParamType type;
+        const char *default_value;
+        const char *glossary;
     } params[];
 } SolverDescriptor;
 
@@ -118,11 +149,17 @@ Solution solution_create(const Instance *instance);
 void solution_destroy(Solution *solution);
 void solution_invalidate(Solution *solution);
 
+void solver_typed_params_destroy(SolverTypedParams *params);
+bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
+                    SolverTypedParams *out);
+
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed);
 
-static inline bool cptp_solve_found_tour_solution(SolveStatus status) {
+void cptp_print_list_of_solvers_and_params(void);
+
+static inline bool cptp_solve_did_found_tour_solution(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_OPTIMAL;

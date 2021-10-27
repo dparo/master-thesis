@@ -47,14 +47,16 @@ configure_file("${CMAKE_SOURCE_DIR}/src/version.c.in" "${CMAKE_BINARY_DIR}/src/v
 add_library(libcptp
     types.c
     parser.c
+    parsing-utils.c
     core.c
     timing.c
     validation.c
+    visualization.c
     solvers/stub.c
     solvers/mip.c
     )
 target_include_directories(libcptp PUBLIC ./)
-target_link_libraries(libcptp PUBLIC logc)
+target_link_libraries(libcptp PUBLIC logc libstb)
 
 if (NOT WIN32)
     target_link_libraries(libcptp PUBLIC m)

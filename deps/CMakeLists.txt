@@ -78,6 +78,8 @@ set(ARGTABLE3_ENABLE_EXAMPLES OFF CACHE BOOL "Enable examples")
 fetchgitsubmodule("${DEPS_DIR}/log.c")
 fetchgitsubmodule("${DEPS_DIR}/Unity")
 fetchgitsubmodule("${DEPS_DIR}/argtable3")
+fetchgitsubmodule("${DEPS_DIR}/stb")
+
 
 
 # Customize logc
@@ -90,11 +92,19 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Relase")
     target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_INFO")
 endif()
 
+# Customize stb
+
+add_library(libstb STATIC
+  stb_impl.c
+)
+target_include_directories(libstb PUBLIC "${DEPS_DIR}/stb")
+
+
 # Customize argtable3
 
 # Customize unity
 
-target_compile_definitions(unity PUBLIC UNITY_INCLUDE_PRINT_FORMATTED "UNITY_EXCLUDE_SETJMP_H=1" "UNITY_USE_FLUSH_STDOUT=1")
+target_compile_definitions(unity PUBLIC UNITY_INCLUDE_PRINT_FORMATTED "UNITY_EXCLUDE_SETJMP_H=1" "UNITY_USE_FLUSH_STDOUT=1" "UNITY_INCLUDE_DOUBLE=1")
 if (MSVC)
     target_compile_definitions(unity PUBLIC "UNITY_NORETURN=__declspec(noreturn)")
 endif()

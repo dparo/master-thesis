@@ -89,11 +89,16 @@ int32_t *mati32_create(int32_t w, int32_t h);
 int32_t *veci32_copy(int32_t *other, int32_t len);
 int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h);
 
+static inline int32_t *veci32_access(int32_t *vec, int32_t idx, int32_t len) {
+    assert(idx >= 0 && idx < len);
+    return &vec[idx];
+}
+
 static inline int32_t *mati32_access(int32_t *mat, int32_t row, int32_t col,
                                      int32_t width,
                                      ATTRIB_MAYBE_UNUSED int32_t height) {
-    assert(row >= 0 && row <= height);
-    assert(col >= 0 && col <= width);
+    assert(row >= 0 && row < height);
+    assert(col >= 0 && col < width);
     return &mat[row * width + col];
 }
 
@@ -119,8 +124,10 @@ typedef struct EnumToStrMapping {
     const char *name;
 } EnumToStrMapping;
 
-#define ENUM_TO_STR_TABLE_FIELD(x)                                             \
-    { (x), #x }
+#define ENUM_TO_STR_TABLE_FIELD_CUSTOM(x, STR)                                 \
+    { (x), STR }
+
+#define ENUM_TO_STR_TABLE_FIELD(x) ENUM_TO_STR_TABLE_FIELD_CUSTOM(x, #x)
 
 #define ENUM_TO_STR_TABLE_DECL(ENUM_TYPE)                                      \
     const EnumToStrMapping ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE[]

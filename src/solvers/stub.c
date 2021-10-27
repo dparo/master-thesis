@@ -30,8 +30,10 @@ static SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
 
 static void destroy(ATTRIB_MAYBE_UNUSED Solver *self) {}
 
-Solver stub_solver_create(ATTRIB_MAYBE_UNUSED const Instance *instance,
+Solver stub_solver_create(const Instance *instance, SolverTypedParams *tparams,
                           double timelimit, int32_t randomseed) {
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(tparams);
     UNUSED_PARAM(timelimit);
     UNUSED_PARAM(randomseed);
     Solver solver = {0};

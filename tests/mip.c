@@ -45,12 +45,18 @@ static void test_mip_solver_create(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
     Instance instance = parse(filepath);
     instance_set_name(&instance, "test");
-    Solver solver = mip_solver_create(&instance, TIMELIMIT, RANDOMSEED);
+    SolverParams params = {0};
+    SolverTypedParams tparams = {0};
+    bool resolved = resolve_params(&params, &MIP_SOLVER_DESCRIPTOR, &tparams);
+    TEST_ASSERT(resolved == true);
+    Solver solver =
+        mip_solver_create(&instance, &tparams, TIMELIMIT, RANDOMSEED);
     TEST_ASSERT_NOT_NULL(solver.solve);
     TEST_ASSERT_NOT_NULL(solver.destroy);
     TEST_ASSERT_NOT_NULL(solver.data);
     solver.destroy(&solver);
     instance_destroy(&instance);
+    solver_typed_params_destroy(&tparams);
 }
 
 static void test_mip_solver_solve_on_small_test_instance(void) {
@@ -60,12 +66,12 @@ static void test_mip_solver_solve_on_small_test_instance(void) {
     Solution solution = solution_create(&instance);
     SolveStatus status =
         cptp_solve(&instance, "mip", &params, &solution, TIMELIMIT, RANDOMSEED);
-    TEST_ASSERT(cptp_solve_found_tour_solution(status));
+    TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
     TEST_ASSERT(status == SOLVE_STATUS_FEASIBLE ||
                 status == SOLVE_STATUS_OPTIMAL);
     TEST_ASSERT(solution.lower_bound != -INFINITY);
     TEST_ASSERT(solution.upper_bound != +INFINITY);
-    TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
+    TEST_ASSERT(solution.tour.num_comps == 1);
     instance_destroy(&instance);
     solution_destroy(&solution);
 }
@@ -78,10 +84,10 @@ static void test_mip_solver_solve_on_some_instances(void) {
             Solution solution = solution_create(&instance);
             SolveStatus status = cptp_solve(&instance, "mip", &params,
                                             &solution, TIMELIMIT, RANDOMSEED);
-            TEST_ASSERT(cptp_solve_found_tour_solution(status));
+            TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
             TEST_ASSERT(solution.lower_bound != -INFINITY);
             TEST_ASSERT(solution.upper_bound != +INFINITY);
-            TEST_ASSERT(*tour_num_comps(&solution.tour, 0) == 1);
+            TEST_ASSERT(solution.tour.num_comps == 1);
             instance_destroy(&instance);
             solution_destroy(&solution);
         }
