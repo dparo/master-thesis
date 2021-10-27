@@ -46,12 +46,6 @@ void validate_solution(const Instance *instance, Solution *solution) {
 
 void validate_tour(const Instance *instance, Tour *tour) {
 #ifndef NDEBUG
-
-    // TODO:
-    //     For now we are going to handle the single vehicle case
-    //
-
-    int32_t num_vehicles = 1;
     int32_t n = tour->num_customers + 1;
 
     //
