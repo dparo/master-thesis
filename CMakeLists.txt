@@ -2,6 +2,21 @@ cmake_minimum_required(VERSION 3.14)
 
 project(cptp VERSION 0.1.0)
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
+option(BUILD_DOC "Build documentation" OFF)
+
+if (BUILD_DOC)
+    set(DOXYGEN_GENERATE_HTML ON)
+    set(DOXYGEN_GENERATE_MAN OFF)
+    find_package(Doxygen OPTIONAL_COMPONENTS mscgen dia dot)
+endif()
+
+if(NOT BUILD_DOC OR NOT DOXYGEN_FOUND)
+    function(doxygen_add_docs)
+    endfunction()
+endif()
+
+
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     option(ENABLE_ADRESS_SANITIZER "Enable address sanitizer for supported compilers and DEBUG builds" ON)
 endif()

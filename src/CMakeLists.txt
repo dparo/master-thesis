@@ -42,6 +42,7 @@ execute_process(COMMAND
 
 # generate version.c
 configure_file("${CMAKE_SOURCE_DIR}/src/version.c.in" "${CMAKE_BINARY_DIR}/src/version.c" @ONLY)
+doxygen_add_docs(docs "${CMAKE_SOURCE_DIR}/src/")
 
 
 add_library(libcptp
