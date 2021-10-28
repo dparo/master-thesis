@@ -28,7 +28,7 @@ This work tries to revisit, and if possible improve, the original work of Jepsen
     - A working `C` compiler
     - `cmake`
     - `git`
-    - `CPLEX v>=12.10`: A free academic license can be downloaded at this [URL](https://www.ibm.com/academic/topic/data-science)
+    - `CPLEX>=12.10`: A free academic license can be downloaded at this [URL](https://www.ibm.com/academic/topic/data-science)
 - Getting the source code:
     ```bash
     git clone --recursive https://github.com/dparo/master-thesis/
