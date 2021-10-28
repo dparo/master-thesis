@@ -54,7 +54,7 @@ static void validate_instance(Instance *instance,
     if (0) {
         TEST_ASSERT(instance->duals[0] == 0.0);
         for (int32_t i = 1; i < instance->num_customers + 1; i++)
-            TEST_ASSERT(instance->duals[i] > 0.0);
+            TEST_ASSERT(instance->duals[i] >= 0.0);
     }
 }
 
