@@ -263,11 +263,12 @@ exit:
 
 static void print_brief_description(const char *progname) {
     UNUSED_PARAM(progname);
-    printf("The Capacitated Profitable Tour Problem (CPTP) solver\n");
+    printf("%s: %s\n", PROJECT_NAME, PROJECT_DESCRIPTION);
 }
 
 static void print_version(void) {
-    printf("%s (revision: %s)\n", GIT_DATE, GIT_SHA1);
+    printf("%s v%s (%s, revision: %s)\n", PROJECT_NAME, PROJECT_VERSION,
+           GIT_DATE, GIT_SHA1);
     printf("Compiled with %s v%s (%s), %s build\n", C_COMPILER_ID,
            C_COMPILER_VERSION, C_COMPILER_ABI, BUILD_TYPE);
 }

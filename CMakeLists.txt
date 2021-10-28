@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(cptp VERSION 0.1.0)
+project(cptp
+    VERSION 0.1.0
+    DESCRIPTION "A Capacitated Profitable Tour Problem solver"
+)
+
 option(CODE_COVERAGE "Enable coverage reporting" OFF)
 option(BUILD_DOC "Build documentation" OFF)
 
