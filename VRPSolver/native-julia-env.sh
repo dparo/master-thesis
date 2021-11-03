@@ -6,7 +6,8 @@ cd "$(dirname "$0")" || exit 1
 set -x
 
 docker save -o vrpsolver-dump.tar bapdock
-mkdir "$PWD/vrpsolver-dump" && pushd "$PWD/vrpsolver-dump" || exit 1
+rm -rf "$PWD/vrpsolver-dump"
+mkdir  -p "$PWD/vrpsolver-dump" && pushd "$PWD/vrpsolver-dump" || exit 1
 tar -xf ../vrpsolver-dump.tar
 pushd 9b89c96fbb8dfbf0219c0f6e9fdd732859af7fc5f0e8a3ddaea4763ef5d357cc || exit 1
 tar -xf layer.tar
@@ -29,7 +30,7 @@ fi
 PWD="$(pwd)"
 export LD_LIBRARY_PATH="${PWD}/bin"
 
-mkdir bin
+mkdir -p bin
 ln -s "$CPLEX_DYN_LIB" bin/libcplex12x.so
 
 rm -rf "$HOME/.julia/compiled"
