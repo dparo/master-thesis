@@ -37,4 +37,5 @@ rm -rf "$HOME/.julia/compiled"
 julia <<END
     import Pkg
     Pkg.precompile()
+    Pkg.add("Debugger")
 END
