@@ -3,20 +3,21 @@
 
 cd "$(dirname "$0")" || exit 1
 
+set -x
+
 docker save -o vrpsolver-dump.tar bapdock
 mkdir "$PWD/vrpsolver-dump" && pushd "$PWD/vrpsolver-dump" || exit 1
 tar -xf ../vrpsolver-dump.tar
 pushd 9b89c96fbb8dfbf0219c0f6e9fdd732859af7fc5f0e8a3ddaea4763ef5d357cc || exit 1
 tar -xf layer.tar
-rm -r "$HOME/.julia"
-cp -rf ./root/julia "$HOME/.julia"
+cp -rf ./root/.julia "$HOME/.julia"
 popd || exit 1
 popd || exit 1
 
 rm -f "$PWD/vrpsolver-dump.tar"
 rm -rf "$PWD/vrpsolver-dump"
 
-chown -r "$USER:$USER" "$HOME/.julia"
+chown --recursive "$USER:$USER" "$HOME/.julia"
 
 CPLEX_DYN_LIB="/opt/ibm/ILOG/CPLEX_Studio1210/cplex/bin/x86-64_linux/libcplex12100.so"
 
