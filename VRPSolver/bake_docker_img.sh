@@ -12,7 +12,7 @@ INPUT_IMG="bapdock.img.backup"
 OUTPUT_IMG="bapdock"
 
 if [ ! -f "${INPUT_IMG}" ]; then
-	cp "${OUTPUT_IMG}" "${INPUT_IMG}"
+	cp bapdock.img "${INPUT_IMG}"
 fi
 
 docker import -c 'ENTRYPOINT ["/julia"]' bapdock.img.backup bapdock-init
