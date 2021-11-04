@@ -1,7 +1,12 @@
-/vrpsolver*/
+/vrpsolver-docker-v*/
+/bapcod-v*/
 /*.tar
 ImageDump.tar
 ImageDump
 MinimalImageDump.zip
 MinimalImageDump
 bin/
+
+/BapcodFramework
+/archives/
+/*.tar.gz
