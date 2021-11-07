@@ -10,3 +10,6 @@
 [submodule "deps/stb"]
 	path = deps/stb
 	url = https://github.com/nothings/stb
+[submodule "deps/doxygen-awesome"]
+	path = deps/doxygen-awesome-css
+	url = https://github.com/jothepro/doxygen-awesome-css.git
