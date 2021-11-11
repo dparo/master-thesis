@@ -33,6 +33,13 @@ extern "C" {
 
 #define INT32_DEAD_VAL (INT32_MIN >> 1)
 
+typedef enum DistanceRounding {
+    CPTP_DIST_ROUND = 0, /// default
+    CPTP_DIST_NO_ROUND = 1,
+    CPTP_DIST_CEIL = 2,
+    CPTP_DIST_FLOOR = 3,
+} DistanceRounding;
+
 typedef struct Instance {
     char *name;
 
@@ -40,11 +47,11 @@ typedef struct Instance {
     int32_t num_vehicles;
     double vehicle_cap;
 
-    struct {
-        Vec2d *positions;
-        double *demands;
-        double *duals;
-    };
+    DistanceRounding rounding_strat;
+    Vec2d *positions;
+    double *demands;
+    double *duals;
+
 } Instance;
 
 typedef struct Tour {

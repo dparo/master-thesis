@@ -32,7 +32,21 @@ extern "C" {
 static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
     assert(i >= 0 && i < instance->num_customers + 1);
     assert(j >= 0 && j < instance->num_customers + 1);
-    return vec2d_dist(&instance->positions[i], &instance->positions[j]);
+    double distance =
+        vec2d_dist(&instance->positions[i], &instance->positions[j]);
+
+    switch (instance->rounding_strat) {
+    case CPTP_DIST_ROUND: /// Default
+        return round(distance);
+    case CPTP_DIST_NO_ROUND:
+        return distance;
+    case CPTP_DIST_CEIL:
+        return ceil(distance);
+    case CPTP_DIST_FLOOR:
+        return floor(distance);
+    default:
+        assert(!"Invalid code path!");
+    }
 }
 
 static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }

@@ -157,6 +157,7 @@ bool parse_file(Instance *instance, FILE *filehandle, const char *filepath) {
 Instance parse(const char *filepath) {
     FILE *filehandle = fopen(filepath, "r");
     Instance result = {0};
+    result.rounding_strat = CPTP_DIST_ROUND;
     bool success = false;
 
     if (filehandle) {
