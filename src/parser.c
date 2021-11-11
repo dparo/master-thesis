@@ -220,7 +220,7 @@ ATTRIB_PRINTF(2, 3)
 static void parse_error(VrplibParser *p, char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "%s:%d [ERROR] ", p->filename, p->curline);
+    fprintf(stderr, "%s:%d: error: ", p->filename, p->curline);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
 }
@@ -252,40 +252,51 @@ static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
     return NULL;
 }
 
-static bool parse_vrp_hdr(VrplibParser *p) {
+static bool parse_vrplib_hdr(VrplibParser *p) {
     bool result = true;
     while (!parser_is_eof(p)) {
-        bool header_terminated = false;
+        bool header_terminated = parser_match_string(p, "NODE_COORD_SECTION") &&
+                                 parser_match_newline(p);
         if (header_terminated) {
             break;
         }
 
         char *value = NULL;
         if ((value = parse_hdr_field(p, "NAME"))) {
+            // TODO
         } else if ((value = parse_hdr_field(p, "COMMENT"))) {
-
+            // TODO
         } else if ((value = parse_hdr_field(p, "TYPE"))) {
-
+            if (0 != strcmp(value, "CVRP")) {
+                parse_error(p,
+                            "only CVRP type is supported. Found `%s` "
+                            "instead",
+                            value);
+                result = false;
+            }
         } else if ((value = parse_hdr_field(p, "DIMENSION"))) {
-
-            free(value);
+            // TODO
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
             if (0 != strcmp(value, "EUC_2D")) {
                 parse_error(
                     p,
-                    "Only EUC_2D edge weight type is supported. Found `%s` "
+                    "only EUC_2D edge weight type is supported. Found `%s` "
                     "instead",
                     value);
                 result = false;
             }
+        } else if ((value = parse_hdr_field(p, "CAPACITY"))) {
+            // TODO
         } else {
+            parse_error(p, "while parsing header encountered invalid input");
             result = false;
         }
 
+        if (value) {
+            free(value);
+        }
+
         if (result == false) {
-            if (value) {
-                free(value);
-            }
             goto terminate;
         }
     }
@@ -293,6 +304,16 @@ static bool parse_vrp_hdr(VrplibParser *p) {
 terminate:
     return result;
 }
+
+static bool parse_vrplib_nodecoord_section(VrplibParser *p) {}
+
+static bool parse_vrplib_demand_section(VrplibParser *p) {}
+
+static bool parse_vrplib_reducedcost_section(VrplibParser *p) {}
+
+static bool parse_vrplib_profit_section(VrplibParser *p) {}
+
+static bool parse_vrplib_depot_section(VrplibParser *p) {}
 
 bool parse_vrp_file(Instance *instance, FILE *filehandle,
                     const char *filepath) {

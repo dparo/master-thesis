@@ -109,6 +109,8 @@ extern "C" {
 #define todo(...) assert(!"!!!TODO!!!")
 #define todo_msg(msg) assert(!(msg))
 
+#define free(x) (free(x), x = NULL)
+
 #if __cplusplus
 }
 #endif
