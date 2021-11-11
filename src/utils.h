@@ -90,6 +90,13 @@ extern "C" {
         abort();                                                               \
     } while (0)
 
+static inline size_t get_file_size(FILE *f) {
+    fseek(f, 0L, SEEK_END);
+    size_t result = ftell(f);
+    fseek(f, 0L, SEEK_SET);
+    return result;
+}
+
 #if __cplusplus
 }
 #endif

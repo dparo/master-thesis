@@ -108,7 +108,7 @@ static bool parse_line(Instance *instance, FILE *filehandle,
     return true;
 }
 
-bool prep_memory(Instance *instance) {
+static bool prep_memory(Instance *instance) {
 
     instance->positions =
         calloc(instance->num_customers + 1, sizeof(*instance->positions));
@@ -122,7 +122,8 @@ bool prep_memory(Instance *instance) {
     return instance->positions && instance->demands && instance->duals;
 }
 
-bool parse_file(Instance *instance, FILE *filehandle, const char *filepath) {
+static bool parse_file(Instance *instance, FILE *filehandle,
+                       const char *filepath) {
     int32_t line_cnt = 0;
     int32_t found_num_customers = 0;
 
@@ -152,6 +153,182 @@ bool parse_file(Instance *instance, FILE *filehandle, const char *filepath) {
     }
 
     return true;
+}
+
+typedef struct VrplibParser {
+    const char *filename;
+    char *base;
+    char *at;
+    int32_t curline;
+    int32_t size;
+} VrplibParser;
+
+static inline int32_t parser_remainder_size(const VrplibParser *p) {
+    return p->base - p->at + p->size;
+}
+
+static inline void parser_adv(VrplibParser *p, int32_t amt) {
+    assert(amt != 0);
+    amt = MIN(amt, parser_remainder_size(p));
+    p->at += amt;
+}
+
+static inline bool parser_is_eof(const VrplibParser *p) {
+    return parser_remainder_size(p) == 0;
+}
+
+static inline void parser_eat_whitespaces(VrplibParser *p) {
+    while (!parser_is_eof(p) && (*p->at == ' ' || *p->at == '\t')) {
+        parser_adv(p, 1);
+    }
+}
+
+static inline void parser_eat_newline(VrplibParser *p) {
+    parser_eat_whitespaces(p);
+
+    while (!parser_is_eof(p) && (*p->at == '\r' || *p->at == '\n')) {
+        if (*p->at == '\r') {
+            parser_adv(p, 1);
+            if (!parser_is_eof(p) && (*p->at == '\n')) {
+                parser_adv(p, 1);
+            }
+            p->curline += 1;
+        }
+    }
+}
+
+static inline bool parser_match_newline(VrplibParser *p) {
+    parser_eat_whitespaces(p);
+    int32_t cache_curline = p->curline;
+    parser_eat_newline(p);
+    return p->curline > cache_curline;
+}
+
+static inline bool parser_match_string(VrplibParser *p, char *string) {
+    parser_eat_whitespaces(p);
+    int32_t len = MIN(parser_remainder_size(p), (int32_t)strlen(string));
+    bool result = (0 == strncmp(string, p->at, len));
+
+    if (result) {
+        parser_adv(p, len);
+    }
+    parser_eat_whitespaces(p);
+    return result;
+}
+
+ATTRIB_PRINTF(2, 3)
+static void parse_error(VrplibParser *p, char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    fprintf(stderr, "%s:%d [ERROR] ", p->filename, p->curline);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+}
+
+static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
+    if (parser_match_string(p, fieldname)) {
+        parser_eat_whitespaces(p);
+
+        if (parser_match_string(p, ":")) {
+            char *at = p->at;
+
+            while (!parser_is_eof(p)) {
+                bool is_newline = (*p->at == '\r' || *p->at == '\n');
+                if (is_newline) {
+                    break;
+                }
+                parser_adv(p, 1);
+            };
+            size_t namesize = (p->at - 1) - at;
+            char *name = malloc(namesize + 1);
+            name[namesize] = 0;
+            strncpy(name, at, namesize);
+            return name;
+        } else {
+            return NULL;
+        }
+    }
+
+    return NULL;
+}
+
+static bool parse_vrp_hdr(VrplibParser *p) {
+    bool result = true;
+    while (!parser_is_eof(p)) {
+        bool header_terminated = false;
+        if (header_terminated) {
+            break;
+        }
+
+        char *value = NULL;
+        if ((value = parse_hdr_field(p, "NAME"))) {
+        } else if ((value = parse_hdr_field(p, "COMMENT"))) {
+
+        } else if ((value = parse_hdr_field(p, "TYPE"))) {
+
+        } else if ((value = parse_hdr_field(p, "DIMENSION"))) {
+
+            free(value);
+        } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
+            if (0 != strcmp(value, "EUC_2D")) {
+                parse_error(
+                    p,
+                    "Only EUC_2D edge weight type is supported. Found `%s` "
+                    "instead",
+                    value);
+                result = false;
+            }
+        } else {
+            result = false;
+        }
+
+        if (result == false) {
+            if (value) {
+                free(value);
+            }
+            goto terminate;
+        }
+    }
+
+terminate:
+    return result;
+}
+
+bool parse_vrp_file(Instance *instance, FILE *filehandle,
+                    const char *filepath) {
+
+    bool result = true;
+    size_t filesize = get_file_size(filehandle);
+
+    // + 1 for null termination
+    char *buffer = malloc(filesize + 1);
+    if (!buffer) {
+        result = false;
+        goto terminate;
+    }
+
+    size_t readamt = fread(buffer, 1, filesize, filehandle);
+    if (readamt != filesize) {
+        result = false;
+        goto terminate;
+    }
+
+    // NULL terminate the buffer
+    buffer[filesize] = 0;
+    VrplibParser parser = {0};
+    parser.filename = filepath;
+    parser.base = buffer;
+    parser.at = buffer;
+    parser.size = filesize;
+
+    // First extract the header informations
+    bool hdr_parse_result = parse_vrplib_hdr(&parser);
+
+terminate:
+    if (buffer) {
+        free(buffer);
+    }
+    return result;
 }
 
 Instance parse(const char *filepath) {
