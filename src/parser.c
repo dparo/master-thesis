@@ -21,6 +21,8 @@
  */
 
 #include "parser.h"
+#include "parsing-utils.h"
+#include "core-utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -155,12 +157,19 @@ static bool parse_file(Instance *instance, FILE *filehandle,
     return true;
 }
 
+typedef enum EdgeWeightFormat {
+    EDGE_WEIGHT_FORMAT_FUNCTION = 0,
+    EDGE_WEIGHT_FORMAT_UPPER_ROW = 1,
+} EdgeWeightFormat;
+
 typedef struct VrplibParser {
     const char *filename;
     char *base;
     char *at;
     int32_t curline;
     int32_t size;
+
+    EdgeWeightFormat edgew_format;
 } VrplibParser;
 
 static inline int32_t parser_remainder_size(const VrplibParser *p) {
@@ -218,11 +227,12 @@ static inline bool parser_match_string(VrplibParser *p, char *string) {
 
 ATTRIB_PRINTF(2, 3)
 static void parse_error(VrplibParser *p, char *fmt, ...) {
+    fprintf(stderr, "%s:%d: error: ", p->filename, p->curline);
     va_list ap;
     va_start(ap, fmt);
-    fprintf(stderr, "%s:%d: error: ", p->filename, p->curline);
     vfprintf(stderr, fmt, ap);
     va_end(ap);
+    fprintf(stderr, "\n");
 }
 
 static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
@@ -252,20 +262,15 @@ static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
     return NULL;
 }
 
-static bool parse_vrplib_hdr(VrplibParser *p) {
+static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
     bool result = true;
-    while (!parser_is_eof(p)) {
-        bool header_terminated = parser_match_string(p, "NODE_COORD_SECTION") &&
-                                 parser_match_newline(p);
-        if (header_terminated) {
-            break;
-        }
-
+    bool done = false;
+    while (!parser_is_eof(p) && !done) {
         char *value = NULL;
         if ((value = parse_hdr_field(p, "NAME"))) {
-            // TODO
+            instance_set_name(instance, value);
         } else if ((value = parse_hdr_field(p, "COMMENT"))) {
-            // TODO
+            instance->comment = strdup(value);
         } else if ((value = parse_hdr_field(p, "TYPE"))) {
             if (0 != strcmp(value, "CVRP")) {
                 parse_error(p,
@@ -275,7 +280,15 @@ static bool parse_vrplib_hdr(VrplibParser *p) {
                 result = false;
             }
         } else if ((value = parse_hdr_field(p, "DIMENSION"))) {
-            // TODO
+            int32_t dim = 0;
+            if (!str_to_int32(value, &dim)) {
+                parse_error(p,
+                            "expected valid integer for DIMENSION field. Got "
+                            "`%s` instead",
+                            value);
+                result = false;
+            }
+            instance->num_customers = MIN(0, dim - 1);
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
             if (0 != strcmp(value, "EUC_2D")) {
                 parse_error(
@@ -285,11 +298,28 @@ static bool parse_vrplib_hdr(VrplibParser *p) {
                     value);
                 result = false;
             }
+        } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_FORMAT"))) {
+            if (0 == strcmp(value, "FUNCTION")) {
+                p->edgew_format = EDGE_WEIGHT_FORMAT_FUNCTION;
+            } else if (0 == strcmp(value, "UPPER_ROW")) {
+                p->edgew_format = EDGE_WEIGHT_FORMAT_UPPER_ROW;
+            } else {
+                parse_error(p, "unsupported format `%s` for EDGE_WEIGHT_FORMAT",
+                            value);
+                result = false;
+            }
         } else if ((value = parse_hdr_field(p, "CAPACITY"))) {
-            // TODO
+            double capacity = 0;
+            if (!str_to_double(value, &capacity)) {
+                parse_error(p,
+                            "expected valid number for CAPACITY field. Got "
+                            "`%s` instead",
+                            value);
+                result = false;
+            }
+            instance->vehicle_cap = MIN(0.0, capacity);
         } else {
-            parse_error(p, "while parsing header encountered invalid input");
-            result = false;
+            done = true;
         }
 
         if (value) {
@@ -305,15 +335,27 @@ terminate:
     return result;
 }
 
-static bool parse_vrplib_nodecoord_section(VrplibParser *p) {}
+static bool parse_vrplib_nodecoord_section(VrplibParser *p,
+                                           Instance *instance) {
+    return false;
+}
 
-static bool parse_vrplib_demand_section(VrplibParser *p) {}
+static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
+    return false;
+}
 
-static bool parse_vrplib_reducedcost_section(VrplibParser *p) {}
+static bool parse_vrplib_edge_weight_section(VrplibParser *p,
+                                             Instance *instance) {
+    return false;
+}
 
-static bool parse_vrplib_profit_section(VrplibParser *p) {}
+static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
+    return false;
+}
 
-static bool parse_vrplib_depot_section(VrplibParser *p) {}
+static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
+    return false;
+}
 
 bool parse_vrp_file(Instance *instance, FILE *filehandle,
                     const char *filepath) {
@@ -343,7 +385,102 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
     parser.size = filesize;
 
     // First extract the header informations
-    bool hdr_parse_result = parse_vrplib_hdr(&parser);
+    if (!parse_vrplib_hdr(&parser, instance)) {
+        result = false;
+        goto terminate;
+    }
+
+    if (instance->num_customers <= 0) {
+        parse_error(&parser, "couldn't deduce number of customers after "
+                             "parsing the VRPLIB header");
+        result = false;
+        goto terminate;
+    } else if (instance->vehicle_cap <= 0.0) {
+        parse_error(
+            &parser,
+            "couldn't deduce vehicle capacity after parsing the VRPLIB header");
+        result = false;
+        goto terminate;
+    }
+
+    if (!prep_memory(instance)) {
+        log_fatal("Failed to prepare memory for storing instance");
+        result = false;
+        goto terminate;
+    }
+
+    bool needs_edge_section =
+        parser.edgew_format == EDGE_WEIGHT_FORMAT_UPPER_ROW;
+
+    if (needs_edge_section) {
+        instance->edge_weight =
+            malloc(hm_nentries(1 + instance->num_customers) *
+                   sizeof(*instance->edge_weight));
+        if (!instance->edge_weight) {
+            log_fatal("Failed to prepare memory for storing instance");
+            result = false;
+            goto terminate;
+        }
+    }
+
+    bool found_depot_section = false;
+    bool found_nodecoord_section = false;
+    bool found_edge_weight_section = false;
+
+    while (result) {
+        bool done =
+            parser_is_eof(&parser) || parser_match_string(&parser, "EOF");
+        if (done) {
+            break;
+        }
+
+        if (parser_match_string(&parser, "NODE_COORD_SECTION") &&
+            parser_match_newline(&parser)) {
+            found_nodecoord_section = true;
+            result = parse_vrplib_nodecoord_section(&parser, instance);
+        } else if (parser_match_string(&parser, "DEMAND_SECTION") &&
+                   parser_match_newline(&parser)) {
+            result = parse_vrplib_demand_section(&parser, instance);
+        } else if (parser_match_string(&parser, "DEPOT_SECTION") &&
+                   parser_match_newline(&parser)) {
+            found_depot_section = true;
+            result = parse_vrplib_depot_section(&parser, instance);
+        } else if (parser_match_string(&parser, "PROFIT_SECTION") &&
+                   parser_match_newline(&parser)) {
+            result = parse_vrplib_profit_section(&parser, instance);
+        } else if (parser_match_string(&parser, "EDGE_WEIGHT_SECTION") &&
+                   parser_match_newline(&parser)) {
+            found_edge_weight_section = true;
+            result = parse_vrplib_edge_weight_section(&parser, instance);
+        } else {
+            parse_error(&parser, "invalid input");
+            result = false;
+        }
+    }
+
+    if (result) {
+        if (!found_nodecoord_section) {
+            parse_error(&parser,
+                        "did not encounter a NODE_COORD_SECTION listing "
+                        "the nodes of the problem");
+            result = false;
+            goto terminate;
+        } else if (!found_depot_section) {
+            parse_error(&parser,
+                        "did not encounter a DEPOT_SECTION listing the depots");
+            result = false;
+            goto terminate;
+        } else {
+            if (needs_edge_section && !found_edge_weight_section) {
+                parse_error(
+                    &parser,
+                    "did not encouter an EDGE_WEIGHT_SECTION, which is "
+                    "required since EDGE_WEIGHT_TYPE is not set to `FUNCTION`");
+                result = false;
+                goto terminate;
+            }
+        }
+    }
 
 terminate:
     if (buffer) {

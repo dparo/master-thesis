@@ -42,6 +42,7 @@ typedef enum DistanceRounding {
 
 typedef struct Instance {
     char *name;
+    char *comment;
 
     int32_t num_customers;
     int32_t num_vehicles;
@@ -51,7 +52,7 @@ typedef struct Instance {
     Vec2d *positions;
     double *demands;
     double *duals;
-
+    double *edge_weight;
 } Instance;
 
 typedef struct Tour {
@@ -166,7 +167,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 
 void cptp_print_list_of_solvers_and_params(void);
 
-static inline bool cptp_solve_did_found_tour_solution(SolveStatus status) {
+static inline bool is_valid_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_OPTIMAL;

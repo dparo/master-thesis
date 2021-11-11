@@ -29,31 +29,55 @@ extern "C" {
 #include "core.h"
 #include <math.h>
 
-static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
-    assert(i >= 0 && i < instance->num_customers + 1);
-    assert(j >= 0 && j < instance->num_customers + 1);
-    double distance =
-        vec2d_dist(&instance->positions[i], &instance->positions[j]);
-
-    switch (instance->rounding_strat) {
-    case CPTP_DIST_ROUND: /// Default
-        return round(distance);
-    case CPTP_DIST_NO_ROUND:
-        return distance;
-    case CPTP_DIST_CEIL:
-        return ceil(distance);
-    case CPTP_DIST_FLOOR:
-        return floor(distance);
-    default:
-        assert(!"Invalid code path!");
-    }
-}
-
 static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
 
 // Number of entries in a full matrix of size `N x N`
 // Eg N**2 - num_entries(diagonal)
 static inline int64_t fm_nentries(int32_t n) { return (n * n) - n; }
+
+static inline int64_t sxpos(const Instance *instance, int32_t i, int32_t j) {
+    assert(i != j);
+
+    int32_t l = MIN(i, j);
+    int32_t u = MAX(i, j);
+
+    int64_t n = instance->num_customers + 1;
+    int64_t result = l * n + u - ((l + 1) * (l + 2)) / 2;
+    return result;
+}
+
+static inline int64_t asxpos(const Instance *instance, int32_t i, int32_t j) {
+    int32_t n = instance->num_customers + 1;
+    if (i <= j)
+        return sxpos(instance, i, j);
+    else
+        return hm_nentries(n) + sxpos(instance, j, i);
+}
+
+static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
+    assert(i >= 0 && i < instance->num_customers + 1);
+    assert(j >= 0 && j < instance->num_customers + 1);
+
+    if (instance->edge_weight) {
+        return instance->edge_weight[sxpos(instance, i, j)];
+    } else {
+        double distance =
+            vec2d_dist(&instance->positions[i], &instance->positions[j]);
+
+        switch (instance->rounding_strat) {
+        case CPTP_DIST_ROUND: /// Default
+            return round(distance);
+        case CPTP_DIST_NO_ROUND:
+            return distance;
+        case CPTP_DIST_CEIL:
+            return ceil(distance);
+        case CPTP_DIST_FLOOR:
+            return floor(distance);
+        default:
+            assert(!"Invalid code path!");
+        }
+    }
+}
 
 static inline int32_t *tsucc(Tour *tour, int32_t customer_idx) {
     return veci32_access(tour->succ, customer_idx, tour->num_customers + 1);
