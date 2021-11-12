@@ -43,7 +43,7 @@
 
 static void test_mip_solver_create(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
-    Instance instance = parse(filepath);
+    Instance instance = parse_test_instance(filepath);
     instance_set_name(&instance, "test");
     SolverParams params = {0};
     SolverTypedParams tparams = {0};
@@ -61,12 +61,12 @@ static void test_mip_solver_create(void) {
 
 static void test_mip_solver_solve_on_small_test_instance(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
-    Instance instance = parse(filepath);
+    Instance instance = parse_test_instance(filepath);
     SolverParams params = {0};
     Solution solution = solution_create(&instance);
     SolveStatus status =
         cptp_solve(&instance, "mip", &params, &solution, TIMELIMIT, RANDOMSEED);
-    TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
+    TEST_ASSERT(is_valid_solve_status(status));
     TEST_ASSERT(status == SOLVE_STATUS_FEASIBLE ||
                 status == SOLVE_STATUS_OPTIMAL);
     TEST_ASSERT(solution.lower_bound != -INFINITY);
@@ -79,12 +79,12 @@ static void test_mip_solver_solve_on_small_test_instance(void) {
 static void test_mip_solver_solve_on_some_instances(void) {
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
         if (G_TEST_INSTANCES[i].expected_num_customers <= 71) {
-            Instance instance = parse(G_TEST_INSTANCES[i].filepath);
+            Instance instance = parse_test_instance(G_TEST_INSTANCES[i].filepath);
             SolverParams params = {0};
             Solution solution = solution_create(&instance);
             SolveStatus status = cptp_solve(&instance, "mip", &params,
                                             &solution, TIMELIMIT, RANDOMSEED);
-            TEST_ASSERT(cptp_solve_did_found_tour_solution(status));
+            TEST_ASSERT(is_valid_solve_status(status));
             TEST_ASSERT(solution.lower_bound != -INFINITY);
             TEST_ASSERT(solution.upper_bound != +INFINITY);
             TEST_ASSERT(solution.tour.num_comps == 1);

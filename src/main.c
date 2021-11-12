@@ -76,7 +76,7 @@ static int main2(const char *instance_filepath, const char *solver,
                  double timelimit, int32_t randomseed, const char **defines,
                  int32_t num_defines, const char *vis_path) {
     const char *filepath = instance_filepath;
-    Instance instance = parse(filepath);
+    Instance instance = parse_test_instance(filepath);
     if (instance.num_customers > 0) {
         SolverParams params =
             make_solver_params_from_cmdline(defines, num_defines);
@@ -92,7 +92,7 @@ static int main2(const char *instance_filepath, const char *solver,
                 cptp_solve(&instance, solver ? solver : "mip", &params,
                            &solution, timelimit, randomseed);
 
-            success = cptp_solve_did_found_tour_solution(status);
+            success = is_valid_solve_status(status);
 
             time_t ended = time(NULL);
             usecs_t solve_time = os_get_usecs() - begin_solve_time;

@@ -36,8 +36,8 @@
 #include "core-utils.h"
 
 static void test_tour_create(void) {
-    const char *filepath = "res/ESPPRC - Test Instances/E-n101-k14_a.vrp";
-    Instance instance = parse(filepath);
+    const char *filepath = "data/ESPPRC - Test Instances/E-n101-k14_a.vrp";
+    Instance instance = parse_test_instance(filepath);
     Tour tour = tour_create(&instance);
     tour_destroy(&tour);
     instance_destroy(&instance);

@@ -202,6 +202,10 @@ static inline void parser_eat_newline(VrplibParser *p) {
                 parser_adv(p, 1);
             }
             p->curline += 1;
+        } else {
+            assert(*p->at == '\n');
+            p->curline += 1;
+            parser_adv(p, 1);
         }
     }
 }
@@ -210,7 +214,9 @@ static inline bool parser_match_newline(VrplibParser *p) {
     parser_eat_whitespaces(p);
     int32_t cache_curline = p->curline;
     parser_eat_newline(p);
-    return p->curline > cache_curline;
+    bool result = p->curline > cache_curline;
+    parser_eat_whitespaces(p);
+    return result;
 }
 
 static inline bool parser_match_string(VrplibParser *p, char *string) {
@@ -248,12 +254,24 @@ static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
                     break;
                 }
                 parser_adv(p, 1);
-            };
-            size_t namesize = (p->at - 1) - at;
-            char *name = malloc(namesize + 1);
-            name[namesize] = 0;
-            strncpy(name, at, namesize);
-            return name;
+            }
+
+            ptrdiff_t namesize = p->at - at;
+
+            // Match and of line
+            if (!parser_match_newline(p)) {
+                return NULL;
+            }
+
+            // Walk string backwards and trim any trailing whitespace
+            while (namesize > 0 && (at[namesize - 1] == ' ' || at[namesize - 1] == '\t')) {
+                namesize--;
+            }
+
+            char *value = malloc(namesize + 1);
+            value[namesize] = 0;
+            strncpy(value , at, namesize);
+            return value;
         } else {
             return NULL;
         }
@@ -288,7 +306,17 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
                             value);
                 result = false;
             }
-            instance->num_customers = MIN(0, dim - 1);
+            instance->num_customers = MAX(0, dim - 1);
+        } else if ((value = parse_hdr_field(p, "VEHICLES"))) {
+            int32_t num_vehicles = 0;
+            if (!str_to_int32(value, &num_vehicles)) {
+                parse_error(p,
+                            "expected valid integer for VEHICLES field. Got "
+                            "`%s` instead",
+                            value);
+                result = false;
+            }
+            instance->num_vehicles = MAX(0, num_vehicles);
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
             if (0 != strcmp(value, "EUC_2D")) {
                 parse_error(
@@ -317,7 +345,7 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
                             value);
                 result = false;
             }
-            instance->vehicle_cap = MIN(0.0, capacity);
+            instance->vehicle_cap = MAX(0.0, capacity);
         } else {
             done = true;
         }
@@ -489,14 +517,18 @@ terminate:
     return result;
 }
 
-Instance parse(const char *filepath) {
+static Instance parse(const char *filepath, bool is_test_instance) {
     FILE *filehandle = fopen(filepath, "r");
     Instance result = {0};
     result.rounding_strat = CPTP_DIST_ROUND;
     bool success = false;
 
     if (filehandle) {
-        success = parse_file(&result, filehandle, filepath);
+        if (is_test_instance) {
+            success = parse_file(&result, filehandle, filepath);
+        } else {
+            success = parse_vrp_file(&result, filehandle, filepath);
+        }
         fclose(filehandle);
     }
 
@@ -507,4 +539,12 @@ Instance parse(const char *filepath) {
         instance_destroy(&result);
         return result;
     }
+}
+
+Instance parse_test_instance(const char *filepath) {
+    return parse(filepath, true);
+}
+
+Instance parse_vrplib_instance(const char *filepath) {
+    return parse(filepath, false);
 }
