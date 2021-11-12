@@ -52,7 +52,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
 #include "log.h"
 
 typedef struct SolverData {
-    usecs_t begin_time;
+    int64_t begin_time;
     CPXENVptr env;
     CPXLPptr lp;
     int numcores;
@@ -807,7 +807,7 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 }
 
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
-                  usecs_t begin_time) {
+                  int64_t begin_time) {
     self->data->begin_time = begin_time;
 
     SolveStatus result = SOLVE_STATUS_ERR;

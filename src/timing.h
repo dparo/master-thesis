@@ -30,14 +30,6 @@ extern "C" {
 #include <stddef.h>
 #include <stdio.h>
 
-typedef uint64_t usecs_t;
-
-#define NUM_USECS_IN_A_MSEC ((usecs_t)1000ll)
-#define NUM_USECS_IN_A_SEC ((usecs_t)1000000ll)
-#define NUM_USECS_IN_A_MINUTE ((usecs_t)60000000ll)
-#define NUM_USECS_IN_AN_HOUR ((usecs_t)3600000000ll)
-#define NUM_USECS_IN_A_DAY ((usecs_t)86400000000ll)
-
 typedef struct TimeRepr {
     int32_t days;
     int32_t hours;
@@ -47,11 +39,18 @@ typedef struct TimeRepr {
     int32_t microseconds;
 } TimeRepr;
 
-void os_sleep(usecs_t usecs);
-usecs_t os_get_usecs(void);
-TimeRepr timerepr_from_usecs(usecs_t usecs);
+void os_sleep(int64_t usecs);
 
-double elapsed_seconds_since(usecs_t begin);
+int64_t os_get_nanosecs(void);
+static inline int64_t os_get_usecs(void) { return os_get_nanosecs() / 1000; }
+
+TimeRepr timerepr_from_usecs(int64_t usecs);
+
+static inline TimeRepr timerepr_from_nanosecs(int64_t nsecs) {
+    return timerepr_from_usecs(nsecs / 1000);
+}
+
+double os_get_elapsed_secs(int64_t usecs_begin);
 
 void print_timerepr(FILE *f, const TimeRepr *repr);
 

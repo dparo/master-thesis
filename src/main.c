@@ -87,7 +87,7 @@ static int main2(const char *instance_filepath, const char *solver,
         // Solve, timing and printing of final solution
         {
             time_t started = time(NULL);
-            usecs_t begin_solve_time = os_get_usecs();
+            int64_t begin_solve_time = os_get_usecs();
             SolveStatus status =
                 cptp_solve(&instance, solver ? solver : "mip", &params,
                            &solution, timelimit, randomseed);
@@ -95,7 +95,7 @@ static int main2(const char *instance_filepath, const char *solver,
             success = is_valid_solve_status(status);
 
             time_t ended = time(NULL);
-            usecs_t solve_time = os_get_usecs() - begin_solve_time;
+            int64_t solve_time = os_get_usecs() - begin_solve_time;
 
             printf("\n\n###\n###\n###\n\n");
 

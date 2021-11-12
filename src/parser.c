@@ -194,13 +194,13 @@ static inline bool parser_is_eof(const VrplibParser *p) {
     return parser_remainder_size(p) == 0;
 }
 
-static inline void parser_eat_whitespaces(VrplibParser *p) {
+static void parser_eat_whitespaces(VrplibParser *p) {
     while (!parser_is_eof(p) && (*p->at == ' ' || *p->at == '\t')) {
         parser_adv(p, 1);
     }
 }
 
-static inline void parser_eat_newline(VrplibParser *p) {
+static void parser_eat_newline(VrplibParser *p) {
     parser_eat_whitespaces(p);
 
     while (!parser_is_eof(p) && (*p->at == '\r' || *p->at == '\n')) {
@@ -218,7 +218,7 @@ static inline void parser_eat_newline(VrplibParser *p) {
     }
 }
 
-static inline bool parser_match_newline(VrplibParser *p) {
+static bool parser_match_newline(VrplibParser *p) {
     parser_eat_whitespaces(p);
     int32_t cache_curline = p->curline;
     parser_eat_newline(p);
@@ -227,7 +227,17 @@ static inline bool parser_match_newline(VrplibParser *p) {
     return result;
 }
 
-static inline bool parser_match_string(VrplibParser *p, char *string) {
+static void parser_eat_all_blanks(VrplibParser *p) {
+    char *at;
+    do {
+        at = p->at;
+        parser_eat_whitespaces(p);
+        parser_eat_newline(p);
+        parser_eat_whitespaces(p);
+    } while (p->at != at);
+}
+
+static bool parser_match_string(VrplibParser *p, char *string) {
     parser_eat_whitespaces(p);
     int32_t len = MIN(parser_remainder_size(p), (int32_t)strlen(string));
     bool result = (0 == strncmp(string, p->at, len));
@@ -297,8 +307,16 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
     bool result = true;
     bool done = false;
     while (!parser_is_eof(p) && !done) {
+        parser_eat_all_blanks(p);
         char *value = NULL;
-        if ((value = parse_hdr_field(p, "NAME"))) {
+        if (parser_match_string(p, "#")) {
+            // Eat comment
+            while (!parser_is_eof(p) && !(*p->at == '\n' || *p->at == '\r')) {
+                parser_adv(p, 1);
+            }
+            parser_eat_newline(p);
+            parser_eat_whitespaces(p);
+        } else if ((value = parse_hdr_field(p, "NAME"))) {
             instance_set_name(instance, value);
         } else if ((value = parse_hdr_field(p, "COMMENT"))) {
             instance->comment = strdup(value);
@@ -752,15 +770,7 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
     if (result) {
 
         // Keep eating whitespaces and newlines while there are any
-        {
-            char *at;
-            do {
-                at = parser.at;
-                parser_eat_whitespaces(&parser);
-                parser_eat_newline(&parser);
-                parser_eat_whitespaces(&parser);
-            } while (parser.at != at);
-        }
+        parser_eat_all_blanks(&parser);
 
         if (parser_remainder_size(&parser) != 0) {
             parse_error(

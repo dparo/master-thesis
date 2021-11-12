@@ -24,7 +24,7 @@
 
 static SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
                          ATTRIB_MAYBE_UNUSED const Instance *instance,
-                         Solution *solution, usecs_t begin_time) {
+                         Solution *solution, int64_t begin_time) {
     return SOLVE_STATUS_INVALID;
 }
 

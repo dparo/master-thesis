@@ -474,7 +474,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         // Setup signals
         signal(SIGTERM, sighandler);
         signal(SIGINT, sighandler);
-        usecs_t begin_time = os_get_usecs();
+        int64_t begin_time = os_get_usecs();
         status = solver.solve(&solver, instance, solution, begin_time);
         // Resets the signals
         signal(SIGTERM, SIG_DFL);

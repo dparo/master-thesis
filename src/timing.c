@@ -42,7 +42,13 @@
 #error "Unsupported platform"
 #endif
 
-void os_sleep(usecs_t usecs) {
+#define NUM_USECS_IN_A_MSEC ((int64_t)1000ll)
+#define NUM_USECS_IN_A_SEC ((int64_t)1000000ll)
+#define NUM_USECS_IN_A_MINUTE ((int64_t)60000000ll)
+#define NUM_USECS_IN_AN_HOUR ((int64_t)3600000000ll)
+#define NUM_USECS_IN_A_DAY ((int64_t)86400000000ll)
+
+void os_sleep(int64_t usecs) {
 #if defined __APPLE__
     usleep(usecs);
 #elif defined __unix__
@@ -60,46 +66,48 @@ void os_sleep(usecs_t usecs) {
 #error "Unsupported platform"
 #endif
 }
-usecs_t os_get_usecs(void) {
-#if defined __APPLE__
-    static double clock_ticks_to_usecs = 0;
-    if (clock_ticks_to_usecs == 0.0) {
-        mach_timebase_info_data_t timebase;
-        mach_timebase_info(&timebase);
-        clock_ticks_to_usecs = 1000.0 * (double)timebase.numer / timebase.denom;
-    }
-    return (usecs_t)(mach_absolute_time() * clock_ticks_to_usecs);
-#elif defined __unix__
 
-    struct timespec ts = {0};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * NUM_USECS_IN_A_SEC + (usecs_t)(0.001 * ts.tv_nsec);
+#ifndef CAST
+#define CAST(type, x) ((type)x)
+#endif
 
-#elif defined _WIN64
+int64_t os_get_nanosecs(void) {
+#if defined(_MSC_VER) || defined(__MINGW64__) || defined(__MINGW32__)
+    LARGE_INTEGER counter;
     static LARGE_INTEGER frequency = {0};
     if (frequency.QuadPart == 0) {
         QueryPerformanceFrequency(&frequency);
     }
-    LARGE_INTEGER ticks = {0};
-    QueryPerformanceCounter(&ticks);
-    return (usecs_t)((double)ticks.QuadPart * 1000.0 /
-                     (double)frequency.QuadPart);
-
+    QueryPerformanceCounter(&counter);
+    return CAST(int64_t, (counter.QuadPart * 1000000000) / frequency.QuadPart);
+#elif defined(__linux__) && defined(__STRICT_ANSI__)
+    return CAST(int64_t, clock()) * 1000000000 / CLOCKS_PER_SEC;
+#elif defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||    \
+    defined(__NetBSD__) || defined(__DragonFly__)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    return (int64_t)ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
+#elif __APPLE__
+    struct timespec ts;
+    clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW, &ts);
+    return (int64_t)ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
+#elif __EMSCRIPTEN__
+    return emscripten_performance_now() * 1000000.0;
 #else
-#error "Unsupported platform"
+#error Unsupported platform!
 #endif
 }
 
-double elapsed_seconds_since(usecs_t begin) {
-    usecs_t now = os_get_usecs();
-    usecs_t diff = now - begin;
+double os_get_elapsed_secs(int64_t usecs_begin) {
+    int64_t now = os_get_usecs();
+    int64_t diff = now - usecs_begin;
     return (double)diff / (double)NUM_USECS_IN_A_SEC;
 }
 
-TimeRepr timerepr_from_usecs(usecs_t usecs) {
+TimeRepr timerepr_from_usecs(int64_t usecs) {
     TimeRepr result = {0};
 
-    usecs_t x = usecs;
+    int64_t x = usecs;
 
     result.days = x / NUM_USECS_IN_A_DAY;
     x -= result.days * NUM_USECS_IN_A_DAY;
