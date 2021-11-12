@@ -457,8 +457,8 @@ static bool parse_vrplib_nodecoord_section(VrplibParser *p,
     return result;
 }
 
-static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
-
+static bool parse_node_double_tuple_section(VrplibParser *p, Instance *instance,
+                                            char *valuename, double *outarray) {
     bool result = true;
 
     for (int32_t node_id = 0;
@@ -476,10 +476,11 @@ static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
                     // Parse the demand
                     double demand = 0;
                     if (!str_to_double(lexeme, &demand)) {
-                        parse_error(p, "Expected valid double for demand");
+                        parse_error(p, "Expected valid double for %s",
+                                    valuename);
                         result = false;
                     } else {
-                        instance->demands[node_id] = demand;
+                        outarray[node_id] = demand;
                     }
                     break;
                 }
@@ -501,7 +502,19 @@ static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
     return result;
 }
 
+static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
+    return parse_node_double_tuple_section(p, instance, "demand",
+                                           instance->demands);
+}
+
+static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
+
+    return parse_node_double_tuple_section(p, instance, "profit",
+                                           instance->duals);
+}
+
 static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
+
     bool result = true;
     for (int32_t i = 0; result && (i <= 1); i++) {
         char *lexeme = get_token_lexeme(p);
@@ -548,10 +561,6 @@ static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
 
 static bool parse_vrplib_edge_weight_section(VrplibParser *p,
                                              Instance *instance) {
-    return false;
-}
-
-static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
     return false;
 }
 
