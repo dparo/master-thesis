@@ -368,7 +368,8 @@ static char *get_token_lexeme(VrplibParser *p) {
     parser_eat_whitespaces(p);
     char *at = p->at;
 
-    while (!parser_is_eof(p) && (*p->at == '-' || *p->at == '+' || *p->at == '.' || isalnum(*p->at))) {
+    while (!parser_is_eof(p) && (*p->at == '-' || *p->at == '+' ||
+                                 *p->at == '.' || isalnum(*p->at))) {
         parser_adv(p, 1);
     }
 
