@@ -258,7 +258,7 @@ static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
 
             ptrdiff_t namesize = p->at - at;
 
-            // Match and of line
+            // Match end of line
             if (!parser_match_newline(p)) {
                 return NULL;
             }
@@ -661,6 +661,26 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
     }
 
     if (result) {
+
+        // Keep eating whitespaces and newlines while there are any
+        {
+            char *at;
+            do {
+                at = parser.at;
+                parser_eat_whitespaces(&parser);
+                parser_eat_newline(&parser);
+                parser_eat_whitespaces(&parser);
+            } while (parser.at != at);
+        }
+
+        if (parser_remainder_size(&parser) != 0) {
+            parse_error(
+                &parser,
+                "Found premature `EOF` while more input is still available");
+            result = false;
+            goto terminate;
+        }
+
         for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
             if (sections[secid].required && !sections[secid].found) {
                 parse_error(&parser, "Required section `%s` was not found",
