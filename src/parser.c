@@ -264,13 +264,14 @@ static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
             }
 
             // Walk string backwards and trim any trailing whitespace
-            while (namesize > 0 && (at[namesize - 1] == ' ' || at[namesize - 1] == '\t')) {
+            while (namesize > 0 &&
+                   (at[namesize - 1] == ' ' || at[namesize - 1] == '\t')) {
                 namesize--;
             }
 
             char *value = malloc(namesize + 1);
             value[namesize] = 0;
-            strncpy(value , at, namesize);
+            strncpy(value, at, namesize);
             return value;
         } else {
             return NULL;
@@ -363,9 +364,94 @@ terminate:
     return result;
 }
 
+static char *get_token_lexeme(VrplibParser *p) {
+    parser_eat_whitespaces(p);
+    char *at = p->at;
+
+    while (!parser_is_eof(p) && isalnum(*p->at)) {
+        parser_adv(p, 1);
+    }
+
+    intptr_t toksize = p->at - at;
+
+    if (toksize != 0) {
+        char *lexeme = malloc(toksize + 1);
+        if (!lexeme) {
+            log_fatal("Failed memory allocation");
+            return NULL;
+        }
+
+        strncpy(lexeme, at, toksize);
+        lexeme[toksize] = '\0';
+        parser_eat_whitespaces(p);
+        return lexeme;
+    }
+
+    parser_eat_whitespaces(p);
+    return NULL;
+}
+
+static bool parse_node_id(VrplibParser *p, char *lexeme, int32_t node_id) {
+    int32_t value = 0;
+    if (!str_to_int32(lexeme, &value)) {
+        parse_error(p, "Failed to retrieve integer");
+        return false;
+    }
+
+    if (value != node_id + 1) {
+        parse_error(p, "Expected node id to be `%d`. Got `%d` instead",
+                    node_id + 1, value);
+        return false;
+    }
+
+    return true;
+}
+
 static bool parse_vrplib_nodecoord_section(VrplibParser *p,
                                            Instance *instance) {
-    return false;
+    bool result = true;
+
+    for (int32_t node_id = 0;
+         result && (node_id != (instance->num_customers + 1)); node_id++) {
+        for (int32_t i = 0; i < 3; i++) {
+            char *lexeme = get_token_lexeme(p);
+            if (!lexeme) {
+                result = false;
+            } else {
+                switch (i) {
+                case 0:
+                    result = parse_node_id(p, lexeme, node_id);
+                    break;
+                case 1:
+                case 2: {
+                    // Parsing the x, y coordinate
+                    double coord = 0;
+                    if (!str_to_double(lexeme, &coord)) {
+                        parse_error(p, "Expected valid double for coordinate");
+                        result = false;
+                    } else {
+                        if (i == 1) {
+                            instance->positions[node_id].x = coord;
+                        } else {
+                            instance->positions[node_id].y = coord;
+                        }
+                    }
+                } break;
+                }
+                if (lexeme) {
+                    free(lexeme);
+                }
+            }
+        }
+
+        if (!parser_match_newline(p)) {
+            parse_error(p, "Expected newline after parsing node id `%d`",
+                        node_id);
+            result = false;
+        }
+    }
+
+    return result;
 }
 
 static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
@@ -424,9 +510,8 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         result = false;
         goto terminate;
     } else if (instance->vehicle_cap <= 0.0) {
-        parse_error(
-            &parser,
-            "couldn't deduce vehicle capacity after parsing the VRPLIB header");
+        parse_error(&parser, "couldn't deduce vehicle capacity after "
+                             "parsing the VRPLIB header");
         result = false;
         goto terminate;
     }
@@ -451,9 +536,18 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         }
     }
 
-    bool found_depot_section = false;
-    bool found_nodecoord_section = false;
-    bool found_edge_weight_section = false;
+    struct {
+        char *name;
+        bool (*parse_fn)(VrplibParser *p, Instance *instance);
+        bool required;
+        bool found;
+    } sections[] = {
+        {"NODE_COORD_SECTION", parse_vrplib_nodecoord_section, 1, 0},
+        {"DEMAND_SECTION", parse_vrplib_demand_section, 1, 0},
+        {"DEPOT_SECTION", parse_vrplib_depot_section, 1, 0},
+        {"PROFIT_SECTION", parse_vrplib_profit_section, 0, 0},
+        {"EDGE_WEIGHT_SECTION", parse_vrplib_edge_weight_section, 0, 0},
+    };
 
     while (result) {
         bool done =
@@ -462,51 +556,43 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
             break;
         }
 
-        if (parser_match_string(&parser, "NODE_COORD_SECTION") &&
-            parser_match_newline(&parser)) {
-            found_nodecoord_section = true;
-            result = parse_vrplib_nodecoord_section(&parser, instance);
-        } else if (parser_match_string(&parser, "DEMAND_SECTION") &&
-                   parser_match_newline(&parser)) {
-            result = parse_vrplib_demand_section(&parser, instance);
-        } else if (parser_match_string(&parser, "DEPOT_SECTION") &&
-                   parser_match_newline(&parser)) {
-            found_depot_section = true;
-            result = parse_vrplib_depot_section(&parser, instance);
-        } else if (parser_match_string(&parser, "PROFIT_SECTION") &&
-                   parser_match_newline(&parser)) {
-            result = parse_vrplib_profit_section(&parser, instance);
-        } else if (parser_match_string(&parser, "EDGE_WEIGHT_SECTION") &&
-                   parser_match_newline(&parser)) {
-            found_edge_weight_section = true;
-            result = parse_vrplib_edge_weight_section(&parser, instance);
-        } else {
+        bool found_matching_section = false;
+        for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
+            if (parser_match_string(&parser, sections[secid].name) &&
+                parser_match_newline(&parser)) {
+                sections[secid].found = true;
+                found_matching_section = true;
+                result = sections[secid].parse_fn(&parser, instance);
+                if (!result) {
+                    parse_error(&parser, "Failure while parsing section `%s`",
+                                sections[secid].name);
+                }
+                break;
+            }
+        }
+        if (!found_matching_section) {
             parse_error(&parser, "invalid input");
             result = false;
         }
     }
 
     if (result) {
-        if (!found_nodecoord_section) {
-            parse_error(&parser,
-                        "did not encounter a NODE_COORD_SECTION listing "
-                        "the nodes of the problem");
-            result = false;
-            goto terminate;
-        } else if (!found_depot_section) {
-            parse_error(&parser,
-                        "did not encounter a DEPOT_SECTION listing the depots");
-            result = false;
-            goto terminate;
-        } else {
-            if (needs_edge_section && !found_edge_weight_section) {
-                parse_error(
-                    &parser,
-                    "did not encouter an EDGE_WEIGHT_SECTION, which is "
-                    "required since EDGE_WEIGHT_TYPE is not set to `FUNCTION`");
+        for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
+            if (sections[secid].required && !sections[secid].found) {
+                parse_error(&parser, "Required section `%s` was not found",
+                            sections[secid].name);
                 result = false;
                 goto terminate;
             }
+        }
+
+        if (needs_edge_section && instance->edge_weight == NULL) {
+            parse_error(&parser,
+                        "did not encouter an EDGE_WEIGHT_SECTION, which is "
+                        "required since EDGE_WEIGHT_TYPE is not set to "
+                        "`FUNCTION`");
+            result = false;
+            goto terminate;
         }
     }
 
