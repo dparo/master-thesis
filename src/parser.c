@@ -436,8 +436,10 @@ static bool parse_vrplib_nodecoord_section(VrplibParser *p,
                             instance->positions[node_id].y = coord;
                         }
                     }
-                } break;
+                    break;
                 }
+                }
+
                 if (lexeme) {
                     free(lexeme);
                 }
@@ -455,7 +457,47 @@ static bool parse_vrplib_nodecoord_section(VrplibParser *p,
 }
 
 static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
-    return false;
+
+    bool result = true;
+
+    for (int32_t node_id = 0;
+         result && (node_id != (instance->num_customers + 1)); node_id++) {
+        for (int32_t i = 0; i < 2; i++) {
+            char *lexeme = get_token_lexeme(p);
+            if (!lexeme) {
+                result = false;
+            } else {
+                switch (i) {
+                case 0:
+                    result = parse_node_id(p, lexeme, node_id);
+                    break;
+                case 1: {
+                    // Parse the demand
+                    double demand = 0;
+                    if (!str_to_double(lexeme, &demand)) {
+                        parse_error(p, "Expected valid double for demand");
+                        result = false;
+                    } else {
+                        instance->demands[node_id] = demand;
+                    }
+                    break;
+                }
+                }
+            }
+
+            if (lexeme) {
+                free(lexeme);
+            }
+        }
+
+        if (!parser_match_newline(p)) {
+            parse_error(p, "Expected newline after parsing node id `%d`",
+                        node_id);
+            result = false;
+        }
+    }
+
+    return result;
 }
 
 static bool parse_vrplib_edge_weight_section(VrplibParser *p,
@@ -591,6 +633,15 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
                         "did not encouter an EDGE_WEIGHT_SECTION, which is "
                         "required since EDGE_WEIGHT_TYPE is not set to "
                         "`FUNCTION`");
+            result = false;
+            goto terminate;
+        }
+
+        if (instance->demands[0] != 0) {
+            parse_error(
+                &parser,
+                "demand for the depot node should be `0`. Got `%f` instead",
+                instance->demands[0]);
             result = false;
             goto terminate;
         }
