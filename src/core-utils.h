@@ -35,23 +35,21 @@ static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
 // Eg N**2 - num_entries(diagonal)
 static inline int64_t fm_nentries(int32_t n) { return (n * n) - n; }
 
-static inline int64_t sxpos(const Instance *instance, int32_t i, int32_t j) {
+static inline int64_t sxpos(int32_t n, int32_t i, int32_t j) {
     assert(i != j);
 
     int32_t l = MIN(i, j);
     int32_t u = MAX(i, j);
 
-    int64_t n = instance->num_customers + 1;
     int64_t result = l * n + u - ((l + 1) * (l + 2)) / 2;
     return result;
 }
 
-static inline int64_t asxpos(const Instance *instance, int32_t i, int32_t j) {
-    int32_t n = instance->num_customers + 1;
+static inline int64_t asxpos(int32_t n, int32_t i, int32_t j) {
     if (i <= j)
-        return sxpos(instance, i, j);
+        return sxpos(n, i, j);
     else
-        return hm_nentries(n) + sxpos(instance, j, i);
+        return hm_nentries(n) + sxpos(n, j, i);
 }
 
 static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
@@ -59,7 +57,7 @@ static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
     assert(j >= 0 && j < instance->num_customers + 1);
 
     if (instance->edge_weight) {
-        return instance->edge_weight[sxpos(instance, i, j)];
+        return instance->edge_weight[sxpos(instance->num_customers + 1, i, j)];
     } else {
         double distance =
             vec2d_dist(&instance->positions[i], &instance->positions[j]);

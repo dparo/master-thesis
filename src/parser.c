@@ -162,6 +162,14 @@ typedef enum EdgeWeightFormat {
     EDGE_WEIGHT_FORMAT_UPPER_ROW = 1,
 } EdgeWeightFormat;
 
+static struct {
+    char *name;
+    EdgeWeightFormat fmt;
+} const G_supported_edgew_fmt[] = {
+    {"EUC_2D", EDGE_WEIGHT_FORMAT_FUNCTION},
+    {"UPPER_ROW", EDGE_WEIGHT_FORMAT_UPPER_ROW},
+};
+
 typedef struct VrplibParser {
     const char *filename;
     char *base;
@@ -239,6 +247,10 @@ static void parse_error(VrplibParser *p, char *fmt, ...) {
     vfprintf(stderr, fmt, ap);
     va_end(ap);
     fprintf(stderr, "\n");
+}
+
+static bool parser_needs_edge_section(VrplibParser *p) {
+    return p->edgew_format == EDGE_WEIGHT_FORMAT_UPPER_ROW;
 }
 
 static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
@@ -319,12 +331,18 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
             }
             instance->num_vehicles = MAX(0, num_vehicles);
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
-            if (0 != strcmp(value, "EUC_2D")) {
-                parse_error(
-                    p,
-                    "only EUC_2D edge weight type is supported. Found `%s` "
-                    "instead",
-                    value);
+            bool is_supported = false;
+            for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_supported_edgew_fmt);
+                 i++) {
+                if (0 == strcmp(value, G_supported_edgew_fmt[i].name)) {
+                    is_supported = true;
+                    p->edgew_format = G_supported_edgew_fmt[i].fmt;
+                    break;
+                }
+            }
+            if (!is_supported) {
+                parse_error(p, "Found unsupported EDGE_WEIGHT_TYPE (`%s`)",
+                            value);
                 result = false;
             }
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_FORMAT"))) {
@@ -473,14 +491,14 @@ static bool parse_node_double_tuple_section(VrplibParser *p, Instance *instance,
                     result = parse_node_id(p, lexeme, node_id);
                     break;
                 case 1: {
-                    // Parse the demand
-                    double demand = 0;
-                    if (!str_to_double(lexeme, &demand)) {
+                    // Parse the value
+                    double value = 0;
+                    if (!str_to_double(lexeme, &value)) {
                         parse_error(p, "Expected valid double for %s",
                                     valuename);
                         result = false;
                     } else {
-                        outarray[node_id] = demand;
+                        outarray[node_id] = value;
                     }
                     break;
                 }
@@ -561,7 +579,60 @@ static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
 
 static bool parse_vrplib_edge_weight_section(VrplibParser *p,
                                              Instance *instance) {
-    return false;
+    bool result = true;
+    int32_t n = instance->num_customers + 1;
+
+    bool needs_edge_section = parser_needs_edge_section(p);
+    if (!needs_edge_section) {
+        parse_error(p, "Found un-expected `EDGE_WEIGHT_SECTION`. "
+                       "EDGE_WEIGHT_TYPE should be set accordingly");
+        return false;
+    }
+
+    assert(instance->edge_weight);
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = i + 1; j < n; j++) {
+            int32_t idx = sxpos(n, i, j);
+
+            for (int32_t lexid = 0; lexid < 3; lexid++) {
+                char *lexeme = get_token_lexeme(p);
+                if (lexid == 0 || lexid == 1) {
+                    result = parse_node_id(p, lexeme, lexid == 0 ? i : j);
+                } else {
+                    // Parse the reduced cost variable
+                    double value = 0;
+                    if (!str_to_double(lexeme, &value)) {
+                        parse_error(p,
+                                    "Expected valid double for reduced cost");
+                        result = false;
+                    } else {
+                        instance->edge_weight[idx] = value;
+                    }
+                }
+
+                if (lexeme) {
+                    free(lexeme);
+                }
+
+                if (!result) {
+                    goto terminate;
+                }
+            }
+
+            if (!parser_match_newline(p)) {
+                parse_error(
+                    p,
+                    "Expected newline after reduced cost for arc `(%d, %d)``",
+                    i + 1, j + 1);
+                result = false;
+                goto terminate;
+            }
+        }
+    }
+
+terminate:
+    return result;
 }
 
 bool parse_vrp_file(Instance *instance, FILE *filehandle,
@@ -615,8 +686,7 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         goto terminate;
     }
 
-    bool needs_edge_section =
-        parser.edgew_format == EDGE_WEIGHT_FORMAT_UPPER_ROW;
+    bool needs_edge_section = parser_needs_edge_section(&parser);
 
     if (needs_edge_section) {
         instance->edge_weight =
@@ -639,7 +709,8 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         {"DEMAND_SECTION", parse_vrplib_demand_section, 1, 0},
         {"DEPOT_SECTION", parse_vrplib_depot_section, 1, 0},
         {"PROFIT_SECTION", parse_vrplib_profit_section, 0, 0},
-        {"EDGE_WEIGHT_SECTION", parse_vrplib_edge_weight_section, 0, 0},
+        {"EDGE_WEIGHT_SECTION", parse_vrplib_edge_weight_section,
+         needs_edge_section, 0},
     };
 
     while (result) {
@@ -706,15 +777,6 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
                 result = false;
                 goto terminate;
             }
-        }
-
-        if (needs_edge_section && instance->edge_weight == NULL) {
-            parse_error(&parser,
-                        "did not encouter an EDGE_WEIGHT_SECTION, which is "
-                        "required since EDGE_WEIGHT_TYPE is not set to "
-                        "`FUNCTION`");
-            result = false;
-            goto terminate;
         }
 
         if (instance->demands[0] != 0) {

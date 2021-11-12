@@ -43,9 +43,22 @@ static void test_tour_create(void) {
     instance_destroy(&instance);
 }
 
+static void test_sxpos(void) {
+    for (int32_t n = 0; n < 200; n++) {
+        int32_t pos = 0;
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = i + 1; j < n; j++) {
+                TEST_ASSERT(sxpos(n, i, j) == pos);
+                pos++;
+            }
+        }
+    }
+}
+
 int main(void) {
     UNITY_BEGIN();
     RUN_TEST(test_tour_create);
+    RUN_TEST(test_sxpos);
     return UNITY_END();
 }
 
