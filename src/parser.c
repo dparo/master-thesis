@@ -368,7 +368,7 @@ static char *get_token_lexeme(VrplibParser *p) {
     parser_eat_whitespaces(p);
     char *at = p->at;
 
-    while (!parser_is_eof(p) && isalnum(*p->at)) {
+    while (!parser_is_eof(p) && (*p->at == '-' || *p->at == '+' || *p->at == '.' || isalnum(*p->at))) {
         parser_adv(p, 1);
     }
 
@@ -500,16 +500,57 @@ static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
     return result;
 }
 
+static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
+    bool result = true;
+    for (int32_t i = 0; result && (i <= 1); i++) {
+        char *lexeme = get_token_lexeme(p);
+        if (!lexeme) {
+            result = false;
+        } else {
+            int32_t nodeid = 0;
+            if (!str_to_int32(lexeme, &nodeid)) {
+                parse_error(p, "Expected valid integer for DEPOT_SECTION");
+                result = false;
+            } else {
+                if (i == 0) {
+                    if (nodeid != 1) {
+                        parse_error(p,
+                                    "Expected single depot with index `1`. Got "
+                                    "`%d` instead",
+                                    nodeid);
+                        result = false;
+                    }
+                } else {
+                    if (nodeid != -1) {
+                        parse_error(p,
+                                    "Expected value `-1` marking the end of "
+                                    "the depot section, Found `%d` instead",
+                                    nodeid);
+                        result = false;
+                    }
+                }
+            }
+        }
+
+        if (lexeme) {
+            free(lexeme);
+        }
+
+        if (!parser_match_newline(p)) {
+            parse_error(p, "Expected newline");
+            result = false;
+        }
+    }
+
+    return result;
+}
+
 static bool parse_vrplib_edge_weight_section(VrplibParser *p,
                                              Instance *instance) {
     return false;
 }
 
 static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
-    return false;
-}
-
-static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
     return false;
 }
 
