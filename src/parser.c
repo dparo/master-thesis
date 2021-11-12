@@ -644,12 +644,21 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
             if (parser_match_string(&parser, sections[secid].name) &&
                 parser_match_newline(&parser)) {
+                if (sections[secid].found) {
+                    parse_error(&parser,
+                                "Multiple definitions for section `%s`",
+                                sections[secid].name);
+                    result = false;
+                    break;
+                }
+
                 sections[secid].found = true;
                 found_matching_section = true;
                 result = sections[secid].parse_fn(&parser, instance);
                 if (!result) {
                     parse_error(&parser, "Failure while parsing section `%s`",
                                 sections[secid].name);
+                    result = false;
                 }
                 break;
             }
