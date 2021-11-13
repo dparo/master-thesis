@@ -88,9 +88,7 @@ int64_t os_get_nanosecs(void) {
     clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
     return (int64_t)ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
 #elif __APPLE__
-    struct timespec ts;
-    clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW, &ts);
-    return (int64_t)ts.tv_sec * 1000 * 1000 * 1000 + ts.tv_nsec;
+    return (int64_t)clock_gettime_nsec_np(CLOCK_MONOTONIC_RAW);
 #elif __EMSCRIPTEN__
     return emscripten_performance_now() * 1000000.0;
 #else
