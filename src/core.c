@@ -415,9 +415,11 @@ static void postprocess_solver_solution(const Instance *instance,
     }
 }
 
-static Solver *sighandler_ctx_solver_ptr;
+typedef void (*sighandler_t)(int);
+static THREAD_LOCAL Solver *sighandler_ctx_solver_ptr;
 
-void sighandler(int signum) {
+/// \brief Consumes the signal and does not propage it further
+static void cptp_sighandler(int signum) {
     switch (signum) {
     case SIGTERM:
         log_warn("Received SIGINT");
@@ -468,17 +470,19 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 
     Solver solver =
         lookup->create_fn(instance, &tparams, timelimit, randomseed);
-    sighandler_ctx_solver_ptr = &solver;
 
     {
         // Setup signals
-        signal(SIGTERM, sighandler);
-        signal(SIGINT, sighandler);
-        int64_t begin_time = os_get_usecs();
-        status = solver.solve(&solver, instance, solution, begin_time);
+        sighandler_ctx_solver_ptr = &solver;
+        sighandler_t prev_sigterm_handler = signal(SIGTERM, cptp_sighandler);
+        sighandler_t prev_sigint_handler = signal(SIGINT, cptp_sighandler);
+        {
+            int64_t begin_time = os_get_usecs();
+            status = solver.solve(&solver, instance, solution, begin_time);
+        }
         // Resets the signals
-        signal(SIGTERM, SIG_DFL);
-        signal(SIGINT, SIG_DFL);
+        signal(SIGTERM, prev_sigterm_handler);
+        signal(SIGINT, prev_sigint_handler);
         sighandler_ctx_solver_ptr = NULL;
     }
 

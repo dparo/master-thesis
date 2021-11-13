@@ -639,10 +639,10 @@ static bool parse_vrplib_edge_weight_section(VrplibParser *p,
             }
 
             if (!parser_match_newline(p)) {
-                parse_error(
-                    p,
-                    "Expected newline after reduced cost for arc `(%d, %d)``",
-                    i + 1, j + 1);
+                parse_error(p,
+                            "Expected newline after reduced cost for arc "
+                            "`(%d, %d)``",
+                            i + 1, j + 1);
                 result = false;
                 goto terminate;
             }
@@ -773,9 +773,8 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         parser_eat_all_blanks(&parser);
 
         if (parser_remainder_size(&parser) != 0) {
-            parse_error(
-                &parser,
-                "Found premature `EOF` while more input is still available");
+            parse_error(&parser, "Found premature `EOF` while more input "
+                                 "is still available");
             result = false;
             goto terminate;
         }

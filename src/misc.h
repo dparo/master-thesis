@@ -29,9 +29,9 @@ extern "C" {
 #define STD_C11_VERSION 201112L
 
 #if __GNUC__ || __clang__
-#define THREAD_LOCAL_STORAGE __thread
+#define THREAD_LOCAL __thread
 #elif _MSC_VER
-#define THREAD_LOCAL_STORAGE __declspec(thread)
+#define THREAD_LOCAL __declspec(thread)
 #endif
 
 #define UNUSED_PARAM(x) (void)(x)
