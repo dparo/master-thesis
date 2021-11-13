@@ -28,32 +28,38 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <unity.h>
+#include <greatest.h>
 #include "types.h"
 
-static void test_example(void) { TEST_ASSERT_EQUAL(1 + 2, 3); }
+TEST test_example(void) {
+    ASSERT_EQ(1 + 2, 3);
+    PASS();
+}
 
-static void test_read(void) {
+TEST calling_fread(void) {
     FILE *f = fopen("./CMakeLists.txt", "r");
     char buffer[16 * 1024];
     size_t sizeRead = fread(buffer, 1, ARRAY_LEN(buffer), f);
-    TEST_ASSERT_GREATER_OR_EQUAL(64, sizeRead);
+    ASSERT_GTE(sizeRead, 64);
     fclose(f);
+    PASS();
 }
 
-static void test_calloc_0_0(void) {
+TEST calling_calloc_0_0(void) {
     char *p = calloc(0, 0);
-    TEST_ASSERT(p);
+    ASSERT(p);
     free(p);
+    PASS();
 }
 
-static void test_malloc_0(void) {
+TEST calling_malloc_0(void) {
     char *p = malloc(0);
-    TEST_ASSERT(p);
+    ASSERT(p);
     free(p);
+    PASS();
 }
 
-static void test_enum_lookup(void) {
+TEST calling_enum_lookup(void) {
 
     typedef enum DummyEnum {
         RED = -1,
@@ -65,28 +71,29 @@ static void test_enum_lookup(void) {
         ENUM_TO_STR_TABLE_FIELD(GREEN),
     };
 
-    TEST_ASSERT(0 == strcmp("RED", ENUM_TO_STR(DummyEnum, RED)));
-    TEST_ASSERT(0 == strcmp("GREEN", ENUM_TO_STR(DummyEnum, GREEN)));
+    ASSERT(0 == strcmp("RED", ENUM_TO_STR(DummyEnum, RED)));
+    ASSERT(0 == strcmp("GREEN", ENUM_TO_STR(DummyEnum, GREEN)));
 
-    TEST_ASSERT(RED == *STR_TO_ENUM(DummyEnum, "RED"));
-    TEST_ASSERT(GREEN == *STR_TO_ENUM(DummyEnum, "GREEN"));
+    ASSERT(RED == *STR_TO_ENUM(DummyEnum, "RED"));
+    ASSERT(GREEN == *STR_TO_ENUM(DummyEnum, "GREEN"));
 
-    TEST_ASSERT_NULL(STR_TO_ENUM(DummyEnum, "NON_EXISTENT"));
-    TEST_ASSERT(RED == STR_TO_ENUM_DEFAULT(DummyEnum, "NON_EXISTENT", RED));
+    ASSERT(!STR_TO_ENUM(DummyEnum, "NON_EXISTENT"));
+    ASSERT(RED == STR_TO_ENUM_DEFAULT(DummyEnum, "NON_EXISTENT", RED));
+    PASS();
 }
 
-int main(void) {
-    UNITY_BEGIN();
+/* Add all the definitions that need to be in the test runner's main file. */
+GREATEST_MAIN_DEFS();
+
+int main(int argc, char **argv) {
+    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
+
+    /* If tests are run outside of a suite, a default suite is used. */
     RUN_TEST(test_example);
-    RUN_TEST(test_read);
-    RUN_TEST(test_calloc_0_0);
-    RUN_TEST(test_malloc_0);
-    RUN_TEST(test_enum_lookup);
-    return UNITY_END();
+    RUN_TEST(calling_fread);
+    RUN_TEST(calling_calloc_0_0);
+    RUN_TEST(calling_malloc_0);
+    RUN_TEST(calling_enum_lookup);
+
+    GREATEST_MAIN_END(); /* display results */
 }
-
-/// Ran before each test
-void setUp(void) {}
-
-/// Ran after each test
-void tearDown(void) {}

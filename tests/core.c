@@ -29,41 +29,45 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <unity.h>
+#include <greatest.h>
 
 #include "parser.h"
 #include "core.h"
 #include "core-utils.h"
 
-static void test_tour_create(void) {
+TEST tour_creation(void) {
     const char *filepath = "data/ESPPRC - Test Instances/E-n101-k14_a.vrp";
     Instance instance = parse_test_instance(filepath);
     Tour tour = tour_create(&instance);
+    ASSERT(tour.comp);
+    ASSERT_EQ(instance.num_customers, tour.num_customers);
     tour_destroy(&tour);
     instance_destroy(&instance);
+    PASS();
 }
 
-static void test_sxpos(void) {
+TEST calling_sxpos(void) {
     for (int32_t n = 0; n < 200; n++) {
         int32_t pos = 0;
         for (int32_t i = 0; i < n; i++) {
             for (int32_t j = i + 1; j < n; j++) {
-                TEST_ASSERT(sxpos(n, i, j) == pos);
+                ASSERT(sxpos(n, i, j) == pos);
                 pos++;
             }
         }
     }
+    PASS();
 }
 
-int main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_tour_create);
-    RUN_TEST(test_sxpos);
-    return UNITY_END();
+/* Add all the definitions that need to be in the test runner's main file. */
+GREATEST_MAIN_DEFS();
+
+int main(int argc, char **argv) {
+    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
+
+    /* If tests are run outside of a suite, a default suite is used. */
+    RUN_TEST(tour_creation);
+    RUN_TEST(calling_sxpos);
+
+    GREATEST_MAIN_END(); /* display results */
 }
-
-/// Ran before each test
-void setUp(void) {}
-
-/// Ran after each test
-void tearDown(void) {}

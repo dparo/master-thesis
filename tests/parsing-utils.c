@@ -28,12 +28,12 @@
 #include <string.h>
 #include <stdio.h>
 
-#include <unity.h>
+#include <greatest.h>
 #include "types.h"
 #include "parsing-utils.h"
 #include <stdbool.h>
 
-static void test_parse_int32(void) {
+TEST parsing_int32(void) {
 
 #define SS(str, x)                                                             \
     { str, ((int32_t)(x)), true }
@@ -92,14 +92,16 @@ static void test_parse_int32(void) {
         int32_t expected = i32_tests[i].expected;
         int32_t obtained;
         bool success = str_to_int32(in, &obtained);
-        TEST_ASSERT(success == i32_tests[i].expect_success);
+        ASSERT_EQ(i32_tests[i].expect_success, success);
         if (success) {
-            TEST_ASSERT(expected == obtained);
+            ASSERT_EQ(expected, obtained);
         }
     }
+
+    PASS();
 }
 
-static void test_parse_usize(void) {
+TEST parsing_usize(void) {
 
 #define SS(str, x)                                                             \
     { str, ((size_t)(UINT64_C(x))), true }
@@ -159,14 +161,15 @@ static void test_parse_usize(void) {
         size_t expected = usize_tests[i].expected;
         size_t obtained;
         bool success = str_to_usize(in, &obtained);
-        TEST_ASSERT(success == usize_tests[i].expect_success);
+        ASSERT_EQ(usize_tests[i].expect_success, success);
         if (success) {
-            TEST_ASSERT(expected == obtained);
+            ASSERT_EQ(expected, obtained);
         }
     }
+    PASS();
 }
 
-static void test_parse_float(void) {
+TEST parsing_float(void) {
 
 #define SS(str, x)                                                             \
     { str, ((float)(x)), true }
@@ -259,14 +262,15 @@ static void test_parse_float(void) {
         float expected = float_tests[i].expected;
         float obtained;
         bool success = str_to_float(in, &obtained);
-        TEST_ASSERT(success == float_tests[i].expect_success);
+        ASSERT_EQ(float_tests[i].expect_success, success);
         if (success) {
-            TEST_ASSERT_FLOAT_WITHIN(EPSILON, expected, obtained);
+            ASSERT_IN_RANGE(expected, obtained, EPSILON);
         }
     }
+    PASS();
 }
 
-static void test_parse_double(void) {
+TEST parsing_double(void) {
 
 #define SS(str, x)                                                             \
     { str, ((double)(x)), true }
@@ -359,14 +363,16 @@ static void test_parse_double(void) {
         double expected = double_tests[i].expected;
         double obtained;
         bool success = str_to_double(in, &obtained);
-        TEST_ASSERT(success == double_tests[i].expect_success);
+        ASSERT_EQ(double_tests[i].expect_success, success);
         if (success) {
-            TEST_ASSERT_DOUBLE_WITHIN(EPSILON, expected, obtained);
+            ASSERT_IN_RANGE(expected, obtained, EPSILON);
         }
     }
+
+    PASS();
 }
 
-static void test_parse_bool(void) {
+TEST parsing_bool(void) {
 #define SS(str, x)                                                             \
     { str, ((bool)(x)), true }
 
@@ -417,25 +423,27 @@ static void test_parse_bool(void) {
         bool expected = bool_tests[i].expected;
         bool obtained;
         bool success = str_to_bool(in, &obtained);
-        TEST_ASSERT(success == bool_tests[i].expect_success);
+        ASSERT_EQ(bool_tests[i].expect_success, success);
         if (success) {
-            TEST_ASSERT(expected == obtained);
+            ASSERT_EQ(expected, obtained);
         }
     }
+
+    PASS();
 }
 
-int main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_parse_int32);
-    RUN_TEST(test_parse_usize);
-    RUN_TEST(test_parse_float);
-    RUN_TEST(test_parse_double);
-    RUN_TEST(test_parse_bool);
-    return UNITY_END();
+/* Add all the definitions that need to be in the test runner's main file. */
+GREATEST_MAIN_DEFS();
+
+int main(int argc, char **argv) {
+    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
+
+    /* If tests are run outside of a suite, a default suite is used. */
+    RUN_TEST(parsing_int32);
+    RUN_TEST(parsing_float);
+    RUN_TEST(parsing_double);
+    RUN_TEST(parsing_usize);
+    RUN_TEST(parsing_bool);
+
+    GREATEST_MAIN_END(); /* display results */
 }
-
-/// Ran before each test
-void setUp(void) {}
-
-/// Ran after each test
-void tearDown(void) {}

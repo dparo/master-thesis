@@ -26,26 +26,25 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unity.h>
+#include <greatest.h>
 
 #include "parser.h"
 #include "misc.h"
 #include "instances.h"
 
-static void validate_instance(Instance *instance,
-                              int32_t expected_num_customers,
-                              int32_t expected_num_vehicles) {
-    TEST_ASSERT_EQUAL(instance->num_customers, expected_num_customers);
-    TEST_ASSERT_EQUAL(instance->num_vehicles, expected_num_vehicles);
-    TEST_ASSERT(instance->vehicle_cap > 0);
+TEST validate_instance(Instance *instance, int32_t expected_num_customers,
+                       int32_t expected_num_vehicles) {
+    ASSERT_EQ(instance->num_customers, expected_num_customers);
+    ASSERT_EQ(instance->num_vehicles, expected_num_vehicles);
+    ASSERT(instance->vehicle_cap > 0);
 
-    TEST_ASSERT_NOT_NULL(instance->positions);
-    TEST_ASSERT_NOT_NULL(instance->demands);
-    TEST_ASSERT_NOT_NULL(instance->duals);
+    ASSERT(instance->positions);
+    ASSERT(instance->demands);
+    ASSERT(instance->duals);
 
-    TEST_ASSERT(instance->demands[0] == 0.0);
+    ASSERT(instance->demands[0] == 0.0);
     for (int32_t i = 1; i < instance->num_customers + 1; i++)
-        TEST_ASSERT(instance->demands[i] > 0.0);
+        ASSERT(instance->demands[i] > 0.0);
 
     // TODO: __EMAIL the professor__
     //       Double check these assertions. For some reason there are instances
@@ -53,63 +52,70 @@ static void validate_instance(Instance *instance,
     //       duals which are negative. Therefore not all instances pass these
     //       checks. For this reason these checks are currently disabled
     if (0) {
-        TEST_ASSERT(instance->duals[0] == 0.0);
+        ASSERT(instance->duals[0] == 0.0);
         for (int32_t i = 1; i < instance->num_customers + 1; i++)
-            TEST_ASSERT(instance->duals[i] >= 0.0);
+            ASSERT(instance->duals[i] >= 0.0);
     }
+
+    PASS();
 }
 
-static void test_parser_on_single_instance(void) {
+TEST parsing_single_instance(void) {
     const char *filepath = "data/ESPPRC - Test Instances/E-n101-k14_a.vrp";
     Instance instance = parse_test_instance(filepath);
-    validate_instance(&instance, 100, 14);
-    TEST_ASSERT(instance.positions[0].x == 35);
-    TEST_ASSERT(instance.positions[0].y == 35);
-    TEST_ASSERT(instance.demands[0] == 0);
-    TEST_ASSERT(instance.duals[0] == 7.247);
 
-    TEST_ASSERT(instance.positions[1].x == 41);
-    TEST_ASSERT(instance.positions[1].y == 49);
-    TEST_ASSERT(instance.demands[1] == 10.0);
-    TEST_ASSERT(instance.duals[1] == 5.843);
+    CHECK_CALL(validate_instance(&instance, 100, 14));
+
+    ASSERT(instance.positions[0].x == 35);
+    ASSERT(instance.positions[0].y == 35);
+    ASSERT(instance.demands[0] == 0);
+    ASSERT(instance.duals[0] == 7.247);
+
+    ASSERT(instance.positions[1].x == 41);
+    ASSERT(instance.positions[1].y == 49);
+    ASSERT(instance.demands[1] == 10.0);
+    ASSERT(instance.duals[1] == 5.843);
 
     int32_t n = instance.num_customers;
 
-    TEST_ASSERT(instance.positions[n - 1].x == 20);
-    TEST_ASSERT(instance.positions[n - 1].y == 26);
-    TEST_ASSERT(instance.demands[n - 1] == 9.0);
-    TEST_ASSERT(instance.duals[n - 1] == 3.546);
+    ASSERT(instance.positions[n - 1].x == 20);
+    ASSERT(instance.positions[n - 1].y == 26);
+    ASSERT(instance.demands[n - 1] == 9.0);
+    ASSERT(instance.duals[n - 1] == 3.546);
 
-    TEST_ASSERT(instance.positions[n].x == 18);
-    TEST_ASSERT(instance.positions[n].y == 18);
-    TEST_ASSERT(instance.demands[n] == 17.0);
-    TEST_ASSERT(instance.duals[n] == 6.82);
+    ASSERT(instance.positions[n].x == 18);
+    ASSERT(instance.positions[n].y == 18);
+    ASSERT(instance.demands[n] == 17.0);
+    ASSERT(instance.duals[n] == 6.82);
 
     instance_destroy(&instance);
+    PASS();
 }
 
-static void test_parser_on_all_instances(void) {
+TEST parsing_all_instances(void) {
 
     STATIC_ASSERT(ARRAY_LEN(G_TEST_INSTANCES) == 31,
                   "This is the amount of test instances that we have");
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
         Instance instance = parse_test_instance(G_TEST_INSTANCES[i].filepath);
-        validate_instance(&instance, G_TEST_INSTANCES[i].expected_num_customers,
-                          G_TEST_INSTANCES[i].expected_num_vehicles);
+        CHECK_CALL(validate_instance(
+            &instance, G_TEST_INSTANCES[i].expected_num_customers,
+            G_TEST_INSTANCES[i].expected_num_vehicles));
         instance_destroy(&instance);
     }
+    PASS();
 }
 
-int main(void) {
-    UNITY_BEGIN();
-    RUN_TEST(test_parser_on_single_instance);
-    RUN_TEST(test_parser_on_all_instances);
-    return UNITY_END();
+/* Add all the definitions that need to be in the test runner's main file. */
+GREATEST_MAIN_DEFS();
+
+int main(int argc, char **argv) {
+    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
+
+    /* If tests are run outside of a suite, a default suite is used. */
+    RUN_TEST(parsing_single_instance);
+    RUN_TEST(parsing_all_instances);
+
+    GREATEST_MAIN_END(); /* display results */
 }
-
-/// Ran before each test
-void setUp(void) {}
-
-/// Ran after each test
-void tearDown(void) {}
