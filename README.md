@@ -69,6 +69,6 @@ Baldacci, R., Mingozzi, A., & Roberti, R. (2011). New route relaxation and prici
 This project is licensed under the **MIT** license. Check the [LICENSE file](LICENSE).
 
 This project makes use of thirdy party projects (located under `deps`) licensed respectively in their corresponding licenses:
-1. [rxi/log.c](github.com/rxi/log.c) [**MIT license**](https://github.com/rxi/log.c/blob/master/LICENSE)
-2. [argtable3/argtable3](github.com/argtable3/argtable3) [**BSD license**](https://github.com/argtable/argtable3/blob/master/LICENSE)
-3. [ThrowTheSwitch/Unity](github.com/ThrowTheSwitch/Unity) [**MIT license**](https://github.com/ThrowTheSwitch/Unity/blob/master/LICENSE.txt)
+1. [rxi/log.c](https://github.com/rxi/log.c) [**MIT license**](https://github.com/rxi/log.c/blob/master/LICENSE)
+2. [argtable3/argtable3](https://github.com/argtable3/argtable3) [**BSD license**](https://github.com/argtable/argtable3/blob/master/LICENSE)
+3. [silentbicycle/greatest/](https://github.com/silentbicycle/greatest/) [**MIT license**](https://github.com/silentbicycle/greatest/blob/master/LICENSE)
