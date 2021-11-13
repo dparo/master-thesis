@@ -29,6 +29,7 @@
 #include <greatest.h>
 
 #include "parser.h"
+#include "core-utils.h"
 #include "misc.h"
 #include "instances.h"
 
@@ -75,6 +76,52 @@ TEST parsing_single_instance(void) {
     PASS();
 }
 
+#define EPS ((double)0.000001)
+
+struct BapCodGeneratedInstanceTest {
+    int32_t column_generation_it;
+    struct {
+        int32_t i;
+        double expected_x, expected_y;
+        double expected_demand;
+    } nodes[100];
+    struct {
+        int32_t i, j;
+        double expected;
+    } distances[100];
+};
+
+TEST parsing_bapcod_output_instances(void) {
+    char filepath[4096];
+    for (int32_t i = 0; i <= 62; i++) {
+        snprintf(filepath, ARRAY_LEN(filepath),
+                 "data/BaPCod generated - Test instances/A-n37-k5.cgit-%d.vrp",
+                 i);
+        Instance instance = parse_vrplib_instance(filepath);
+        CHECK_CALL(validate_instance(&instance, 36, 5));
+
+        if (i == 28) {
+            // Some extra checks for this instance
+            ASSERT_EQ(10, instance.positions[19 - 1].x);
+            ASSERT_EQ(91, instance.positions[19 - 1].y);
+
+            ASSERT_EQ(50, instance.positions[34 - 1].x);
+            ASSERT_EQ(2, instance.positions[34 - 1].y);
+
+            ASSERT_EQ(4, instance.demands[19 - 1]);
+            ASSERT_EQ(19, instance.demands[33 - 1]);
+
+            ASSERT_IN_RANGE(22.2962, cptp_dist(&instance, 1 - 1, 2 - 1), EPS);
+            ASSERT_IN_RANGE(-6.33531, cptp_dist(&instance, 1 - 1, 4 - 1), EPS);
+            ASSERT_IN_RANGE(28.2942, cptp_dist(&instance, 3 - 1, 32 - 1), EPS);
+            ASSERT_IN_RANGE(40.6364, cptp_dist(&instance, 19 - 1, 34 - 1), EPS);
+        }
+
+        instance_destroy(&instance);
+    }
+    PASS();
+}
+
 /* Add all the definitions that need to be in the test runner's main file. */
 GREATEST_MAIN_DEFS();
 
@@ -83,6 +130,7 @@ int main(int argc, char **argv) {
 
     /* If tests are run outside of a suite, a default suite is used. */
     RUN_TEST(parsing_single_instance);
+    RUN_TEST(parsing_bapcod_output_instances);
 
     GREATEST_MAIN_END(); /* display results */
 }
