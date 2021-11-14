@@ -1,6 +1,7 @@
 # Generated from: A-n37-k5
 # Column generation iteration: 58
-# RCSP solver took (seconds): 0.020414
+# Zero Reduced Cost Threshold: 3.768173
+# RCSP solver took (seconds): 0.020421
 # RCSP solver generated 32 columns
 
 NAME : A-n37-k5.cgit-58
