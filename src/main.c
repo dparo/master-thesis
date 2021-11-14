@@ -111,9 +111,7 @@ static int main2(const char *instance_filepath, const char *solver,
                 printf("%-12s Could not solve\n", "ERR:");
             }
 
-            printf("%-12s ", "COST:");
-            printf("%f\n", tour_eval(&instance, &solution.tour));
-
+            printf("%-12s %f\n", "COST:", tour_eval(&instance, &solution.tour));
             printf("%-12s %s", "STARTED:", ctime(&started));
             printf("%-12s %s", "ENDED:", ctime(&ended));
             printf("%-12s ", "TOOK:");
