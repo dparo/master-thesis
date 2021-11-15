@@ -72,64 +72,86 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
     return result;
 }
 
-static int main2(const char *instance_filepath, const char *solver,
-                 double timelimit, int32_t randomseed, const char **defines,
-                 int32_t num_defines, const char *vis_path) {
-    const char *filepath = instance_filepath;
-    Instance instance = parse_test_instance(filepath);
+typedef struct {
+    const char *instance_filepath;
+    const char *solver;
+    double timelimit;
+    int32_t randomseed;
+    const char **defines;
+    int32_t num_defines;
+    const char *vis_path;
+} AppCtx;
+
+typedef struct {
+    time_t started;
+    time_t ended;
+    int64_t took_usecs;
+} Timing;
+
+static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
+                             Solution *solution, SolveStatus status,
+                             Timing timing) {
+    bool success = is_valid_solve_status(status);
+
+    fprintf(fh, "%-16s %s\n", "SOLVER:", ctx->solver);
+    fprintf(fh, "%-16s %f\n", "TIMELIM:", ctx->timelimit);
+    fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
+
+    if (success) {
+        printf("%-16s [%f, %f]\n", "OBJ:", solution->lower_bound,
+               solution->upper_bound);
+        print_tour(&solution->tour);
+    } else {
+        printf("%-16s Could not solve\n", "ERR:");
+    }
+
+    double cost = tour_eval(instance, &solution->tour);
+    printf("%-16s %f\n", "COST:", cost);
+
+    if (instance->zero_reduced_cost_threshold != 0) {
+        printf("%-16s %f\n",
+               "COST THRESHOLD:", instance->zero_reduced_cost_threshold);
+        printf("%-16s %f\n",
+               "RELATIVE COST:", cost - instance->zero_reduced_cost_threshold);
+    }
+    printf("%-16s %s", "STARTED:", ctime(&timing.started));
+    printf("%-16s %s", "ENDED:", ctime(&timing.ended));
+    printf("%-16s ", "TOOK:");
+
+    TimeRepr solve_time_repr = timerepr_from_usecs(timing.took_usecs);
+    print_timerepr(stdout, &solve_time_repr);
+    printf("\n");
+}
+
+static int main2(AppCtx *ctx) {
+    Instance instance = parse_test_instance(ctx->instance_filepath);
     if (instance.num_customers > 0) {
         SolverParams params =
-            make_solver_params_from_cmdline(defines, num_defines);
+            make_solver_params_from_cmdline(ctx->defines, ctx->num_defines);
         Solution solution = solution_create(&instance);
 
         bool success = false;
 
         // Solve, timing and printing of final solution
         {
-            time_t started = time(NULL);
+            Timing timing;
+            timing.started = time(NULL);
+
             int64_t begin_solve_time = os_get_usecs();
             SolveStatus status =
-                cptp_solve(&instance, solver ? solver : "mip", &params,
-                           &solution, timelimit, randomseed);
+                cptp_solve(&instance, ctx->solver ? ctx->solver : "mip",
+                           &params, &solution, ctx->timelimit, ctx->randomseed);
+
+            timing.ended = time(NULL);
+            timing.took_usecs = os_get_usecs() - begin_solve_time;
 
             success = is_valid_solve_status(status);
 
-            time_t ended = time(NULL);
-            int64_t solve_time = os_get_usecs() - begin_solve_time;
-
             printf("\n\n###\n###\n###\n\n");
+            writeout_results(stdout, ctx, &instance, &solution, status, timing);
 
-            printf("%-16s %s\n", "SOLVER:", solver);
-            printf("%-16s %f\n", "TIMELIM:", timelimit);
-            printf("%-16s %s\n", "INPUT:", instance_filepath);
-
-            if (success) {
-                printf("%-16s [%f, %f]\n", "OBJ:", solution.lower_bound,
-                       solution.upper_bound);
-                print_tour(&solution.tour);
-            } else {
-                printf("%-16s Could not solve\n", "ERR:");
-            }
-
-            double cost = tour_eval(&instance, &solution.tour);
-            printf("%-16s %f\n", "COST:", cost);
-
-            if (instance.zero_reduced_cost_threshold != 0) {
-                printf("%-16s %f\n",
-                       "COST THRESHOLD:", instance.zero_reduced_cost_threshold);
-                printf("%-16s %f\n", "RELATIVE COST:",
-                       cost - instance.zero_reduced_cost_threshold);
-            }
-            printf("%-16s %s", "STARTED:", ctime(&started));
-            printf("%-16s %s", "ENDED:", ctime(&ended));
-            printf("%-16s ", "TOOK:");
-
-            TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
-            print_timerepr(stdout, &solve_time_repr);
-            printf("\n");
-
-            if (vis_path) {
-                tour_plot(vis_path, &instance, &solution.tour, NULL);
+            if (ctx->vis_path) {
+                tour_plot(ctx->vis_path, &instance, &solution.tour, NULL);
             }
         }
 
@@ -138,7 +160,7 @@ static int main2(const char *instance_filepath, const char *solver,
 
         return success ? EXIT_SUCCESS : EXIT_FAILURE;
     } else {
-        fprintf(stderr, "%s: Failed to parse file\n", instance_filepath);
+        fprintf(stderr, "%s: Failed to parse file\n", ctx->instance_filepath);
         return EXIT_FAILURE;
     }
 }
@@ -255,9 +277,17 @@ int main(int argc, char **argv) {
         }
     }
 
-    exitcode = main2(instance->filename[0], solver->sval[0], timelimit->dval[0],
-                     randomseed->ival[0], defines->sval, defines->count,
-                     vis_path->filename[0]);
+    AppCtx ctx = {
+        .instance_filepath = instance->filename[0],
+        .solver = solver->sval[0],
+        .timelimit = timelimit->dval[0],
+        .randomseed = randomseed->ival[0],
+        .defines = defines->sval,
+        .num_defines = defines->count,
+        .vis_path = vis_path->filename[0],
+    };
+
+    exitcode = main2(&ctx);
 
 exit:
     arg_freetable(argtable, ARRAY_LEN(argtable));
