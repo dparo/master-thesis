@@ -98,7 +98,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
 
     if (success) {
-        printf("%-16s [%f, %f]\n", "OBJ:", solution->lower_bound,
+        printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
                solution->upper_bound);
         print_tour(&solution->tour);
     } else {
@@ -106,12 +106,12 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
     }
 
     double cost = tour_eval(instance, &solution->tour);
-    printf("%-16s %f\n", "COST:", cost);
+    printf("%-16s %.17g\n", "COST:", cost);
 
     if (instance->zero_reduced_cost_threshold != 0) {
-        printf("%-16s %f\n",
+        printf("%-16s %.17g\n",
                "COST THRESHOLD:", instance->zero_reduced_cost_threshold);
-        printf("%-16s %f\n",
+        printf("%-16s %.17g\n",
                "RELATIVE COST:", cost - instance->zero_reduced_cost_threshold);
     }
     printf("%-16s %s", "STARTED:", ctime(&timing.started));
