@@ -6,9 +6,9 @@
     "vehicles": 5,
     "capacity": 100,
     "columnGenerationIteration": 56,
-    "zeroReducedCostThreshold": 3.754717,
+    "zeroReducedCostThreshold": 3.75471698113209,
     "rcsp-infos": {
-         "seconds": 0.024463,
+         "seconds": 0.032151,
          "generatedColumns": 31,
          "columns": [
                 [
