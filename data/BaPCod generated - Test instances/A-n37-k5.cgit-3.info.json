@@ -8,7 +8,7 @@
     "columnGenerationIteration": 3,
     "zeroReducedCostThreshold": 12000.000000,
     "rcsp-infos": {
-         "seconds": 0.020069,
+         "seconds": 0.035188,
          "generatedColumns": 33,
          "columns": [
                 [

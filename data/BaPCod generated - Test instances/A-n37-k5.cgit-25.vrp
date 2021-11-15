@@ -1,7 +1,7 @@
 # Generated from: A-n37-k5
 # Column generation iteration: 25
 # Zero Reduced Cost Threshold: 2.777189
-# RCSP solver took (seconds): 0.000714
+# RCSP solver took (seconds): 0.001222
 # RCSP solver generated 36 columns
 
 NAME : A-n37-k5.cgit-25
@@ -10,6 +10,7 @@ TYPE : CVRP
 DIMENSION : 37
 VEHICLES : 5
 CAPACITY : 100
+ZERO_REDUCED_COST_THRESHOLD : 2.777189
 EDGE_WEIGHT_TYPE : UPPER_ROW
 NODE_COORD_SECTION
 1 38 46
