@@ -99,30 +99,30 @@ static int main2(const char *instance_filepath, const char *solver,
 
             printf("\n\n###\n###\n###\n\n");
 
-            printf("%-12s %s\n", "SOLVER:", solver);
-            printf("%-12s %f\n", "TIMELIM:", timelimit);
-            printf("%-12s %s\n", "INPUT:", instance_filepath);
+            printf("%-16s %s\n", "SOLVER:", solver);
+            printf("%-16s %f\n", "TIMELIM:", timelimit);
+            printf("%-16s %s\n", "INPUT:", instance_filepath);
 
             if (success) {
-                printf("%-12s [%f, %f]\n", "OBJ:", solution.lower_bound,
+                printf("%-16s [%f, %f]\n", "OBJ:", solution.lower_bound,
                        solution.upper_bound);
                 print_tour(&solution.tour);
             } else {
-                printf("%-12s Could not solve\n", "ERR:");
+                printf("%-16s Could not solve\n", "ERR:");
             }
 
             double cost = tour_eval(&instance, &solution.tour);
-            printf("%-12s %f\n", "COST:", cost);
+            printf("%-16s %f\n", "COST:", cost);
 
             if (instance.zero_reduced_cost_threshold != 0) {
-                printf("%-12s %f\n",
+                printf("%-16s %f\n",
                        "COST THRESHOLD:", instance.zero_reduced_cost_threshold);
-                printf("%-12s %f\n", "RELATIVE COST:",
+                printf("%-16s %f\n", "RELATIVE COST:",
                        cost - instance.zero_reduced_cost_threshold);
             }
-            printf("%-12s %s", "STARTED:", ctime(&started));
-            printf("%-12s %s", "ENDED:", ctime(&ended));
-            printf("%-12s ", "TOOK:");
+            printf("%-16s %s", "STARTED:", ctime(&started));
+            printf("%-16s %s", "ENDED:", ctime(&ended));
+            printf("%-16s ", "TOOK:");
 
             TimeRepr solve_time_repr = timerepr_from_usecs(solve_time);
             print_timerepr(stdout, &solve_time_repr);
@@ -287,7 +287,7 @@ static void print_use_help_for_more_information(const char *progname) {
 }
 
 static void print_tour(Tour *t) {
-    printf("%-12s ", "TOUR:");
+    printf("%-16s ", "TOUR:");
 
     int32_t curr_vertex = 0;
     int32_t next_vertex = curr_vertex;
