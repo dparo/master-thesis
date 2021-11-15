@@ -383,6 +383,19 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
                 result = false;
             }
             instance->vehicle_cap = MAX(0.0, capacity);
+        } else if ((value =
+                        parse_hdr_field(p, "ZERO_REDUCED_COST_THRESHOLD"))) {
+
+            double zero_reduced_cost_threshold = 0;
+            if (!str_to_double(value, &zero_reduced_cost_threshold)) {
+                parse_error(p,
+                            "expected valid number for "
+                            "ZERO_REDUCED_COST_THRESHOLD field. Got "
+                            "`%s` instead",
+                            value);
+                result = false;
+            }
+            instance->zero_reduced_cost_threshold = zero_reduced_cost_threshold;
         } else {
             done = true;
         }

@@ -47,6 +47,7 @@ typedef struct Instance {
     int32_t num_customers;
     int32_t num_vehicles;
     double vehicle_cap;
+    double zero_reduced_cost_threshold;
 
     DistanceRounding rounding_strat;
     Vec2d *positions;
