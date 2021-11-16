@@ -29,7 +29,7 @@
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
 static void push_relabel_max_flow(void) {}
 
-static inline double *flow(Net *net, int32_t i, int32_t j) {
+static inline double *flow(Network *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
     return &net->flow[i * net->nnodes + j];
