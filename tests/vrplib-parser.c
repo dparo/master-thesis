@@ -96,7 +96,8 @@ TEST parsing_bapcod_output_instances(void) {
     char filepath[4096];
     for (int32_t i = 0; i <= 62; i++) {
         snprintf(filepath, ARRAY_LEN(filepath),
-                 "data/BaPCod generated - Test instances/A-n37-k5.cgit-%d.vrp",
+                 "data/BaPCod generated - Test "
+                 "instances/A-n37-k5/A-n37-k5.cgit-%d.vrp",
                  i);
         Instance instance = parse(filepath);
         CHECK_CALL(validate_instance(&instance, 36, 5));
