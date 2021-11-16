@@ -35,6 +35,7 @@
 
 TEST validate_instance(Instance *instance, int32_t expected_num_customers,
                        int32_t expected_num_vehicles) {
+    ASSERT(is_valid_instance(instance));
     ASSERT_EQ(expected_num_customers, instance->num_customers);
     ASSERT_EQ(expected_num_vehicles, instance->num_vehicles);
     ASSERT(instance->vehicle_cap > 0);
@@ -70,13 +71,13 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
 }
 
 TEST parsing_single_instance(void) {
-    Instance instance = parse_vrplib_instance("./data/CVRP/toy.vrp");
-    CHECK_CALL(validate_instance(&instance, 5, 0));
+    Instance instance = parse("./data/CVRP/toy.vrp");
+    CHECK_CALL(validate_instance(&instance, 5, 1));
     instance_destroy(&instance);
     PASS();
 }
 
-#define EPS ((double)0.000001)
+#define EPS ((double)1e-4)
 
 struct BapCodGeneratedInstanceTest {
     int32_t column_generation_it;
@@ -97,7 +98,7 @@ TEST parsing_bapcod_output_instances(void) {
         snprintf(filepath, ARRAY_LEN(filepath),
                  "data/BaPCod generated - Test instances/A-n37-k5.cgit-%d.vrp",
                  i);
-        Instance instance = parse_vrplib_instance(filepath);
+        Instance instance = parse(filepath);
         CHECK_CALL(validate_instance(&instance, 36, 5));
 
         if (i == 28) {

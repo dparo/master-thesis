@@ -36,8 +36,8 @@
 #include "core-utils.h"
 
 TEST tour_creation(void) {
-    const char *filepath = "data/ESPPRC - Test Instances/E-n101-k14_a.vrp";
-    Instance instance = parse_test_instance(filepath);
+    const char *filepath = "data/ESPPRC - Test Instances/vrps/E-n101-k14_a.vrp";
+    Instance instance = parse(filepath);
     Tour tour = tour_create(&instance);
     ASSERT(tour.comp);
     ASSERT_EQ(instance.num_customers, tour.num_customers);

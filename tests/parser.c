@@ -34,6 +34,7 @@
 
 TEST validate_instance(Instance *instance, int32_t expected_num_customers,
                        int32_t expected_num_vehicles) {
+    ASSERT(is_valid_instance(instance));
     ASSERT_EQ(instance->num_customers, expected_num_customers);
     ASSERT_EQ(instance->num_vehicles, expected_num_vehicles);
     ASSERT(instance->vehicle_cap > 0);
@@ -61,8 +62,8 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
 }
 
 TEST parsing_single_instance(void) {
-    const char *filepath = "data/ESPPRC - Test Instances/E-n101-k14_a.vrp";
-    Instance instance = parse_test_instance(filepath);
+    const char *filepath = "data/ESPPRC - Test Instances/vrps/E-n101-k14_a.vrp";
+    Instance instance = parse(filepath);
 
     CHECK_CALL(validate_instance(&instance, 100, 14));
 
@@ -98,7 +99,7 @@ TEST parsing_all_instances(void) {
                   "This is the amount of test instances that we have");
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
-        Instance instance = parse_test_instance(G_TEST_INSTANCES[i].filepath);
+        Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         CHECK_CALL(validate_instance(
             &instance, G_TEST_INSTANCES[i].expected_num_customers,
             G_TEST_INSTANCES[i].expected_num_vehicles));

@@ -43,8 +43,8 @@
 
 TEST creation(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
-    Instance instance = parse_test_instance(filepath);
-    instance_set_name(&instance, "test");
+    Instance instance = parse(filepath);
+    ASSERT(is_valid_instance(&instance));
     SolverParams params = {0};
     SolverTypedParams tparams = {0};
     bool resolved = resolve_params(&params, &MIP_SOLVER_DESCRIPTOR, &tparams);
@@ -62,7 +62,8 @@ TEST creation(void) {
 
 TEST solving_small_instances(void) {
     const char *filepath = SMALL_TEST_INSTANCE;
-    Instance instance = parse_test_instance(filepath);
+    Instance instance = parse(filepath);
+    ASSERT(is_valid_instance(&instance));
     SolverParams params = {0};
     Solution solution = solution_create(&instance);
     SolveStatus status =
@@ -80,8 +81,8 @@ TEST solving_small_instances(void) {
 TEST solving_some_instances(void) {
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
         if (G_TEST_INSTANCES[i].expected_num_customers <= 71) {
-            Instance instance =
-                parse_test_instance(G_TEST_INSTANCES[i].filepath);
+            Instance instance = parse(G_TEST_INSTANCES[i].filepath);
+            ASSERT(is_valid_instance(&instance));
             SolverParams params = {0};
             Solution solution = solution_create(&instance);
             SolveStatus status = cptp_solve(&instance, "mip", &params,

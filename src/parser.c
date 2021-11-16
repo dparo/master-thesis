@@ -53,8 +53,8 @@ static bool expect_newline(FILE *filehandle, const char *filepath,
     return true;
 }
 
-static bool parse_hdr(Instance *instance, FILE *filehandle,
-                      const char *filepath, int32_t *line_cnt) {
+static bool parse_simplified_vrp_hdr(Instance *instance, FILE *filehandle,
+                                     const char *filepath, int32_t *line_cnt) {
 
     int32_t num_read = fscanf(filehandle, "%d %d %lf", &instance->num_customers,
                               &instance->num_vehicles, &instance->vehicle_cap);
@@ -69,8 +69,8 @@ static bool parse_hdr(Instance *instance, FILE *filehandle,
     return true;
 }
 
-static bool parse_line(Instance *instance, FILE *filehandle,
-                       const char *filepath, int32_t *line_cnt) {
+static bool parse_simplified_vrp_line(Instance *instance, FILE *filehandle,
+                                      const char *filepath, int32_t *line_cnt) {
 
     int32_t idx;
     double x, y;
@@ -124,8 +124,8 @@ static bool prep_memory(Instance *instance) {
     return instance->positions && instance->demands && instance->duals;
 }
 
-static bool parse_file(Instance *instance, FILE *filehandle,
-                       const char *filepath) {
+static bool parse_simplified_vrp_file(Instance *instance, FILE *filehandle,
+                                      const char *filepath) {
     int32_t line_cnt = 0;
     int32_t found_num_customers = 0;
 
@@ -134,7 +134,7 @@ static bool parse_file(Instance *instance, FILE *filehandle,
         return false;
     }
 
-    if (!parse_hdr(instance, filehandle, filepath, &line_cnt)) {
+    if (!parse_simplified_vrp_hdr(instance, filehandle, filepath, &line_cnt)) {
         return false;
     }
 
@@ -144,7 +144,7 @@ static bool parse_file(Instance *instance, FILE *filehandle,
         return false;
     }
 
-    while (parse_line(instance, filehandle, filepath, &line_cnt))
+    while (parse_simplified_vrp_line(instance, filehandle, filepath, &line_cnt))
         ;
 
     found_num_customers = line_cnt - 3;
@@ -818,23 +818,53 @@ terminate:
     return result;
 }
 
-static Instance parse(const char *filepath, bool is_test_instance) {
+typedef enum {
+    PARSING_FILE_EXT_AUTODETECT = 0,
+    PARSING_FILE_EXT_VRPLIB = 1,
+    PARSING_FILE_EXT_SIMPLIFIED_VRP = 2,
+} ParsingFileExt;
+
+static Instance parse_impl(const char *filepath, ParsingFileExt ext) {
     FILE *filehandle = fopen(filepath, "r");
     Instance result = {0};
     result.rounding_strat = CPTP_DIST_ROUND;
     bool success = false;
 
+    if (ext == PARSING_FILE_EXT_AUTODETECT) {
+        // Default to VRPLIB parsing
+        ext = PARSING_FILE_EXT_VRPLIB;
+
+        // Walk string backward to determine file extension
+        for (int32_t i = strlen(filepath) - 1; i >= 0; i--) {
+            if (filepath[i] == '.') {
+                const char *extstr = &filepath[i + 1];
+                if (0 == strcmp(extstr, "simplified-vrp")) {
+                    ext = PARSING_FILE_EXT_SIMPLIFIED_VRP;
+                }
+                break;
+            }
+        }
+    }
+
     if (filehandle) {
-        if (is_test_instance) {
-            success = parse_file(&result, filehandle, filepath);
-        } else {
+        switch (ext) {
+        case PARSING_FILE_EXT_SIMPLIFIED_VRP:
+            success = parse_simplified_vrp_file(&result, filehandle, filepath);
+            break;
+        case PARSING_FILE_EXT_VRPLIB:
             success = parse_vrp_file(&result, filehandle, filepath);
+            break;
+        default:
+            assert(!"Invalid code path");
+            break;
         }
         fclose(filehandle);
     }
 
     if (success) {
-        instance_set_name(&result, filepath);
+        if (!result.name || result.name[0] == '\0') {
+            instance_set_name(&result, filepath);
+        }
         return result;
     } else {
         instance_destroy(&result);
@@ -842,10 +872,6 @@ static Instance parse(const char *filepath, bool is_test_instance) {
     }
 }
 
-Instance parse_test_instance(const char *filepath) {
-    return parse(filepath, true);
-}
-
-Instance parse_vrplib_instance(const char *filepath) {
-    return parse(filepath, false);
+Instance parse(const char *filepath) {
+    return parse_impl(filepath, PARSING_FILE_EXT_AUTODETECT);
 }

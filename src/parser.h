@@ -24,5 +24,4 @@
 
 #include "core.h"
 
-Instance parse_test_instance(const char *filepath);
-Instance parse_vrplib_instance(const char *filepath);
+Instance parse(const char *filepath);

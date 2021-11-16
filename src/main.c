@@ -124,8 +124,8 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
 }
 
 static int main2(AppCtx *ctx) {
-    Instance instance = parse_test_instance(ctx->instance_filepath);
-    if (instance.num_customers > 0) {
+    Instance instance = parse(ctx->instance_filepath);
+    if (is_valid_instance(&instance)) {
         SolverParams params =
             make_solver_params_from_cmdline(ctx->defines, ctx->num_defines);
         Solution solution = solution_create(&instance);

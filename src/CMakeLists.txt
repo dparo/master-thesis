@@ -80,8 +80,4 @@ target_link_libraries(cptp PRIVATE libcptp argtable3::argtable3)
 target_include_directories(cptp PRIVATE "${DEPS_DIR}/argtable3/src")
 
 
-add_executable(test-instance-converter
-    tools/test-instance-converter.c
-    )
-target_link_libraries(test-instance-converter PRIVATE libcptp argtable3::argtable3)
-target_include_directories(test-instance-converter PRIVATE "${DEPS_DIR}/argtable3/src")
+add_subdirectory(tools)

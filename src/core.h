@@ -168,6 +168,13 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 
 void cptp_print_list_of_solvers_and_params(void);
 
+static inline bool is_valid_instance(Instance *instance) {
+    bool invalid = instance->num_customers <= 0 ||
+                   instance->num_vehicles <= 0 || instance->vehicle_cap <= 0 ||
+                   !instance->demands;
+    return !invalid;
+}
+
 static inline bool is_valid_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
