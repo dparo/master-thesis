@@ -35,6 +35,11 @@ extern "C" {
 #include "misc.h"
 #include "utils.h"
 
+typedef struct Mat2d {
+    int32_t w, h;
+    double *data;
+} Mat2d;
+
 static inline bool fcmp(double a, double b, double epsilon) {
     return fabs(a - b) <= epsilon;
 }
