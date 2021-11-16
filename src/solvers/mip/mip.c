@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-#include "solvers/mip.h"
+#include "solvers.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "core-utils.h"

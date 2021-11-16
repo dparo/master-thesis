@@ -33,8 +33,15 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {"mip",
                                                            {0},
                                                        }};
 
+static const SolverDescriptor STUB_SOLVER_DESCRIPTOR = {"stub",
+                                                        {
+                                                            {0},
+                                                        }};
+
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                          double timelimit, int32_t seed);
+Solver stub_solver_create(const Instance *instance, SolverTypedParams *tparams,
+                          double timelimit, int32_t randomseed);
 
 #if __cplusplus
 }

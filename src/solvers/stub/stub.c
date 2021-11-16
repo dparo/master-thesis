@@ -20,7 +20,7 @@
  * SOFTWARE.
  */
 
-#include "solvers/stub.h"
+#include "solvers.h"
 
 static SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
                          ATTRIB_MAYBE_UNUSED const Instance *instance,

@@ -33,7 +33,7 @@
 #if COMPILED_WITH_CPLEX
 
 #include "parser.h"
-#include "solvers/mip.h"
+#include "solvers.h"
 #include "core.h"
 #include "core-utils.h"
 #include "instances.h"

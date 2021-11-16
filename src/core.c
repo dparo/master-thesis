@@ -25,8 +25,7 @@
 #include <string.h>
 #include <signal.h>
 
-#include "solvers/stub.h"
-#include "solvers/mip.h"
+#include "solvers.h"
 #include "core-utils.h"
 #include "parsing-utils.h"
 #include "validation.h"
