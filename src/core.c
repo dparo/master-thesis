@@ -127,9 +127,11 @@ typedef Solver (*SolverCreateFn)(const Instance *instance,
 static const struct SolverLookup {
     const SolverDescriptor *descriptor;
     SolverCreateFn create_fn;
-} SOLVERS_LOOKUP_TABLE[] = {
+} SOLVERS_REGISTRY[] = {
     {&STUB_SOLVER_DESCRIPTOR, &stub_solver_create},
+#if COMPILED_WITH_CPLEX
     {&MIP_SOLVER_DESCRIPTOR, &mip_solver_create},
+#endif
 };
 
 const char *param_type_as_str(SolverParamType type) {
@@ -157,26 +159,28 @@ void cptp_print_list_of_solvers_and_params(void) {
     printf("\n");
     printf("Available Solvers and Settable Params:\n");
     for (int32_t solver_idx = 0;
-         solver_idx < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); solver_idx++) {
-        const SolverDescriptor *d = SOLVERS_LOOKUP_TABLE[solver_idx].descriptor;
+         solver_idx < (int32_t)ARRAY_LEN(SOLVERS_REGISTRY); solver_idx++) {
+        const SolverDescriptor *d = SOLVERS_REGISTRY[solver_idx].descriptor;
         if (d->name != NULL && *d->name != '\0') {
             printf("  - %s:\n", d->name);
             int32_t j;
             for (j = 0; d->params[j].name != NULL; j++) {
                 if (d->params[j].default_value != NULL &&
                     *d->params[j].default_value != '\0') {
-                    printf("      - %-20s  (%s, default: %s)\n",
+                    printf("      - %-20s  (%s, default: %s)",
                            d->params[j].name,
                            param_type_as_str(d->params[j].type),
                            d->params->default_value);
                 } else {
-                    printf("      - %-20s  (%s)\n", d->params[j].name,
+                    printf("      - %-20s  (%s)", d->params[j].name,
                            param_type_as_str(d->params[j].type));
                 }
 
                 if (d->params[j].glossary != NULL &&
                     *d->params[j].glossary != '\0') {
-                    printf("        %s\n", d->params[j].glossary);
+                    printf("  %s\n", d->params[j].glossary);
+                } else {
+                    printf("\n");
                 }
             }
             if (j == 0) {
@@ -191,10 +195,9 @@ typedef struct SolverLookup SolverLookup;
 
 static const SolverLookup *lookup_solver(const char *solver_name) {
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(SOLVERS_LOOKUP_TABLE); i++) {
-        if (0 ==
-            strcmp(solver_name, SOLVERS_LOOKUP_TABLE[i].descriptor->name)) {
-            return &SOLVERS_LOOKUP_TABLE[i];
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(SOLVERS_REGISTRY); i++) {
+        if (0 == strcmp(solver_name, SOLVERS_REGISTRY[i].descriptor->name)) {
+            return &SOLVERS_REGISTRY[i];
         }
     }
 
