@@ -1,13 +1,13 @@
 set(
     TEST_SOURCES_LIST
-    "misc.c"
-    "parser.c"
-    "vrplib-parser.c"
-    "parsing-utils.c"
-    "core.c"
+    "test-misc.c"
+    "test-parser.c"
+    "test-vrplib-parser.c"
+    "test-parsing-utils.c"
+    "test-core.c"
 )
 if (CPLEX_FOUND)
-    list(APPEND TEST_SOURCES_LIST "mip.c")
+    list(APPEND TEST_SOURCES_LIST "test-mip.c")
 endif()
 
 

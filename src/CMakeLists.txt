@@ -47,8 +47,8 @@ doxygen_add_docs(docs
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
 
-
 add_library(libcptp
+    STATIC
     types.c
     parser.c
     parsing-utils.c
@@ -56,8 +56,12 @@ add_library(libcptp
     timing.c
     validation.c
     visualization.c
-    solvers/stub.c
-    solvers/mip.c
+
+    # Stub solver
+    solvers/stub/stub.c
+
+    # MIP solver
+    solvers/mip/mip.c
     )
 target_include_directories(libcptp PUBLIC ./)
 target_link_libraries(libcptp PUBLIC logc libstb)
