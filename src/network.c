@@ -64,8 +64,7 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(rescap > 0.0);
     double delta = MIN(excess_flow[u], rescap);
     *flow(net, u, v) += delta;
-    //*flow(net, v, u) -= delta;
-
+    // *flow(net, v, u) -= delta;
 
     // assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
@@ -106,10 +105,10 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
         if (v >= net->nnodes) {
             relabel(net, height, excess_flow, u);
             curr_neigh[u] = 0;
-        } else if (can_push(net, excess_flow, height, u, v)) {
-            //  NOTE: We can push flow through this edge.
-            push(net, height, excess_flow, u, v);
         } else {
+            if (can_push(net, excess_flow, height, u, v)) {
+                push(net, height, excess_flow, u, v);
+            }
             curr_neigh[u] += 1;
         }
     }
