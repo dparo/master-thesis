@@ -34,7 +34,10 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    return MIN(*cap(net, i, j) - *flow(net, i, j), *flow(net, j, i));
+    double rc1 = *cap(net, i, j) - *flow(net, i, j);
+    double rc2 = *flow(net, j, i);
+    double result = rc1 + rc2;
+    return result;
 }
 
 static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
@@ -61,9 +64,10 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(rescap > 0.0);
     double delta = MIN(excess_flow[u], rescap);
     *flow(net, u, v) += delta;
+    //*flow(net, v, u) -= delta;
 
-    // *flow(net, v, u) -= delta;
-    // assert(*flow(net, u, v) == - *flow(net, v, u));
+
+    // assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
     excess_flow[u] -= delta;
     excess_flow[v] += delta;
@@ -182,7 +186,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
     }
 
     double max_flow = 0.0;
-    // Sum the flow of outgoing edeges from s
+    // Sum the flow of outgoing edges from s
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i == s) {
             continue;
@@ -194,6 +198,8 @@ double push_relabel_max_flow(FlowNetwork *net) {
     free(list);
     free(excess_flow);
     free(height);
+
+    printf(" -- - - - - --- max_flow = %g\n", max_flow);
     return max_flow;
 }
 
