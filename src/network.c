@@ -116,7 +116,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 
     assert(min_height != INT32_MAX);
     int32_t new_height = 1 + min_height;
-    assert(new_height > height[u]);
+    assert(new_height >= height[u] + 1);
     height[u] = new_height;
 }
 
@@ -132,17 +132,51 @@ static void push_relabel_max_flow(FlowNetwork *net) {
     int32_t *height = malloc(net->nnodes * sizeof(*height));
     double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
 
-    // FIXME: Very slow code path O(N^2) with bad cache locality
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        excess_flow[i] = compute_excess_flow_of_vertex(net, i);
+    // PREFLOW
+    {
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            excess_flow[i] = 0.0;
+            height[i] = 0;
+        }
+
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            for (int32_t j = i + 1; j < net->nnodes; j++) {
+                *flow(net, i, j) = 0.0;
+            }
+        }
+
+        // For each vertex touching the source vertex s
+        for (int32_t v = 0; v < s; v++) {
+            double c = *cap(net, v, s);
+            *flow(net, v, s) = c;
+            excess_flow[v] = c;
+            excess_flow[s] -= c;
+        }
+
+        for (int32_t v = s + 1; v < net->nnodes; v++) {
+            double c = *cap(net, s, v);
+            *flow(net, s, v) = c;
+            excess_flow[v] = c;
+            excess_flow[s] -= c;
+        }
+
+        height[s] = net->nnodes;
     }
 
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        height[i] = 0;
+    // While there exist push, or relabel op perform it
+    bool done = false;
+    while (!done) {
+        int32_t cnt_overflowing = 0;
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            if (excess_flow[i] > 0.0) {
+                cnt_overflowing += 1;
+                relabel(net, height, excess_flow, i);
+            }
+        }
+        if (cnt_overflowing == 0) {
+            done = true;
+        }
     }
-
-    height[s] = net->nnodes;
-    height[t] = 0;
 }
 
 static bool is_sink_node_reachable(FlowNetwork *net, int32_t *parent,
