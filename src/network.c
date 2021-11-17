@@ -34,12 +34,11 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    return *cap(net, i, j) - *flow(net, i, j);
+    return MIN(*cap(net, i, j) - *flow(net, i, j), *flow(net, j, i));
 }
 
-// Eg: an edge to which flow can be pushed
-static bool is_admissible_edge(FlowNetwork *net, double *excess_flow,
-                               int32_t *height, int32_t u, int32_t v) {
+static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
+                     int32_t u, int32_t v) {
     if (u == v) {
         return false;
     } else if ((residual_cap(net, u, v) > 0.0) &&
@@ -62,7 +61,10 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(rescap > 0.0);
     double delta = MIN(excess_flow[u], rescap);
     *flow(net, u, v) += delta;
-    *flow(net, v, u) -= delta;
+
+    // *flow(net, v, u) -= delta;
+    // assert(*flow(net, u, v) == - *flow(net, v, u));
+
     excess_flow[u] -= delta;
     excess_flow[v] += delta;
 }
@@ -90,7 +92,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     int32_t new_height = 1 + min_height;
     assert(new_height >= height[u] + 1);
     height[u] = new_height;
-    assert(height[u] <= height[net->source_vertex]);
+    assert(height[u] < 2 * net->nnodes - 1);
 }
 
 static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
@@ -100,7 +102,7 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
         if (v >= net->nnodes) {
             relabel(net, height, excess_flow, u);
             curr_neigh[u] = 0;
-        } else if (is_admissible_edge(net, excess_flow, height, u, v)) {
+        } else if (can_push(net, excess_flow, height, u, v)) {
             //  NOTE: We can push flow through this edge.
             push(net, height, excess_flow, u, v);
         } else {
