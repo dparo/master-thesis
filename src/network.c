@@ -184,6 +184,11 @@ double push_relabel_max_flow(FlowNetwork *net) {
     for (int32_t i = 0; i < net->nnodes; i++) {
         max_flow += *flow(net, s, i);
     }
+
+    free(curr_neigh);
+    free(list);
+    free(excess_flow);
+    free(height);
     return max_flow;
 }
 
