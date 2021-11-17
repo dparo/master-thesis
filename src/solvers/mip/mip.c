@@ -487,6 +487,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     }
 
     double max_flow = push_relabel_max_flow(&network);
+    free(vstar);
 
     return 0;
 

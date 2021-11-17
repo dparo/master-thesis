@@ -141,8 +141,8 @@ double push_relabel_max_flow(FlowNetwork *net) {
                 continue;
             }
 
-            double c = *cap(net, v, s);
-            *flow(net, v, s) = c;
+            double c = *cap(net, s, v);
+            *flow(net, s, v) = c;
             excess_flow[v] = c;
             excess_flow[s] -= c;
         }

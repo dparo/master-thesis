@@ -62,10 +62,6 @@ static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double *network_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    if (j > i) {
-        static double dummy = 0.0;
-        return &dummy;
-    }
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
     return &net->cap[i * net->nnodes + j];
