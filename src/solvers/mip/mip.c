@@ -461,7 +461,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     double obj_p;
     if (CPXXcallbackgetrelaxationpoint(
             context, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
-        log_fatal("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
+        log_fatal("%s :: Failed `CPXXcallbackgetrelaxationpoint`", __func__);
         goto terminate;
     }
 
