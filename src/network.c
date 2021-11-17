@@ -42,7 +42,8 @@ static bool is_admissible_edge(FlowNetwork *net, double *excess_flow,
                                int32_t *height, int32_t u, int32_t v) {
     if (u == v) {
         return false;
-    } else if ((residual_cap(net, u, v) > 0.0) && (height[u] == (height[v] + 1))) {
+    } else if ((residual_cap(net, u, v) > 0.0) &&
+               (height[u] == (height[v] + 1))) {
         return true;
     } else {
         return false;
@@ -89,6 +90,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     int32_t new_height = 1 + min_height;
     assert(new_height >= height[u] + 1);
     height[u] = new_height;
+    assert(height[u] <= height[net->source_vertex]);
 }
 
 static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
