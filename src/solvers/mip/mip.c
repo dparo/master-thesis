@@ -567,6 +567,13 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
     //      Called when cplex has a new feasible integral solution
     //      satisfying all constraints
 
+    // NOTE:
+    //   Subtour Elimination Constraints (SECs) separation based on
+    //   the connected components
+
+    // NOTE: In alternative see function CCcut_connect_component of Concorde to
+    // use a more efficient function
+
     double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {
         log_fatal("%s :: Failed memory allocation", __func__);
