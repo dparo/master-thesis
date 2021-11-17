@@ -453,11 +453,6 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
         goto terminate;
     }
 
-    Tour tour = tour_create(instance);
-    if (!tour.comp || !tour.succ) {
-        goto terminate;
-    }
-
     double obj_p;
     if (CPXXcallbackgetrelaxationpoint(
             context, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
@@ -487,14 +482,17 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     }
 
     double max_flow = push_relabel_max_flow(&network);
+    (void)max_flow;
     free(vstar);
-
+    free(network.flow);
+    free(network.cap);
     return 0;
 
 terminate:
     log_fatal("%s :: Fatal termination error", __func__);
     free(vstar);
-    tour_destroy(&tour);
+    free(network.flow);
+    free(network.cap);
     return 1;
 }
 
