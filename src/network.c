@@ -34,7 +34,6 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    assert(i != j);
     return *cap(net, i, j) - *flow(net, i, j);
 }
 
@@ -43,7 +42,7 @@ static bool is_admissible_edge(FlowNetwork *net, double *excess_flow,
                                int32_t *height, int32_t u, int32_t v) {
     if (u == v) {
         return false;
-    } else if (residual_cap(net, u, v) > 0.0 && height[u] == height[v] + 1) {
+    } else if ((residual_cap(net, u, v) > 0.0) && (height[u] == (height[v] + 1))) {
         return true;
     } else {
         return false;
@@ -54,17 +53,17 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
                  int32_t u, int32_t v) {
     UNUSED_PARAM(height);
     assert(excess_flow[u] > 0.0);
-    assert(residual_cap(net, u, v) > 0.0);
+
+    assert(u != v);
+
     assert(height[u] == height[v] + 1);
-    double delta = MIN(excess_flow[u], residual_cap(net, u, v));
+    double rescap = residual_cap(net, u, v);
+    assert(rescap > 0.0);
+    double delta = MIN(excess_flow[u], rescap);
     *flow(net, u, v) += delta;
     *flow(net, v, u) -= delta;
     excess_flow[u] -= delta;
     excess_flow[v] += delta;
-
-    // At the end of the push operation, the node u should no longer be
-    // overflowing
-    assert(excess_flow[u] == 0.0);
 }
 
 static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
@@ -78,14 +77,14 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
         }
     }
 #endif
+    assert(u != net->source_vertex && u != net->sink_vertex);
 
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
-        if (u != v && residual_cap(net, u, v) > 0) {
+        if (residual_cap(net, u, v) > 0) {
             min_height = MIN(min_height, height[v]);
         }
     }
-
     assert(min_height != INT32_MAX);
     int32_t new_height = 1 + min_height;
     assert(new_height >= height[u] + 1);
@@ -100,10 +99,8 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
             relabel(net, height, excess_flow, u);
             curr_neigh[u] = 0;
         } else if (is_admissible_edge(net, excess_flow, height, u, v)) {
-            //  NOTE: We can push flow through this edge. Push is the last
-            //  operation performed since it will make excess_flow[u] = 0.0
+            //  NOTE: We can push flow through this edge.
             push(net, height, excess_flow, u, v);
-            assert(excess_flow[u] == 0.0);
         } else {
             curr_neigh[u] += 1;
         }
@@ -173,6 +170,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
             // Make space at the start of the list to move u at the front
             memmove(list + 1, list, curr_node * sizeof(*list));
             list[0] = u;
+            assert(excess_flow[u] == 0.0);
             curr_node = 1;
         } else {
             curr_node += 1;
@@ -182,6 +180,9 @@ double push_relabel_max_flow(FlowNetwork *net) {
     double max_flow = 0.0;
     // Sum the flow of outgoing edeges from s
     for (int32_t i = 0; i < net->nnodes; i++) {
+        if (i == s) {
+            continue;
+        }
         max_flow += *flow(net, s, i);
     }
 
