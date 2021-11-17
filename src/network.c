@@ -23,17 +23,23 @@
 #include "network.h"
 #include <memory.h>
 
+/// \brief Just a shorter alias for network_flow
+static inline double *flow(Network *net, int32_t i, int32_t j) {
+    return network_flow(net, i, j);
+}
+
+/// \brief Just a shorter alias for network_cap
+static inline double *cap(Network *net, int32_t i, int32_t j) {
+    return network_cap(net, i, j);
+}
+
 // See:
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
 static void push_relabel_max_flow(void) {}
 
-static inline double *flow(Network *net, int32_t i, int32_t j) {
-    assert(i >= 0 && i < net->nnodes);
-    assert(j >= 0 && j < net->nnodes);
-    return &net->flow[i * net->nnodes + j];
-}
+__attribute__((alias("network_flow")));
 
 static bool is_sink_node_reachable(Network *net, int32_t *parent, bool *visited,
                                    int32_t *queue) {
@@ -75,10 +81,7 @@ double edmond_karp_max_flow(Network *net) {
         parent[i] = -1;
     }
 
-    bool path_exists = false;
-
-    while (
-        (path_exists = is_sink_node_reachable(net, parent, visited, queue))) {
+    while (is_sink_node_reachable(net, parent, visited, queue)) {
         double path_flow = INFINITY;
         int32_t i = net->sink_vertex;
 
@@ -108,7 +111,77 @@ double edmond_karp_max_flow(Network *net) {
     return max_flow;
 }
 
-FlowBipartition ford_fulkerson_max_flow(Network *net) {
+MaxFlowResult ford_fulkerson_max_flow(Network *net, double initial_flow) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
+
+    double max_flow = initial_flow;
+    if (max_flow < 0.0) {
+        max_flow = 0.0;
+        // Compute it ourselves
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            for (int32_t j = 0; j < net->nnodes; j++) {
+                max_flow += *flow(net, i, j);
+            }
+        }
+    }
+    int32_t *pred = malloc(net->nnodes * sizeof(*pred));
+    double *eps = malloc(net->nnodes * sizeof(*eps));
+    int32_t *queue = malloc(net->nnodes * sizeof(*queue));
+
+    int32_t queue_begin = 0;
+    int32_t queue_end = 0;
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        pred[i] = -1;
+    }
+
+    do {
+        eps[s] = INFINITY;
+        pred[s] = s;
+        // Enqueue s
+        queue[queue_end++] = s;
+
+        while ((queue_end - queue_begin > 0) && pred[t] < 0) {
+            // Dequeue node
+            int32_t h = queue[queue_begin++];
+            for (int32_t j = 0; j < net->nnodes; j++) {
+                double f = *flow(net, h, j);
+                double c = *cap(net, h, j);
+                if (f < c && pred[j] < 0) {
+                    // Non saturated directed edges
+                    eps[j] = MIN(eps[h], c - f);
+                    pred[j] = h;
+                    queue[queue_end++] = j;
+                }
+            }
+
+            for (int32_t i = 0; i < net->nnodes; i++) {
+                double f = *flow(net, i, h);
+                if (f > 0 && pred[i] < 0) {
+                    eps[i] = MIN(eps[h], f);
+                    pred[i] = h;
+                    queue[queue_end++] = i;
+                }
+            }
+        }
+
+        if (pred[t] >= 0) {
+            double delta = eps[t];
+            max_flow += delta;
+            int32_t j = t;
+            while (j != s) {
+                int32_t i = pred[j];
+                if (i > 0) {
+                }
+                j = i;
+            }
+        }
+    } while (pred[t] < 0);
+
+    free(pred);
+    free(eps);
+    free(queue);
+
+    return (MaxFlowResult){0};
 }

@@ -38,14 +38,32 @@ typedef struct {
     int32_t source_vertex;
     int32_t sink_vertex;
     double *flow;
+    double *cap;
 } Network;
 
 typedef struct {
     int32_t nnodes;
     int32_t *labels;
-} FlowBipartition;
+} NetworkBipartition;
+
+typedef struct {
+    double maxflow;
+    NetworkBipartition bipartition;
+} MaxFlowResult;
 
 double edmond_karp_max_flow(Network *net);
+
+static inline double *network_flow(Network *net, int32_t i, int32_t j) {
+    assert(i >= 0 && i < net->nnodes);
+    assert(j >= 0 && j < net->nnodes);
+    return &net->flow[i * net->nnodes + j];
+}
+
+static inline double *network_cap(Network *net, int32_t i, int32_t j) {
+    assert(i >= 0 && i < net->nnodes);
+    assert(j >= 0 && j < net->nnodes);
+    return &net->cap[i * net->nnodes + j];
+}
 
 #if __cplusplus
 }
