@@ -90,6 +90,25 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     height[u] = new_height;
 }
 
+static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
+                      int32_t u, int32_t *curr_neigh) {
+    while (excess_flow[u] > 0.0) {
+        int32_t v = curr_neigh[u];
+        if (v >= net->nnodes) {
+            relabel(net, height, excess_flow, u);
+            curr_neigh[u] = 0;
+        } else if (is_admissible_edge(net, excess_flow, height, u, v)) {
+            //  NOTE: We can push flow through this edge. Push is the last
+            //  oeration performed since it will make excess_flow[u] = 0.0
+            push(net, height, excess_flow, u, v);
+            assert(excess_flow[u] == 0.0);
+        } else {
+            curr_neigh[u] += 1;
+        }
+    }
+}
+
+// This implementation uses the relabel-to-front max flow algorithm version
 // See:
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
@@ -129,21 +148,39 @@ static void push_relabel_max_flow(FlowNetwork *net) {
         height[s] = net->nnodes;
     }
 
-    // While there exist push, or relabel op perform it
-    bool done = false;
-    while (!done) {
-        int32_t cnt_overflowing = 0;
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            if (excess_flow[i] > 0.0) {
-                cnt_overflowing += 1;
+    int32_t *curr_neigh = malloc(net->nnodes * sizeof(*curr_neigh));
+    int32_t *list = malloc(net->nnodes * sizeof(*list));
+    int32_t list_len = 0;
 
-                // TODO
-                relabel(net, height, excess_flow, i);
-            }
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        curr_neigh[i] = 0;
+    }
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        if (i != s && i != t) {
+            list[list_len++] = i;
         }
-        if (cnt_overflowing == 0) {
-            done = true;
+    }
+
+    int32_t curr_node = 0;
+    while (curr_node < list_len) {
+        int32_t u = list[curr_node];
+        int32_t old_height = height[u];
+        discharge(net, height, excess_flow, u, curr_neigh);
+        if (height[u] > old_height) {
+            // Make space at the start of the list to move u at the front
+            memmove(list + 1, list, curr_node * sizeof(*list));
+            list[0] = u;
+            curr_node = 1;
+        } else {
+            curr_node += 1;
         }
+    }
+
+    double max_flow = 0.0;
+    // Sum the flow of outgoing edeges from s
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        max_flow += *flow(net, s, i);
     }
 }
 
