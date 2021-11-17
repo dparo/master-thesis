@@ -34,41 +34,14 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    if (j > i) {
-        return *flow(net, j, i);
-    } else if (i < j) {
-        return *cap(net, i, j) - *flow(net, i, j);
-    } else {
-        return 0.0;
-    }
+    assert(i != j);
+    return *cap(net, i, j) - *flow(net, i, j);
 }
 
-static inline double compute_flow_entering_vertex(FlowNetwork *net, int32_t j) {
-    double sum = 0.0;
-    for (int32_t i = 0; i < j; i++) {
-        sum += *flow(net, i, j);
-    }
-    return sum;
-}
-
-static inline double compute_flow_exiting_vertex(FlowNetwork *net, int32_t i) {
-    double sum = 0.0;
-
-    for (int32_t j = i + 1; j < net->nnodes; j++) {
-        sum += *flow(net, i, j);
-    }
-
-    return sum;
-}
-
-static inline double compute_excess_flow_of_vertex(FlowNetwork *net,
-                                                   int32_t i) {
-    return compute_flow_entering_vertex(net, i) -
-           compute_flow_exiting_vertex(net, i);
-}
-
-static bool is_residual_edge(int32_t *height, int32_t i, int32_t j) {
-    if (height[i] <= height[j] + 1) {
+// Eg: an edge to which flow can be pushed
+static bool is_admissible_edge(FlowNetwork *net, double *excess_flow,
+                               int32_t *height, int32_t u, int32_t v) {
+    if (residual_cap(net, u, v) > 0.0 && height[u] == height[v] + 1) {
         return true;
     } else {
         return false;
@@ -82,11 +55,8 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(residual_cap(net, u, v) > 0.0);
     assert(height[u] == height[v] + 1);
     double delta = MIN(excess_flow[u], residual_cap(net, u, v));
-    if (u < v) {
-        *flow(net, u, v) += delta;
-    } else {
-        *flow(net, v, u) -= delta;
-    }
+    *flow(net, u, v) += delta;
+    *flow(net, v, u) -= delta;
     excess_flow[u] -= delta;
     excess_flow[v] += delta;
 
@@ -101,7 +71,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 
 #ifndef NDEBUG
     for (int32_t v = 0; v < net->nnodes; v++) {
-        if (u != v && is_residual_edge(height, u, v)) {
+        if (u != v && residual_cap(net, u, v) > 0.0) {
             assert(height[u] <= height[v]);
         }
     }
@@ -109,7 +79,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
-        if (u != v && is_residual_edge(height, u, v)) {
+        if (u != v && residual_cap(net, u, v) > 0) {
             min_height = MIN(min_height, height[v]);
         }
     }
@@ -125,7 +95,6 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
 static void push_relabel_max_flow(FlowNetwork *net) {
-    validate_network_flow(net);
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -140,22 +109,19 @@ static void push_relabel_max_flow(FlowNetwork *net) {
         }
 
         for (int32_t i = 0; i < net->nnodes; i++) {
-            for (int32_t j = i + 1; j < net->nnodes; j++) {
+            for (int32_t j = i = 0; j < net->nnodes; j++) {
                 *flow(net, i, j) = 0.0;
             }
         }
 
-        // For each vertex touching the source vertex s
-        for (int32_t v = 0; v < s; v++) {
+        // For each edge leaving the source s, saturate all out-arcs of s
+        for (int32_t v = 0; v < net->nnodes; v++) {
+            if (v == s) {
+                continue;
+            }
+
             double c = *cap(net, v, s);
             *flow(net, v, s) = c;
-            excess_flow[v] = c;
-            excess_flow[s] -= c;
-        }
-
-        for (int32_t v = s + 1; v < net->nnodes; v++) {
-            double c = *cap(net, s, v);
-            *flow(net, s, v) = c;
             excess_flow[v] = c;
             excess_flow[s] -= c;
         }
@@ -170,6 +136,8 @@ static void push_relabel_max_flow(FlowNetwork *net) {
         for (int32_t i = 0; i < net->nnodes; i++) {
             if (excess_flow[i] > 0.0) {
                 cnt_overflowing += 1;
+
+                // TODO
                 relabel(net, height, excess_flow, i);
             }
         }

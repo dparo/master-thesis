@@ -57,7 +57,7 @@ double edmond_karp_max_flow(FlowNetwork *net);
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
-    return &net->flow[sxpos(net->nnodes, i, j)];
+    return &net->flow[i * net->nnodes + j];
 }
 
 static inline double *network_cap(FlowNetwork *net, int32_t i, int32_t j) {
@@ -67,22 +67,7 @@ static inline double *network_cap(FlowNetwork *net, int32_t i, int32_t j) {
     }
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
-    return &net->cap[sxpos(net->nnodes, i, j)];
-}
-
-static inline void validate_network_flow(FlowNetwork *net) {
-    UNUSED_PARAM(net);
-#ifndef NDEBUG
-    assert(net->nnodes > 0);
-    assert(net->source_vertex >= 0 && net->source_vertex < net->nnodes);
-    assert(net->sink_vertex >= 0 && net->sink_vertex < net->nnodes);
-
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        for (int32_t j = i + 1; j < net->nnodes; j++) {
-            assert(*network_cap(net, i, j) >= 0.0);
-        }
-    }
-#endif
+    return &net->cap[i * net->nnodes + j];
 }
 
 #if __cplusplus
