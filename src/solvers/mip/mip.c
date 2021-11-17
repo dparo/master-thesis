@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "core-utils.h"
+#include "network.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -445,7 +446,55 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
+
+    double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
+    if (!vstar) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        goto terminate;
+    }
+
+    Tour tour = tour_create(instance);
+    if (!tour.comp || !tour.succ) {
+        goto terminate;
+    }
+
+    double obj_p;
+    if (CPXXcallbackgetrelaxationpoint(
+            context, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
+        log_fatal("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
+        goto terminate;
+    }
+
+    FlowNetwork network = {0};
+    network.nnodes = instance->num_customers + 1;
+    network.source_vertex = 0;
+    network.sink_vertex = instance->num_customers;
+    network.flow =
+        malloc((instance->num_customers + 1) * (instance->num_customers + 1) *
+               sizeof(*network.flow));
+    network.cap = malloc((instance->num_customers + 1) *
+                         (instance->num_customers + 1) * sizeof(*network.cap));
+
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+            if (i == j) {
+                *network_cap(&network, i, j) = 0.0;
+            } else {
+                *network_cap(&network, i, j) =
+                    vstar[sxpos(instance->num_customers + 1, i, j)];
+            }
+        }
+    }
+
+    double max_flow = push_relabel_max_flow(&network);
+
     return 0;
+
+terminate:
+    log_fatal("%s :: Fatal termination error", __func__);
+    free(vstar);
+    tour_destroy(&tour);
+    return 1;
 }
 
 static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
@@ -613,8 +662,8 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
 
 terminate:
     log_fatal("%s :: Fatal termination error", __func__);
-    tour_destroy(&tour);
     free(vstar);
+    tour_destroy(&tour);
     return 1;
 }
 

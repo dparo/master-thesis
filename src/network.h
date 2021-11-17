@@ -53,6 +53,7 @@ typedef struct {
 } MaxFlowResult;
 
 double edmond_karp_max_flow(FlowNetwork *net);
+double push_relabel_max_flow(FlowNetwork *net);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);

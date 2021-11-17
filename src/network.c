@@ -41,7 +41,9 @@ static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
 // Eg: an edge to which flow can be pushed
 static bool is_admissible_edge(FlowNetwork *net, double *excess_flow,
                                int32_t *height, int32_t u, int32_t v) {
-    if (residual_cap(net, u, v) > 0.0 && height[u] == height[v] + 1) {
+    if (u == v) {
+        return false;
+    } else if (residual_cap(net, u, v) > 0.0 && height[u] == height[v] + 1) {
         return true;
     } else {
         return false;
@@ -99,7 +101,7 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
             curr_neigh[u] = 0;
         } else if (is_admissible_edge(net, excess_flow, height, u, v)) {
             //  NOTE: We can push flow through this edge. Push is the last
-            //  oeration performed since it will make excess_flow[u] = 0.0
+            //  operation performed since it will make excess_flow[u] = 0.0
             push(net, height, excess_flow, u, v);
             assert(excess_flow[u] == 0.0);
         } else {
@@ -113,7 +115,7 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-static void push_relabel_max_flow(FlowNetwork *net) {
+double push_relabel_max_flow(FlowNetwork *net) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -128,7 +130,7 @@ static void push_relabel_max_flow(FlowNetwork *net) {
         }
 
         for (int32_t i = 0; i < net->nnodes; i++) {
-            for (int32_t j = i = 0; j < net->nnodes; j++) {
+            for (int32_t j = 0; j < net->nnodes; j++) {
                 *flow(net, i, j) = 0.0;
             }
         }
@@ -182,6 +184,7 @@ static void push_relabel_max_flow(FlowNetwork *net) {
     for (int32_t i = 0; i < net->nnodes; i++) {
         max_flow += *flow(net, s, i);
     }
+    return max_flow;
 }
 
 static bool is_sink_node_reachable(FlowNetwork *net, int32_t *parent,

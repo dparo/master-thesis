@@ -56,6 +56,7 @@ add_library(libcptp
     timing.c
     validation.c
     visualization.c
+    network.c
 
     # Stub solver
     solvers/stub/stub.c
