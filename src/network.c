@@ -24,25 +24,129 @@
 #include <memory.h>
 
 /// \brief Just a shorter alias for network_flow
-static inline double *flow(Network *net, int32_t i, int32_t j) {
+static inline double *flow(FlowNetwork *net, int32_t i, int32_t j) {
     return network_flow(net, i, j);
 }
 
 /// \brief Just a shorter alias for network_cap
-static inline double *cap(Network *net, int32_t i, int32_t j) {
+static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
     return network_cap(net, i, j);
+}
+
+static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
+    if (j > i) {
+        return *flow(net, j, i);
+    } else if (i < j) {
+        return *cap(net, i, j) - *flow(net, i, j);
+    } else {
+        return 0.0;
+    }
+}
+
+static inline double compute_flow_entering_vertex(FlowNetwork *net, int32_t j) {
+    double sum = 0.0;
+    for (int32_t i = 0; i < j; i++) {
+        sum += *flow(net, i, j);
+    }
+    return sum;
+}
+
+static inline double compute_flow_exiting_vertex(FlowNetwork *net, int32_t i) {
+    double sum = 0.0;
+
+    for (int32_t j = i + 1; j < net->nnodes; j++) {
+        sum += *flow(net, i, j);
+    }
+
+    return sum;
+}
+
+static inline double compute_excess_flow_of_vertex(FlowNetwork *net,
+                                                   int32_t i) {
+    return compute_flow_entering_vertex(net, i) -
+           compute_flow_exiting_vertex(net, i);
+}
+
+static bool is_residual_edge(int32_t *height, int32_t i, int32_t j) {
+    if (height[i] <= height[j] + 1) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
+                 int32_t u, int32_t v) {
+    UNUSED_PARAM(height);
+    assert(excess_flow[u] > 0.0);
+    assert(residual_cap(net, u, v) > 0.0);
+    assert(height[u] == height[v] + 1);
+    double delta = MIN(excess_flow[u], residual_cap(net, u, v));
+    if (u < v) {
+        *flow(net, u, v) += delta;
+    } else {
+        *flow(net, v, u) -= delta;
+    }
+    excess_flow[u] -= delta;
+    excess_flow[v] += delta;
+
+    // At the end of the push operation, the node u should no longer be
+    // overflowing
+    assert(excess_flow[u] == 0.0);
+}
+
+static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
+                    int32_t u) {
+    assert(excess_flow[u] > 0.0);
+
+#ifndef NDEBUG
+    for (int32_t v = 0; v < net->nnodes; v++) {
+        if (u != v && is_residual_edge(height, u, v)) {
+            assert(height[u] <= height[v]);
+        }
+    }
+#endif
+
+    int32_t min_height = INT32_MAX;
+    for (int32_t v = 0; v < net->nnodes; v++) {
+        if (u != v && is_residual_edge(height, u, v)) {
+            min_height = MIN(min_height, height[v]);
+        }
+    }
+
+    assert(min_height != INT32_MAX);
+    int32_t new_height = 1 + min_height;
+    assert(new_height > height[u]);
+    height[u] = new_height;
 }
 
 // See:
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-static void push_relabel_max_flow(void) {}
+static void push_relabel_max_flow(FlowNetwork *net) {
+    validate_network_flow(net);
+    int32_t s = net->source_vertex;
+    int32_t t = net->sink_vertex;
 
-__attribute__((alias("network_flow")));
+    int32_t *height = malloc(net->nnodes * sizeof(*height));
+    double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
 
-static bool is_sink_node_reachable(Network *net, int32_t *parent, bool *visited,
-                                   int32_t *queue) {
+    // FIXME: Very slow code path O(N^2) with bad cache locality
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        excess_flow[i] = compute_excess_flow_of_vertex(net, i);
+    }
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        height[i] = 0;
+    }
+
+    height[s] = net->nnodes;
+    height[t] = 0;
+}
+
+static bool is_sink_node_reachable(FlowNetwork *net, int32_t *parent,
+                                   bool *visited, int32_t *queue) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -70,7 +174,7 @@ static bool is_sink_node_reachable(Network *net, int32_t *parent, bool *visited,
 }
 
 // See: https://en.wikipedia.org/wiki/Ford%E2%80%93Fulkerson_algorithm
-double edmond_karp_max_flow(Network *net) {
+double edmond_karp_max_flow(FlowNetwork *net) {
     int32_t *parent = malloc(net->nnodes * sizeof(*parent));
     int32_t *queue = malloc(net->nnodes * sizeof(*queue));
     bool *visited = calloc(net->nnodes, sizeof(*visited));
@@ -111,7 +215,7 @@ double edmond_karp_max_flow(Network *net) {
     return max_flow;
 }
 
-MaxFlowResult ford_fulkerson_max_flow(Network *net, double initial_flow) {
+MaxFlowResult ford_fulkerson_max_flow(FlowNetwork *net, double initial_flow) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 

@@ -27,6 +27,7 @@ extern "C" {
 #endif
 
 #include "types.h"
+#include "core-utils.h"
 
 typedef struct {
     int32_t w, h;
@@ -39,7 +40,7 @@ typedef struct {
     int32_t sink_vertex;
     double *flow;
     double *cap;
-} Network;
+} FlowNetwork;
 
 typedef struct {
     int32_t nnodes;
@@ -51,18 +52,37 @@ typedef struct {
     NetworkBipartition bipartition;
 } MaxFlowResult;
 
-double edmond_karp_max_flow(Network *net);
+double edmond_karp_max_flow(FlowNetwork *net);
 
-static inline double *network_flow(Network *net, int32_t i, int32_t j) {
+static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
-    return &net->flow[i * net->nnodes + j];
+    return &net->flow[sxpos(net->nnodes, i, j)];
 }
 
-static inline double *network_cap(Network *net, int32_t i, int32_t j) {
+static inline double *network_cap(FlowNetwork *net, int32_t i, int32_t j) {
+    if (j > i) {
+        static double dummy = 0.0;
+        return &dummy;
+    }
     assert(i >= 0 && i < net->nnodes);
     assert(j >= 0 && j < net->nnodes);
-    return &net->cap[i * net->nnodes + j];
+    return &net->cap[sxpos(net->nnodes, i, j)];
+}
+
+static inline void validate_network_flow(FlowNetwork *net) {
+    UNUSED_PARAM(net);
+#ifndef NDEBUG
+    assert(net->nnodes > 0);
+    assert(net->source_vertex >= 0 && net->source_vertex < net->nnodes);
+    assert(net->sink_vertex >= 0 && net->sink_vertex < net->nnodes);
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        for (int32_t j = i + 1; j < net->nnodes; j++) {
+            assert(*network_cap(net, i, j) >= 0.0);
+        }
+    }
+#endif
 }
 
 #if __cplusplus
