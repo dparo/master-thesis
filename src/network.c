@@ -34,6 +34,7 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
+    assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
     double rc1 = *cap(net, i, j) - *flow(net, i, j);
     double rc2 = *flow(net, j, i);
     double result = rc1 + rc2;
@@ -66,7 +67,7 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     *flow(net, u, v) += delta;
     *flow(net, v, u) -= delta;
 
-    // assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
+    assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
     excess_flow[u] -= delta;
     excess_flow[v] += delta;
@@ -193,9 +194,13 @@ double push_relabel_max_flow(FlowNetwork *net) {
         max_flow += *flow(net, s, i);
     }
 
+    // Round to 0.0 if close
     if (fcmp(max_flow, 0.0, 1e-5)) {
         max_flow = 0.0;
     }
+
+    assert(max_flow >= 0.0);
+
 #ifndef NDEBUG
     for (int32_t i = 0; i < net->nnodes; i++) {
         // This assertion is only valid for all vertices except {s, t}.
