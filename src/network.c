@@ -64,7 +64,7 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(rescap > 0.0);
     double delta = MIN(excess_flow[u], rescap);
     *flow(net, u, v) += delta;
-    // *flow(net, v, u) -= delta;
+    *flow(net, v, u) -= delta;
 
     // assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
@@ -146,6 +146,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
 
             double c = *cap(net, s, v);
             *flow(net, s, v) = c;
+            *flow(net, v, s) = -c;
             excess_flow[v] = c;
             excess_flow[s] -= c;
         }
@@ -154,7 +155,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
     }
 
     int32_t *curr_neigh = malloc(net->nnodes * sizeof(*curr_neigh));
-    int32_t *list = malloc(net->nnodes * sizeof(*list));
+    int32_t *list = malloc((net->nnodes - 2) * sizeof(*list));
     int32_t list_len = 0;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
@@ -190,6 +191,10 @@ double push_relabel_max_flow(FlowNetwork *net) {
             continue;
         }
         max_flow += *flow(net, s, i);
+    }
+
+    if (fcmp(max_flow, 0.0, 1e-5)) {
+        max_flow = 0.0;
     }
 
     free(curr_neigh);
