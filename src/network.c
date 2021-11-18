@@ -196,6 +196,15 @@ double push_relabel_max_flow(FlowNetwork *net) {
     if (fcmp(max_flow, 0.0, 1e-5)) {
         max_flow = 0.0;
     }
+#ifndef NDEBUG
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        // This assertion is only valid for all vertices except {s, t}.
+        // This is verified in the CLRS (Introduction to algorithms) book
+        if (i != s && i != t) {
+            assert(fcmp(excess_flow[i], 0.0, 1e-5));
+        }
+    }
+#endif
 
     free(curr_neigh);
     free(list);
