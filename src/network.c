@@ -99,10 +99,7 @@ static inline double flow_exiting(FlowNetwork *net, int32_t i) {
 
 static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
                      int32_t u, int32_t v) {
-    if (u == v) {
-        return false;
-    } else if ((residual_cap(net, u, v) > 0.0) &&
-               (height[u] == (height[v] + 1))) {
+    if ((height[u] == (height[v] + 1)) && (residual_cap(net, u, v) > 0.0)) {
         return true;
     } else {
         return false;
