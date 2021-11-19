@@ -279,11 +279,9 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
         double fexit = flow_exiting(net, i);
 
         if (i == s) {
-            assert(fcmp(fenter, 0.0, 1e-4));
-            assert(fcmp(fexit, max_flow, 1e-4));
+            assert(fcmp(fexit - fenter, max_flow, 1e-4));
         } else if (i == t) {
-            assert(fcmp(fenter, max_flow, 1e-4));
-            assert(fcmp(fexit, 0.0, 1e-4));
+            assert(fcmp(fenter - fexit, max_flow, 1e-4));
         } else {
             // This assertion is only valid for all vertices except {s, t}.
             // This is verified in the CLRS (Introduction to algorithms) book
@@ -321,9 +319,19 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             double section_flow = 0.0;
             for (int32_t i = 0; i < net->nnodes; i++) {
                 for (int32_t j = 0; j < net->nnodes; j++) {
-                    if (result->bipartition.data[i] == 1 &&
-                        result->bipartition.data[j] == 0.0) {
-                        section_flow += *flow(net, i, j);
+                    double f = *flow(net, i, j);
+                    int32_t li = (int32_t)result->bipartition.data[i];
+                    int32_t lj = (int32_t)result->bipartition.data[j];
+                    if (li == 1 && lj == 0) {
+                        if (f >= 0.0) {
+                            double r = residual_cap(net, i, j);
+                            assert(fcmp(0.0, r, 1e-4));
+                        }
+                        section_flow += f;
+                    } else if (li == 0 && lj == 1) {
+                        if (f >= 0.0) {
+                            // assert(fcmp(0.0, f, 1e-4));
+                        }
                     }
                 }
             }
