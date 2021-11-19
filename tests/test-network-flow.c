@@ -34,7 +34,7 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
-TEST non_trivial_network2(void) {
+TEST CLRS_network(void) {
     int32_t nnodes = 6;
     FlowNetwork net = flow_network_create(nnodes);
     net.source_vertex = 0;
@@ -54,17 +54,6 @@ TEST non_trivial_network2(void) {
     double max_flow = push_relabel_max_flow(&net);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
-    ASSERT_IN_RANGE(11, *network_flow(&net, 0, 1), 1e-4);
-    ASSERT_IN_RANGE(12, *network_flow(&net, 0, 2), 1e-4);
-    ASSERT_IN_RANGE(0, *network_flow(&net, 1, 2), 1e-4);
-    ASSERT_IN_RANGE(1, *network_flow(&net, 2, 1), 1e-4);
-    ASSERT_IN_RANGE(12, *network_flow(&net, 1, 3), 1e-4);
-    ASSERT_IN_RANGE(0, *network_flow(&net, 3, 2), 1e-4);
-    ASSERT_IN_RANGE(11, *network_flow(&net, 2, 4), 1e-4);
-    ASSERT_IN_RANGE(7, *network_flow(&net, 4, 3), 1e-4);
-    ASSERT_IN_RANGE(19, *network_flow(&net, 3, 5), 1e-4);
-    ASSERT_IN_RANGE(4, *network_flow(&net, 4, 5), 1e-4);
-
     flow_network_destroy(&net);
     PASS();
 }
@@ -152,7 +141,7 @@ int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
 
     /* If tests are run outside of a suite, a default suite is used. */
-    RUN_TEST(non_trivial_network2);
+    RUN_TEST(CLRS_network);
     RUN_TEST(single_path_flow);
     RUN_TEST(two_path_flow);
 

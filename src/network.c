@@ -67,9 +67,7 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
     assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
-    double rc1 = *cap(net, i, j) - *flow(net, i, j);
-    double rc2 = *flow(net, j, i);
-    double result = rc1 + rc2;
+    double result = *cap(net, i, j) - *flow(net, i, j);
     return result;
 }
 
@@ -290,7 +288,6 @@ double push_relabel_max_flow(FlowNetwork *net) {
             // (i, j)
             assert(flte(*flow(net, i, j), *cap(net, i, j), 1e-4));
             assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
-            assert(!can_push(net, excess_flow, height, i, j));
         }
     }
 #endif
