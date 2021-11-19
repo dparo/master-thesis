@@ -23,6 +23,38 @@
 #include "network.h"
 #include <memory.h>
 
+FlowNetwork flow_network_create(int32_t nnodes) {
+    FlowNetwork net = {0};
+    net.nnodes = nnodes;
+
+    int32_t nsquared = nnodes * nnodes;
+    net.flow = calloc(nsquared, sizeof(*net.flow));
+    net.cap = calloc(nsquared, sizeof(*net.cap));
+
+    if (!net.flow || !net.cap) {
+        flow_network_destroy(&net);
+    }
+
+    return net;
+}
+
+void flow_network_clear(FlowNetwork *net) {
+    int32_t nsquared = net->nnodes * net->nnodes;
+    memset(net->flow, 0, nsquared * sizeof(*net->flow));
+    memset(net->cap, 0, nsquared * sizeof(*net->cap));
+}
+
+void flow_network_destroy(FlowNetwork *net) {
+    if (net->flow) {
+        free(net->flow);
+    }
+    if (net->cap) {
+        free(net->cap);
+    }
+
+    memset(net, 0, sizeof(*net));
+}
+
 /// \brief Just a shorter alias for network_flow
 static inline double *flow(FlowNetwork *net, int32_t i, int32_t j) {
     return network_flow(net, i, j);
@@ -120,6 +152,11 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
 double push_relabel_max_flow(FlowNetwork *net) {
+    assert(net->cap);
+    assert(net->flow);
+    assert(net->nnodes >= 2);
+    assert(net->sink_vertex != net->source_vertex);
+
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -216,7 +253,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
     free(excess_flow);
     free(height);
 
-    printf(" -- - - - - --- max_flow = %g\n", max_flow);
+    // printf(" -- - - - - --- max_flow = %g\n", max_flow);
     return max_flow;
 }
 

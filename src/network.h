@@ -52,6 +52,10 @@ typedef struct {
     NetworkBipartition bipartition;
 } MaxFlowResult;
 
+FlowNetwork flow_network_create(int32_t nnodes);
+void flow_network_clear(FlowNetwork *net);
+void flow_network_destroy(FlowNetwork *net);
+
 double edmond_karp_max_flow(FlowNetwork *net);
 double push_relabel_max_flow(FlowNetwork *net);
 

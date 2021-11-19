@@ -5,6 +5,7 @@ set(
     "test-vrplib-parser.c"
     "test-parsing-utils.c"
     "test-core.c"
+    "test-network-flow.c"
 )
 if (CPLEX_FOUND)
     list(APPEND TEST_SOURCES_LIST "test-mip.c")
