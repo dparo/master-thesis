@@ -32,7 +32,42 @@
 #include "types.h"
 #include "network.h"
 
-#define MAX_NUM_NODES_TO_TEST 150
+#define MAX_NUM_NODES_TO_TEST 50
+
+TEST non_trivial_network2(void) {
+    int32_t nnodes = 6;
+    FlowNetwork net = flow_network_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = nnodes - 1;
+
+    *network_cap(&net, 0, 1) = 16;
+    *network_cap(&net, 0, 2) = 13;
+    *network_cap(&net, 1, 2) = 10;
+    *network_cap(&net, 2, 1) = 4;
+    *network_cap(&net, 1, 3) = 12;
+    *network_cap(&net, 3, 2) = 9;
+    *network_cap(&net, 2, 4) = 14;
+    *network_cap(&net, 4, 3) = 7;
+    *network_cap(&net, 3, 5) = 20;
+    *network_cap(&net, 4, 5) = 4;
+
+    double max_flow = push_relabel_max_flow(&net);
+
+    ASSERT_IN_RANGE(23, max_flow, 1e-4);
+    ASSERT_IN_RANGE(11, *network_flow(&net, 0, 1), 1e-4);
+    ASSERT_IN_RANGE(12, *network_flow(&net, 0, 2), 1e-4);
+    ASSERT_IN_RANGE(0, *network_flow(&net, 1, 2), 1e-4);
+    ASSERT_IN_RANGE(1, *network_flow(&net, 2, 1), 1e-4);
+    ASSERT_IN_RANGE(12, *network_flow(&net, 1, 3), 1e-4);
+    ASSERT_IN_RANGE(0, *network_flow(&net, 3, 2), 1e-4);
+    ASSERT_IN_RANGE(11, *network_flow(&net, 2, 4), 1e-4);
+    ASSERT_IN_RANGE(7, *network_flow(&net, 4, 3), 1e-4);
+    ASSERT_IN_RANGE(19, *network_flow(&net, 3, 5), 1e-4);
+    ASSERT_IN_RANGE(4, *network_flow(&net, 4, 5), 1e-4);
+
+    flow_network_destroy(&net);
+    PASS();
+}
 
 TEST single_path_flow(void) {
     for (int32_t nnodes = 2; nnodes < MAX_NUM_NODES_TO_TEST; nnodes++) {
@@ -49,9 +84,7 @@ TEST single_path_flow(void) {
             min_cap = MIN(min_cap, r);
         }
 
-        printf("Doing max flow (nnodes = %d)...\n", nnodes);
         double max_flow = push_relabel_max_flow(&net);
-        printf("Done!\n");
         ASSERT_IN_RANGE(min_cap, max_flow, 1e-4);
 
         flow_network_destroy(&net);
@@ -102,23 +135,12 @@ TEST two_path_flow(void) {
             min_cap2 = MIN(min_cap2, r);
         }
 
-        printf("Doing max flow (blen = %d, nnodes = %d)...\n", blen, nnodes);
         double max_flow = push_relabel_max_flow(&net);
-        printf("Done!\n");
         ASSERT_IN_RANGE(min_cap1 + min_cap2, max_flow, 1e-4);
 
         flow_network_destroy(&net);
     }
 
-    PASS();
-}
-
-TEST non_trivial_network1(void) {
-#if 0
-    // TODO
-    int32_t nnodes = 10;
-    FlowNetwork net = flow_network_create(nnodes);
-#endif
     PASS();
 }
 
@@ -130,9 +152,9 @@ int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
 
     /* If tests are run outside of a suite, a default suite is used. */
+    RUN_TEST(non_trivial_network2);
     RUN_TEST(single_path_flow);
     RUN_TEST(two_path_flow);
-    RUN_TEST(non_trivial_network1);
 
     GREATEST_MAIN_END(); /* display results */
 }
