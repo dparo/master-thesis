@@ -77,7 +77,10 @@ static inline double flow_entering(FlowNetwork *net, int32_t i) {
     double sum = 0.0;
     for (int32_t j = 0; j < net->nnodes; j++) {
         if (i != j) {
-            sum += *flow(net, j, i);
+            double f = *flow(net, j, i);
+            if (f >= 0) {
+                sum += f;
+            }
         }
     }
     return sum;
@@ -87,7 +90,10 @@ static inline double flow_exiting(FlowNetwork *net, int32_t i) {
     double sum = 0.0;
     for (int32_t j = 0; j < net->nnodes; j++) {
         if (i != j) {
-            sum += *flow(net, i, j);
+            double f = *flow(net, i, j);
+            if (f >= 0) {
+                sum += f;
+            }
         }
     }
     return sum;
@@ -260,14 +266,21 @@ double push_relabel_max_flow(FlowNetwork *net) {
 
 #ifndef NDEBUG
     for (int32_t i = 0; i < net->nnodes; i++) {
-        if (i != s && i != t) {
+        double fenter = flow_entering(net, i);
+        double fexit = flow_exiting(net, i);
 
+        if (i == s) {
+            assert(fcmp(fenter, 0.0, 1e-4));
+            assert(fcmp(fexit, max_flow, 1e-4));
+        } else if (i == t) {
+            assert(fcmp(fenter, max_flow, 1e-4));
+            assert(fcmp(fexit, 0.0, 1e-4));
+        } else {
             // This assertion is only valid for all vertices except {s, t}.
             // This is verified in the CLRS (Introduction to algorithms) book
             assert(fcmp(excess_flow[i], 0.0, 1e-5));
-
             // Verify flow entering node i is equal to flow exiting node i
-            assert(fcmp(flow_entering(net, i), flow_exiting(net, i), 1e-4));
+            assert(fcmp(fenter, fexit, 1e-4));
         }
     }
 
@@ -276,6 +289,7 @@ double push_relabel_max_flow(FlowNetwork *net) {
             // Assert flow on edge (i, j) does not exceed the capacity of edge
             // (i, j)
             assert(flte(*flow(net, i, j), *cap(net, i, j), 1e-4));
+            assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
         }
     }
 #endif
