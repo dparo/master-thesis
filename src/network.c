@@ -23,6 +23,18 @@
 #include "network.h"
 #include <memory.h>
 
+MaxFlowResult max_flow_result_create(int32_t nnodes) {
+    MaxFlowResult result = {0};
+    result.bipartition.nnodes = nnodes;
+    result.bipartition.data = malloc(nnodes * sizeof(*result.bipartition.data));
+    return result;
+}
+
+void max_flow_result_destroy(MaxFlowResult *m) {
+    free(m->bipartition.data);
+    memset(m, 0, sizeof(*m));
+}
+
 FlowNetwork flow_network_create(int32_t nnodes) {
     FlowNetwork net = {0};
     net.nnodes = nnodes;
@@ -106,6 +118,7 @@ static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
     }
 }
 
+// Push flow
 static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
                  int32_t u, int32_t v) {
     UNUSED_PARAM(height);
@@ -126,6 +139,7 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     excess_flow[v] += delta;
 }
 
+// Increase the node height
 static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
                     int32_t u) {
     assert(excess_flow[u] > 0.0);
@@ -172,7 +186,7 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-double push_relabel_max_flow(FlowNetwork *net) {
+double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     assert(net->cap);
     assert(net->flow);
     assert(net->nnodes >= 2);
@@ -288,6 +302,35 @@ double push_relabel_max_flow(FlowNetwork *net) {
         }
     }
 #endif
+
+    if (result) {
+        assert(result->bipartition.nnodes == net->nnodes);
+        assert(result->bipartition.data);
+
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            result->bipartition.data[i] = (height[i] >= height[s]);
+        }
+
+        result->maxflow = max_flow;
+
+#ifndef NDEBUG
+        // Assert that the cross section induced from the bipartition is
+        // consistent with the computed maxflow
+
+        {
+            double section_flow = 0.0;
+            for (int32_t i = 0; i < net->nnodes; i++) {
+                for (int32_t j = 0; j < net->nnodes; j++) {
+                    if (result->bipartition.data[i] == 1 &&
+                        result->bipartition.data[j] == 0.0) {
+                        section_flow += *flow(net, i, j);
+                    }
+                }
+            }
+            assert(fcmp(section_flow, max_flow, 1e-4));
+        }
+#endif
+    }
 
     free(curr_neigh);
     free(list);

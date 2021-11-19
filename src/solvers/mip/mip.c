@@ -481,18 +481,21 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
         }
     }
 
-    double max_flow = push_relabel_max_flow(&network);
+    MaxFlowResult max_flow_result =
+        max_flow_result_create(instance->num_customers + 1);
+    double max_flow = push_relabel_max_flow(&network, &max_flow_result);
     (void)max_flow;
     free(vstar);
-    free(network.flow);
-    free(network.cap);
+    flow_network_destroy(&network);
+    max_flow_result_destroy(&max_flow_result);
     return 0;
 
 terminate:
     log_fatal("%s :: Fatal termination error", __func__);
+
     free(vstar);
-    free(network.flow);
-    free(network.cap);
+    flow_network_destroy(&network);
+    max_flow_result_destroy(&max_flow_result);
     return 1;
 }
 

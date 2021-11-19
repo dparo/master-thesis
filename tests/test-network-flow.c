@@ -37,6 +37,7 @@
 TEST CLRS_network(void) {
     int32_t nnodes = 6;
     FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
     net.source_vertex = 0;
     net.sink_vertex = nnodes - 1;
 
@@ -51,16 +52,18 @@ TEST CLRS_network(void) {
     *network_cap(&net, 3, 5) = 20;
     *network_cap(&net, 4, 5) = 4;
 
-    double max_flow = push_relabel_max_flow(&net);
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
     flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
     PASS();
 }
 
 TEST single_path_flow(void) {
     for (int32_t nnodes = 2; nnodes < MAX_NUM_NODES_TO_TEST; nnodes++) {
         FlowNetwork net = flow_network_create(nnodes);
+        MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
         net.source_vertex = 0;
         net.sink_vertex = nnodes - 1;
 
@@ -73,10 +76,11 @@ TEST single_path_flow(void) {
             min_cap = MIN(min_cap, r);
         }
 
-        double max_flow = push_relabel_max_flow(&net);
+        double max_flow = push_relabel_max_flow(&net, &max_flow_result);
         ASSERT_IN_RANGE(min_cap, max_flow, 1e-4);
 
         flow_network_destroy(&net);
+        max_flow_result_destroy(&max_flow_result);
     }
 
     PASS();
@@ -86,6 +90,8 @@ TEST two_path_flow(void) {
     for (int32_t blen = 2; blen < MAX_NUM_NODES_TO_TEST / 2; blen++) {
         int32_t nnodes = blen * 2 + 2;
         FlowNetwork net = flow_network_create(nnodes);
+
+        MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
         net.source_vertex = 0;
         net.sink_vertex = nnodes - 1;
 
@@ -124,10 +130,11 @@ TEST two_path_flow(void) {
             min_cap2 = MIN(min_cap2, r);
         }
 
-        double max_flow = push_relabel_max_flow(&net);
+        double max_flow = push_relabel_max_flow(&net, &max_flow_result);
         ASSERT_IN_RANGE(min_cap1 + min_cap2, max_flow, 1e-4);
 
         flow_network_destroy(&net);
+        max_flow_result_destroy(&max_flow_result);
     }
 
     PASS();

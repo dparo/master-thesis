@@ -44,7 +44,7 @@ typedef struct {
 
 typedef struct {
     int32_t nnodes;
-    int32_t *labels;
+    uint8_t *data;
 } NetworkBipartition;
 
 typedef struct {
@@ -56,8 +56,11 @@ FlowNetwork flow_network_create(int32_t nnodes);
 void flow_network_clear(FlowNetwork *net);
 void flow_network_destroy(FlowNetwork *net);
 
+MaxFlowResult max_flow_result_create(int32_t nnodes);
+void max_flow_result_destroy(MaxFlowResult *m);
+
 double edmond_karp_max_flow(FlowNetwork *net);
-double push_relabel_max_flow(FlowNetwork *net);
+double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
