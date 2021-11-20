@@ -181,6 +181,34 @@ TEST non_trivial_network3(void) {
     PASS();
 }
 
+TEST no_path_flow(void) {
+
+    int32_t nnodes = 4;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = 3;
+
+    // 3 Nodes are circularly linked with the source node with max capacity 2 in
+    // any direction, while the sink is completely detached (capacity 0)
+    *network_cap(&net, 0, 1) = 2;
+    *network_cap(&net, 1, 0) = 2;
+    *network_cap(&net, 1, 2) = 2;
+    *network_cap(&net, 2, 1) = 2;
+    *network_cap(&net, 2, 0) = 2;
+    *network_cap(&net, 0, 2) = 2;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    ASSERT_IN_RANGE(0, max_flow, 1e-4);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[2]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[3]);
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
 TEST single_path_flow(void) {
     for (int32_t nnodes = 2; nnodes < MAX_NUM_NODES_TO_TEST; nnodes++) {
         FlowNetwork net = flow_network_create(nnodes);
@@ -274,6 +302,7 @@ int main(int argc, char **argv) {
     RUN_TEST(non_trivial_network1);
     RUN_TEST(non_trivial_network2);
     RUN_TEST(non_trivial_network3);
+    RUN_TEST(no_path_flow);
     RUN_TEST(single_path_flow);
     RUN_TEST(two_path_flow);
 

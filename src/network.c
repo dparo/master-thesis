@@ -53,7 +53,12 @@ FlowNetwork flow_network_create(int32_t nnodes) {
 void flow_network_clear(FlowNetwork *net) {
     int32_t nsquared = net->nnodes * net->nnodes;
     memset(net->flow, 0, nsquared * sizeof(*net->flow));
-    memset(net->cap, 0, nsquared * sizeof(*net->cap));
+    if (0) {
+        // NOTE: We do not need to pay for the reset since in most cases
+        //       we are going to manually populate the matrix in its entirety
+        //       anyway.
+        memset(net->cap, 0, nsquared * sizeof(*net->cap));
+    }
 }
 
 void flow_network_destroy(FlowNetwork *net) {
@@ -130,9 +135,14 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     double rescap = residual_cap(net, u, v);
     assert(rescap > 0.0);
     double delta = MIN(excess_flow[u], rescap);
+
+    assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
+    assert(flte(*flow(net, u, v), *cap(net, u, v), 1e-4));
+    assert(flte(*flow(net, v, u), *cap(net, v, u), 1e-4));
     *flow(net, u, v) += delta;
     *flow(net, v, u) -= delta;
-
+    assert(flte(*flow(net, u, v), *cap(net, u, v), 1e-4));
+    assert(flte(*flow(net, v, u), *cap(net, v, u), 1e-4));
     assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
     excess_flow[u] -= delta;
@@ -319,18 +329,22 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             double section_flow = 0.0;
             for (int32_t i = 0; i < net->nnodes; i++) {
                 for (int32_t j = 0; j < net->nnodes; j++) {
-                    double f = *flow(net, i, j);
                     int32_t li = (int32_t)result->bipartition.data[i];
                     int32_t lj = (int32_t)result->bipartition.data[j];
-                    if (li == 1 && lj == 0) {
-                        if (f >= 0.0) {
+                    assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
+                    double f = *flow(net, i, j);
+                    double c = *cap(net, i, j);
+                    assert(flte(f, c, 1e-4));
+                    if (f >= 0) {
+                        if (li == 1 && lj == 0) {
+                            // All edges should be saturated
                             double r = residual_cap(net, i, j);
                             assert(fcmp(0.0, r, 1e-4));
-                        }
-                        section_flow += f;
-                    } else if (li == 0 && lj == 1) {
-                        if (f >= 0.0) {
-                            // assert(fcmp(0.0, f, 1e-4));
+                            section_flow += f;
+                        } else if (li == 0 && lj == 1) {
+                            // All edges should be drained
+                            assert(fcmp(f, 0, 1e-4));
+                            section_flow -= f;
                         }
                     }
                 }
