@@ -228,6 +228,7 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             }
 
             double c = *cap(net, s, v);
+            assert(c >= 0.0);
             *flow(net, s, v) = c;
             *flow(net, v, s) = -c;
             excess_flow[v] = c;

@@ -472,12 +472,14 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
         for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-            if (i == j) {
-                *network_cap(&network, i, j) = 0.0;
-            } else {
-                *network_cap(&network, i, j) =
-                    vstar[sxpos(instance->num_customers + 1, i, j)];
-            }
+            double cap =
+                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
+            assert(fgte(cap, 0.0, 1e-8));
+            // NOTE: Fix floating point rounding errors. In fact cap may be
+            // slightly negative...
+            cap = MAX(0.0, cap);
+            assert(cap >= 0.0);
+            *network_cap(&network, i, j) = cap;
         }
     }
 
