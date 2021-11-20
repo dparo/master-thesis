@@ -334,6 +334,7 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
                     assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
                     double f = *flow(net, i, j);
                     double c = *cap(net, i, j);
+                    assert(c >= 0.0);
                     assert(flte(f, c, 1e-4));
                     if (f >= 0) {
                         if (li == 1 && lj == 0) {
