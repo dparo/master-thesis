@@ -55,6 +55,127 @@ TEST CLRS_network(void) {
     double max_flow = push_relabel_max_flow(&net, &max_flow_result);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[2]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[3]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[4]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[5]);
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
+// From Matteo Fischetti "Lezioni di Ricerca Operativa 1" 4th edition , example
+// at page 175-179
+TEST non_trivial_network1(void) {
+    int32_t nnodes = 7;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = 7 - 1;
+
+    *network_cap(&net, 1 - 1, 4 - 1) = 2;
+    *network_cap(&net, 1 - 1, 2 - 1) = 2;
+    *network_cap(&net, 1 - 1, 5 - 1) = 2;
+    *network_cap(&net, 5 - 1, 2 - 1) = 1;
+    *network_cap(&net, 2 - 1, 4 - 1) = 1;
+    *network_cap(&net, 5 - 1, 6 - 1) = 2;
+    *network_cap(&net, 2 - 1, 6 - 1) = 2;
+    *network_cap(&net, 2 - 1, 3 - 1) = 2;
+    *network_cap(&net, 4 - 1, 3 - 1) = 1;
+    *network_cap(&net, 6 - 1, 3 - 1) = 1;
+    *network_cap(&net, 3 - 1, 7 - 1) = 2;
+    *network_cap(&net, 6 - 1, 7 - 1) = 4;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    ASSERT_IN_RANGE(5, max_flow, 1e-4);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
+// From Matteo Fischetti "Lezioni di Ricerca Operativa 1" 4th edition , exercise
+// 9-23 at page 197-198
+TEST non_trivial_network2(void) {
+    int32_t nnodes = 7;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = 7 - 1;
+
+    *network_cap(&net, 1 - 1, 2 - 1) = 6;
+    *network_cap(&net, 1 - 1, 4 - 1) = 5;
+    *network_cap(&net, 1 - 1, 5 - 1) = 10;
+    *network_cap(&net, 5 - 1, 4 - 1) = 12;
+    *network_cap(&net, 4 - 1, 2 - 1) = 5;
+    *network_cap(&net, 4 - 1, 3 - 1) = 7;
+    *network_cap(&net, 2 - 1, 3 - 1) = 5;
+    *network_cap(&net, 2 - 1, 6 - 1) = 12;
+    *network_cap(&net, 2 - 1, 6 - 1) = 12;
+    *network_cap(&net, 6 - 1, 3 - 1) = 3;
+    *network_cap(&net, 6 - 1, 7 - 1) = 15;
+    *network_cap(&net, 3 - 1, 7 - 1) = 4;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    ASSERT_IN_RANGE(15, max_flow, 1e-4);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
+// From Matteo Fischetti "Lezioni di Ricerca Operativa 1" 4th edition , exercise
+// 9-24 at page 198
+TEST non_trivial_network3(void) {
+    int32_t nnodes = 8;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = 8 - 1;
+
+    *network_cap(&net, 1 - 1, 5 - 1) = 7;
+    *network_cap(&net, 1 - 1, 2 - 1) = 3;
+    *network_cap(&net, 1 - 1, 6 - 1) = 3;
+    *network_cap(&net, 6 - 1, 2 - 1) = 5;
+    *network_cap(&net, 5 - 1, 2 - 1) = 1;
+    *network_cap(&net, 2 - 1, 3 - 1) = 2;
+    *network_cap(&net, 5 - 1, 4 - 1) = 7;
+    *network_cap(&net, 4 - 1, 2 - 1) = 2;
+    *network_cap(&net, 6 - 1, 3 - 1) = 3;
+    *network_cap(&net, 6 - 1, 7 - 1) = 3;
+    *network_cap(&net, 3 - 1, 7 - 1) = 5;
+    *network_cap(&net, 3 - 1, 4 - 1) = 2;
+    *network_cap(&net, 7 - 1, 8 - 1) = 6;
+    *network_cap(&net, 4 - 1, 8 - 1) = 5;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    ASSERT_IN_RANGE(10, max_flow, 1e-4);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[2 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
+    ASSERT_EQ(1, max_flow_result.bipartition.data[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
+    ASSERT_EQ(0, max_flow_result.bipartition.data[8 - 1]);
+
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -140,7 +261,8 @@ TEST two_path_flow(void) {
     PASS();
 }
 
-/* Add all the definitions that need to be in the test runner's main file. */
+/* Add all the definitions that need to be in the test runner's main file.
+ */
 GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
@@ -149,6 +271,9 @@ int main(int argc, char **argv) {
 
     /* If tests are run outside of a suite, a default suite is used. */
     RUN_TEST(CLRS_network);
+    RUN_TEST(non_trivial_network1);
+    RUN_TEST(non_trivial_network2);
+    RUN_TEST(non_trivial_network3);
     RUN_TEST(single_path_flow);
     RUN_TEST(two_path_flow);
 
