@@ -34,6 +34,35 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
+TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
+    ASSERT(net->nnodes >= 2 && net->nnodes <= 8);
+    int32_t *labels = calloc(net->nnodes, sizeof(*labels));
+
+    double min_flow = INFINITY;
+
+    for (int32_t label_it = 0; label_it < 1 << (net->nnodes - 1); label_it++) {
+        for (int32_t k = 0; k < net->nnodes; k++) {
+            labels[k] = label_it & (1 << k);
+        }
+
+        labels[net->source_vertex] = 1;
+        labels[net->sink_vertex] = 0;
+
+        double flow = 0.0;
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            for (int32_t j = 0; j < net->nnodes; j++) {
+                if (labels[i] == 1 && labels[j] == 0) {
+                    flow += *network_cap(net, i, j);
+                }
+            }
+        }
+        min_flow = MIN(flow, min_flow);
+    }
+
+    free(labels);
+    PASS();
+}
+
 TEST CLRS_network(void) {
     int32_t nnodes = 6;
     FlowNetwork net = flow_network_create(nnodes);
@@ -289,6 +318,13 @@ TEST two_path_flow(void) {
     PASS();
 }
 
+TEST random_networks(void) {
+    for (int32_t nnodes = 2; nnodes <= 7; nnodes++) {
+    }
+
+    PASS();
+}
+
 /* Add all the definitions that need to be in the test runner's main file.
  */
 GREATEST_MAIN_DEFS();
@@ -305,6 +341,7 @@ int main(int argc, char **argv) {
     RUN_TEST(no_path_flow);
     RUN_TEST(single_path_flow);
     RUN_TEST(two_path_flow);
+    RUN_TEST(random_networks);
 
     GREATEST_MAIN_END(); /* display results */
 }
