@@ -37,12 +37,13 @@
 TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     ASSERT(net->nnodes >= 2 && net->nnodes <= 8);
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
+    int32_t *max_labels = calloc(net->nnodes, sizeof(*max_labels));
 
-    double min_flow = INFINITY;
+    double max_flow = INFINITY;
 
     for (int32_t label_it = 0; label_it < 1 << (net->nnodes - 1); label_it++) {
         for (int32_t k = 0; k < net->nnodes; k++) {
-            labels[k] = label_it & (1 << k);
+            labels[k] = (label_it & (1 << k)) >> k;
         }
 
         labels[net->source_vertex] = 1;
@@ -56,10 +57,19 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
                 }
             }
         }
-        min_flow = MIN(flow, min_flow);
+        if (flow < max_flow) {
+            max_flow = MIN(max_flow, flow);
+            memcpy(max_labels, labels, sizeof(*max_labels) * net->nnodes);
+        }
+    }
+
+    ASSERT_IN_RANGE(max_flow, result->maxflow, 1e-4);
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        ASSERT_EQ(max_labels[i], result->bipartition.data[i]);
     }
 
     free(labels);
+    free(max_labels);
     PASS();
 }
 
@@ -91,6 +101,7 @@ TEST CLRS_network(void) {
     ASSERT_EQ(1, max_flow_result.bipartition.data[4]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[5]);
 
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -128,6 +139,7 @@ TEST non_trivial_network1(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
 
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -165,6 +177,7 @@ TEST non_trivial_network2(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
 
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -205,6 +218,7 @@ TEST non_trivial_network3(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[8 - 1]);
 
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
