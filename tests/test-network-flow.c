@@ -334,6 +334,28 @@ TEST two_path_flow(void) {
 
 TEST random_networks(void) {
     for (int32_t nnodes = 2; nnodes <= 7; nnodes++) {
+        for (int32_t try_it = 0; try_it < 1024; try_it++) {
+            FlowNetwork network = flow_network_create(nnodes);
+            MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+            network.source_vertex = rand() % nnodes;
+            do {
+                network.sink_vertex = rand() % nnodes;
+            } while (network.sink_vertex == network.source_vertex);
+
+            for (int32_t i = 0; i < nnodes; i++) {
+                for (int32_t j = 0; j < nnodes; j++) {
+                    *network_cap(&network, i, j) = (rand() % 5) / 5.0;
+                }
+            }
+
+            push_relabel_max_flow(&network, &max_flow_result);
+            enum greatest_test_res validation =
+                validate_with_slow_max_flow(&network, &max_flow_result);
+            if (validation == GREATEST_TEST_RES_FAIL) {
+                int32_t breakme = -1;
+            }
+            CHECK_CALL(validation);
+        }
     }
 
     PASS();
@@ -344,7 +366,6 @@ TEST random_networks(void) {
 GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
-    srand(time(NULL));
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
 
     /* If tests are run outside of a suite, a default suite is used. */
