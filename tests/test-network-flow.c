@@ -184,6 +184,82 @@ TEST weird_network2(void) {
     PASS();
 }
 
+TEST weird_network3(void) {
+    /*
+    net->nnodes = 5, source = 0, sink = 2
+    EDGES:
+        flow(0, 0)/cap(0, 0) = 0 / 0
+        flow(0, 1)/cap(0, 1) = 0 / 0.4
+        flow(0, 2)/cap(0, 2) = 0 / 0.8
+        flow(0, 3)/cap(0, 3) = 0 / 0.6
+        flow(0, 4)/cap(0, 4) = 0 / 0.8
+        flow(1, 0)/cap(1, 0) = 0 / 0.8
+        flow(1, 1)/cap(1, 1) = 0 / 0
+        flow(1, 2)/cap(1, 2) = 0 / 0.2
+        flow(1, 3)/cap(1, 3) = 0 / 0.4
+        flow(1, 4)/cap(1, 4) = 0 / 0.8
+        flow(2, 0)/cap(2, 0) = 0 / 0.8
+        flow(2, 1)/cap(2, 1) = 0 / 0.6
+        flow(2, 2)/cap(2, 2) = 0 / 0
+        flow(2, 3)/cap(2, 3) = 0 / 0.6
+        flow(2, 4)/cap(2, 4) = 0 / 0.8
+        flow(3, 0)/cap(3, 0) = 0 / 0.4
+        flow(3, 1)/cap(3, 1) = 0 / 0.6
+        flow(3, 2)/cap(3, 2) = 0 / 0.2
+        flow(3, 3)/cap(3, 3) = 0 / 0
+        flow(3, 4)/cap(3, 4) = 0 / 0.2
+        flow(4, 0)/cap(4, 0) = 0 / 0
+        flow(4, 1)/cap(4, 1) = 0 / 0.4
+        flow(4, 2)/cap(4, 2) = 0 / 0.8
+        flow(4, 3)/cap(4, 3) = 0 / 0.8
+        flow(4, 4)/cap(4, 4) = 0 / 0
+
+    */
+
+    int32_t nnodes = 5;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 0;
+    net.sink_vertex = 2;
+
+    *network_cap(&net, 0, 0) = 0;
+    *network_cap(&net, 0, 1) = 0.4;
+    *network_cap(&net, 0, 2) = 0.8;
+    *network_cap(&net, 0, 3) = 0.6;
+    *network_cap(&net, 0, 4) = 0.8;
+    *network_cap(&net, 1, 0) = 0.8;
+    *network_cap(&net, 1, 1) = 0;
+    *network_cap(&net, 1, 2) = 0.2;
+    *network_cap(&net, 1, 3) = 0.4;
+    *network_cap(&net, 1, 4) = 0.8;
+    *network_cap(&net, 2, 0) = 0.8;
+    *network_cap(&net, 2, 1) = 0.6;
+    *network_cap(&net, 2, 2) = 0;
+    *network_cap(&net, 2, 3) = 0.6;
+    *network_cap(&net, 2, 4) = 0.8;
+    *network_cap(&net, 3, 0) = 0.4;
+    *network_cap(&net, 3, 1) = 0.6;
+    *network_cap(&net, 3, 2) = 0.2;
+    *network_cap(&net, 3, 3) = 0;
+    *network_cap(&net, 3, 4) = 0.2;
+    *network_cap(&net, 4, 0) = 0;
+    *network_cap(&net, 4, 1) = 0.4;
+    *network_cap(&net, 4, 2) = 0.8;
+    *network_cap(&net, 4, 3) = 0.8;
+    *network_cap(&net, 4, 4) = 0;
+
+    print_network(&net);
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+
+    ASSERT_IN_RANGE(0.6, max_flow, 1e-4);
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
+
 TEST CLRS_network(void) {
     int32_t nnodes = 6;
     FlowNetwork net = flow_network_create(nnodes);
@@ -484,6 +560,7 @@ int main(int argc, char **argv) {
     /* If tests are run outside of a suite, a default suite is used. */
     RUN_TEST(weird_network);
     RUN_TEST(weird_network2);
+    RUN_TEST(weird_network3);
     RUN_TEST(CLRS_network);
     RUN_TEST(non_trivial_network1);
     RUN_TEST(non_trivial_network2);
