@@ -34,6 +34,11 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
+typedef struct ExhaustiveMaxFlowResult {
+    int32_t num_min_cuts;
+    MaxFlowResult cuts;
+} ExhaustiveMaxFlowResult;
+
 static void print_network(FlowNetwork *net) {
     printf("net->nnodes = %d, source = %d, sink = %d\n", net->nnodes,
            net->source_vertex, net->sink_vertex);
@@ -251,7 +256,7 @@ TEST weird_network3(void) {
     print_network(&net);
     double max_flow = push_relabel_max_flow(&net, &max_flow_result);
 
-    ASSERT_IN_RANGE(0.6, max_flow, 1e-4);
+    ASSERT_IN_RANGE(2.0, max_flow, 1e-4);
     CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
 
     flow_network_destroy(&net);

@@ -337,7 +337,6 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
 #ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
         // consistent with the computed maxflow
-
         {
             double section_flow = 0.0;
             for (int32_t i = 0; i < net->nnodes; i++) {
