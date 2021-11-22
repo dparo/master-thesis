@@ -163,17 +163,22 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 #endif
     assert(u != net->source_vertex && u != net->sink_vertex);
 
+    bool found = false;
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
         if (residual_cap(net, u, v) > 0) {
             min_height = MIN(min_height, height[v]);
+            found = true;
         }
     }
+
+    assert(found);
     assert(min_height != INT32_MAX);
     int32_t new_height = 1 + min_height;
     assert(new_height >= height[u] + 1);
     height[u] = new_height;
     assert(height[u] < 2 * net->nnodes - 1);
+
 }
 
 static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,

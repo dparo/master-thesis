@@ -119,6 +119,7 @@ TEST weird_network(void) {
     *network_cap(&net, 3, 0) = 0.6;
     *network_cap(&net, 0, 3) = 0.8;
 
+    print_network(&net);
     double max_flow = push_relabel_max_flow(&net, &max_flow_result);
 
     ASSERT_IN_RANGE(1.4, max_flow, 1e-4);
@@ -172,6 +173,7 @@ TEST weird_network2(void) {
     *network_cap(&net, 3, 2) = 0.8;
     *network_cap(&net, 3, 3) = 0;
 
+    print_network(&net);
     double max_flow = push_relabel_max_flow(&net, &max_flow_result);
 
     ASSERT_IN_RANGE(0.6, max_flow, 1e-4);
