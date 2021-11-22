@@ -178,7 +178,6 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(new_height >= height[u] + 1);
     height[u] = new_height;
     assert(height[u] < 2 * net->nnodes - 1);
-
 }
 
 static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
@@ -337,6 +336,7 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
 #ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
         // consistent with the computed maxflow
+
         {
             double section_flow = 0.0;
             for (int32_t i = 0; i < net->nnodes; i++) {
@@ -374,6 +374,91 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
 
     // printf(" -- - - - - --- max_flow = %g\n", max_flow);
     return max_flow;
+}
+
+static double compute_flow_from_labels(FlowNetwork *net, int32_t *labels) {
+    double flow = 0.0;
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        for (int32_t j = 0; j < net->nnodes; j++) {
+            if (i == j) {
+                continue;
+            }
+            if (labels[i] == 1 && labels[j] == 0) {
+                flow += *network_cap(net, i, j);
+            }
+        }
+    }
+    return flow;
+}
+
+BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
+    assert(net->nnodes >= 2 && net->nnodes <= 8);
+    int32_t *labels = calloc(net->nnodes, sizeof(*labels));
+
+    int32_t num_sections = 0;
+    double max_flow = INFINITY;
+
+    for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
+        for (int32_t k = 0; k < net->nnodes; k++) {
+            labels[k] = (label_it & (1 << k)) >> k;
+        }
+        if (labels[net->source_vertex] != 1 || labels[net->sink_vertex] != 0) {
+            continue;
+        }
+
+        labels[net->source_vertex] = 1;
+        labels[net->sink_vertex] = 0;
+
+        double flow = compute_flow_from_labels(net, labels);
+        if (flte(flow, max_flow, 1e-6)) {
+            if (fcmp(flow, max_flow, 1e-6)) {
+                num_sections += 1;
+            } else {
+                max_flow = MIN(max_flow, flow);
+                num_sections = 1;
+            }
+        }
+    }
+
+    BruteforceMaxFlowResult result = {0};
+    result.maxflow = max_flow;
+    result.num_sections = num_sections;
+    result.sections = malloc(result.num_sections * sizeof(*result.sections));
+
+    for (int32_t i = 0; i < result.num_sections; i++) {
+        result.sections[i] = max_flow_result_create(net->nnodes);
+        result.sections[i].maxflow = max_flow;
+    }
+
+    // Populate the sections
+    int32_t cut_idx = 0;
+    for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
+        for (int32_t k = 0; k < net->nnodes; k++) {
+            labels[k] = (label_it & (1 << k)) >> k;
+        }
+        if (labels[net->source_vertex] != 1 || labels[net->sink_vertex] != 0) {
+            continue;
+        }
+
+        labels[net->source_vertex] = 1;
+        labels[net->sink_vertex] = 0;
+
+        double flow = compute_flow_from_labels(net, labels);
+
+        if (fcmp(flow, max_flow, 1e-6)) {
+            for (int32_t i = 0; i < net->nnodes; i++) {
+                assert(cut_idx < num_sections);
+                result.sections[cut_idx].bipartition.data[i] = labels[i];
+            }
+            cut_idx += 1;
+        }
+    }
+    assert(cut_idx == num_sections);
+
+    free(labels);
+
+    return result;
 }
 
 static bool is_sink_node_reachable(FlowNetwork *net, int32_t *parent,

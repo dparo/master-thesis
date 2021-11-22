@@ -34,11 +34,6 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
-typedef struct ExhaustiveMaxFlowResult {
-    int32_t num_min_cuts;
-    MaxFlowResult cuts;
-} ExhaustiveMaxFlowResult;
-
 static void print_network(FlowNetwork *net) {
     printf("net->nnodes = %d, source = %d, sink = %d\n", net->nnodes,
            net->source_vertex, net->sink_vertex);
@@ -57,51 +52,58 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
     int32_t *max_labels = calloc(net->nnodes, sizeof(*max_labels));
 
-    double max_flow = INFINITY;
-
-    for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
-        for (int32_t k = 0; k < net->nnodes; k++) {
-            labels[k] = (label_it & (1 << k)) >> k;
-        }
-
-        labels[net->source_vertex] = 1;
-        labels[net->sink_vertex] = 0;
-
-        double flow = 0.0;
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            for (int32_t j = 0; j < net->nnodes; j++) {
-                if (i == j) {
-                    continue;
-                }
-                if (labels[i] == 1 && labels[j] == 0) {
-                    flow += *network_cap(net, i, j);
-                }
-            }
-        }
-        if (flow <= max_flow) {
-            max_flow = MIN(max_flow, flow);
-            memcpy(max_labels, labels, sizeof(*max_labels) * net->nnodes);
-        }
-    }
+    BruteforceMaxFlowResult bf = max_flow_bruteforce(net);
 
     printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
-           max_flow);
-    printf("LABELS:\n");
+           bf.maxflow);
+    printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
+
     for (int32_t i = 0; i < net->nnodes; i++) {
-        printf("bipartition[%d] = %d,     true_bipartition[%d] = %d\n", i,
-               result->bipartition.data[i], i, max_labels[i]);
+        printf("computed_bipartition[%d] = %d\n", i,
+               result->bipartition.data[i]);
+    }
+
+    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            printf("section[%d][%d] = %d\n", secidx, i,
+                   bf.sections[secidx].bipartition.data[i]);
+        }
     }
     printf("\n");
 
-    ASSERT_IN_RANGE(max_flow, result->maxflow, 1e-4);
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        // This is not necessarily true, there might exist multiple minimum
-        // cross sections which induce the same max flow
-        // ASSERT_EQ(max_labels[i], result->bipartition.data[i]);
+
+
+    bool is_valid_section = false;
+
+    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
+        bool found = true;
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            if (result->bipartition.data[i] !=
+                bf.sections[secidx].bipartition.data[i]) {
+                found = false;
+                break;
+            }
+        }
+
+        if (found) {
+            is_valid_section = true;
+            break;
+        }
     }
 
-    free(labels);
-    free(max_labels);
+
+    ASSERT_IN_RANGE(bf.maxflow, result->maxflow, 1e-4);
+    ASSERT(is_valid_section);
+
+
+    // Cleanup
+    {
+        for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
+            max_flow_result_destroy(&bf.sections[secidx]);
+        }
+        free(bf.sections);
+    }
+
     PASS();
 }
 
@@ -263,7 +265,6 @@ TEST weird_network3(void) {
     max_flow_result_destroy(&max_flow_result);
     PASS();
 }
-
 
 TEST CLRS_network(void) {
     int32_t nnodes = 6;

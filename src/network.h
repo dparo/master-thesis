@@ -52,6 +52,13 @@ typedef struct {
     NetworkBipartition bipartition;
 } MaxFlowResult;
 
+/// For debug only
+typedef struct BruteforceMaxFlowResult {
+    double maxflow;
+    int32_t num_sections;
+    MaxFlowResult *sections;
+} BruteforceMaxFlowResult;
+
 FlowNetwork flow_network_create(int32_t nnodes);
 void flow_network_clear(FlowNetwork *net);
 void flow_network_destroy(FlowNetwork *net);
@@ -61,6 +68,8 @@ void max_flow_result_destroy(MaxFlowResult *m);
 
 double edmond_karp_max_flow(FlowNetwork *net);
 double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result);
+
+BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
