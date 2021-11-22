@@ -205,6 +205,12 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
+#ifndef NDEBUG
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        assert(*cap(net, i, i) == 0.0);
+    }
+#endif
+
     int32_t *height = malloc(net->nnodes * sizeof(*height));
     double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
 

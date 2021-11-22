@@ -34,6 +34,19 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
+static void print_network(FlowNetwork *net) {
+    printf("net->nnodes = %d, source = %d, sink = %d\n", net->nnodes,
+           net->source_vertex, net->sink_vertex);
+    printf("EDGES:\n");
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        for (int32_t j = 0; j < net->nnodes; j++) {
+            printf("    flow(%d, %d)/cap(%d, %d) = %g / %g\n", i, j, i, j,
+                   *network_flow(net, i, j), *network_cap(net, i, j));
+        }
+    }
+    printf("\n");
+}
+
 TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     ASSERT(net->nnodes >= 2 && net->nnodes <= 8);
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
@@ -41,7 +54,7 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
 
     double max_flow = INFINITY;
 
-    for (int32_t label_it = 0; label_it < 1 << (net->nnodes - 1); label_it++) {
+    for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
         for (int32_t k = 0; k < net->nnodes; k++) {
             labels[k] = (label_it & (1 << k)) >> k;
         }
@@ -52,24 +65,120 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
         double flow = 0.0;
         for (int32_t i = 0; i < net->nnodes; i++) {
             for (int32_t j = 0; j < net->nnodes; j++) {
+                if (i == j) {
+                    continue;
+                }
                 if (labels[i] == 1 && labels[j] == 0) {
                     flow += *network_cap(net, i, j);
                 }
             }
         }
-        if (flow < max_flow) {
+        if (flow <= max_flow) {
             max_flow = MIN(max_flow, flow);
             memcpy(max_labels, labels, sizeof(*max_labels) * net->nnodes);
         }
     }
 
+    printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
+           max_flow);
+    printf("LABELS:\n");
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        printf("bipartition[%d] = %d,     true_bipartition[%d] = %d\n", i,
+               result->bipartition.data[i], i, max_labels[i]);
+    }
+    printf("\n");
+
     ASSERT_IN_RANGE(max_flow, result->maxflow, 1e-4);
     for (int32_t i = 0; i < net->nnodes; i++) {
-        ASSERT_EQ(max_labels[i], result->bipartition.data[i]);
+        // This is not necessarily true, there might exist multiple minimum
+        // cross sections which induce the same max flow
+        // ASSERT_EQ(max_labels[i], result->bipartition.data[i]);
     }
 
     free(labels);
     free(max_labels);
+    PASS();
+}
+
+TEST weird_network(void) {
+    int32_t nnodes = 4;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 1;
+    net.sink_vertex = 0;
+
+    *network_cap(&net, 1, 2) = 0.4;
+    *network_cap(&net, 2, 1) = 0.6;
+    *network_cap(&net, 1, 0) = 0.8;
+    *network_cap(&net, 0, 1) = 0.4;
+    *network_cap(&net, 1, 3) = 0.4;
+    *network_cap(&net, 3, 1) = 0.2;
+
+    *network_cap(&net, 2, 0) = 0.2;
+    *network_cap(&net, 0, 2) = 0.2;
+    *network_cap(&net, 3, 0) = 0.6;
+    *network_cap(&net, 0, 3) = 0.8;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+
+    ASSERT_IN_RANGE(1.4, max_flow, 1e-4);
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
+    PASS();
+}
+
+TEST weird_network2(void) {
+    /* net->nnodes = 4, source = 2, sink = 3
+    EDGES:
+        flow(0, 0)/cap(0, 0) = 0 / 0
+        flow(0, 1)/cap(0, 1) = 0 / 0.8
+        flow(0, 2)/cap(0, 2) = 0 / 0.8
+        flow(0, 3)/cap(0, 3) = 0 / 0
+        flow(1, 0)/cap(1, 0) = 0 / 0
+        flow(1, 1)/cap(1, 1) = 0 / 0
+        flow(1, 2)/cap(1, 2) = 0 / 0
+        flow(1, 3)/cap(1, 3) = 0 / 0
+        flow(2, 0)/cap(2, 0) = 0 / 0.2
+        flow(2, 1)/cap(2, 1) = 0 / 0.6
+        flow(2, 2)/cap(2, 2) = 0 / 0
+        flow(2, 3)/cap(2, 3) = 0 / 0.6
+        flow(3, 0)/cap(3, 0) = 0 / 0
+        flow(3, 1)/cap(3, 1) = 0 / 0.2
+        flow(3, 2)/cap(3, 2) = 0 / 0.8
+        flow(3, 3)/cap(3, 3) = 0 / 0 */
+
+    int32_t nnodes = 4;
+    FlowNetwork net = flow_network_create(nnodes);
+    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    net.source_vertex = 2;
+    net.sink_vertex = 3;
+
+    *network_cap(&net, 0, 0) = 0;
+    *network_cap(&net, 0, 1) = 0.8;
+    *network_cap(&net, 0, 2) = 0.8;
+    *network_cap(&net, 0, 3) = 0;
+    *network_cap(&net, 1, 0) = 0;
+    *network_cap(&net, 1, 1) = 0;
+    *network_cap(&net, 1, 2) = 0;
+    *network_cap(&net, 1, 3) = 0;
+    *network_cap(&net, 2, 0) = 0.2;
+    *network_cap(&net, 2, 1) = 0.6;
+    *network_cap(&net, 2, 2) = 0;
+    *network_cap(&net, 2, 3) = 0.6;
+    *network_cap(&net, 3, 0) = 0;
+    *network_cap(&net, 3, 1) = 0.2;
+    *network_cap(&net, 3, 2) = 0.8;
+    *network_cap(&net, 3, 3) = 0;
+
+    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+
+    ASSERT_IN_RANGE(0.6, max_flow, 1e-4);
+    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+
+    flow_network_destroy(&net);
+    max_flow_result_destroy(&max_flow_result);
     PASS();
 }
 
@@ -344,17 +453,16 @@ TEST random_networks(void) {
 
             for (int32_t i = 0; i < nnodes; i++) {
                 for (int32_t j = 0; j < nnodes; j++) {
-                    *network_cap(&network, i, j) = (rand() % 5) / 5.0;
+                    if (i != j) {
+                        *network_cap(&network, i, j) = (double)(rand() % 5) / 5;
+                    }
                 }
             }
 
-            push_relabel_max_flow(&network, &max_flow_result);
-            enum greatest_test_res validation =
-                validate_with_slow_max_flow(&network, &max_flow_result);
-            if (validation == GREATEST_TEST_RES_FAIL) {
-                int32_t breakme = -1;
-            }
-            CHECK_CALL(validation);
+            print_network(&network);
+            double max_flow = push_relabel_max_flow(&network, &max_flow_result);
+            ASSERT_IN_RANGE(max_flow, max_flow_result.maxflow, 1e-5);
+            CHECK_CALL(validate_with_slow_max_flow(&network, &max_flow_result));
         }
     }
 
@@ -369,6 +477,8 @@ int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
 
     /* If tests are run outside of a suite, a default suite is used. */
+    RUN_TEST(weird_network);
+    RUN_TEST(weird_network2);
     RUN_TEST(CLRS_network);
     RUN_TEST(non_trivial_network1);
     RUN_TEST(non_trivial_network2);

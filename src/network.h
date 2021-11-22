@@ -44,7 +44,7 @@ typedef struct {
 
 typedef struct {
     int32_t nnodes;
-    uint8_t *data;
+    bool *data;
 } NetworkBipartition;
 
 typedef struct {
