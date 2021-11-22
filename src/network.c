@@ -183,7 +183,8 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
 
 static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
                       int32_t u, int32_t *curr_neigh) {
-    while (excess_flow[u] > 0.0) {
+    assert(u != net->source_vertex && u != net->sink_vertex);
+    while (fgt(excess_flow[u], 0.0, 1e-5)) {
         int32_t v = curr_neigh[u];
         if (v >= net->nnodes) {
             relabel(net, height, excess_flow, u);
@@ -272,7 +273,7 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             // Make space at the start of the list to move u at the front
             memmove(list + 1, list, curr_node * sizeof(*list));
             list[0] = u;
-            assert(excess_flow[u] == 0.0);
+            assert(fcmp(excess_flow[u], 0.0, 1e-5));
             curr_node = 1;
         } else {
             curr_node += 1;

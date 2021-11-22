@@ -445,7 +445,7 @@ TEST two_path_flow(void) {
 
 TEST random_networks(void) {
     for (int32_t nnodes = 2; nnodes <= 7; nnodes++) {
-        for (int32_t try_it = 0; try_it < 1024; try_it++) {
+        for (int32_t try_it = 0; try_it < 8192; try_it++) {
             FlowNetwork network = flow_network_create(nnodes);
             MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
             network.source_vertex = rand() % nnodes;
@@ -465,6 +465,9 @@ TEST random_networks(void) {
             double max_flow = push_relabel_max_flow(&network, &max_flow_result);
             ASSERT_IN_RANGE(max_flow, max_flow_result.maxflow, 1e-5);
             CHECK_CALL(validate_with_slow_max_flow(&network, &max_flow_result));
+
+            flow_network_destroy(&network);
+            max_flow_result_destroy(&max_flow_result);
         }
     }
 
