@@ -49,9 +49,6 @@ static void print_network(FlowNetwork *net) {
 
 TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     ASSERT(net->nnodes >= 2 && net->nnodes <= 8);
-    int32_t *labels = calloc(net->nnodes, sizeof(*labels));
-    int32_t *max_labels = calloc(net->nnodes, sizeof(*max_labels));
-
     BruteforceMaxFlowResult bf = max_flow_bruteforce(net);
 
     printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
@@ -71,8 +68,6 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     }
     printf("\n");
 
-
-
     bool is_valid_section = false;
 
     for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
@@ -91,10 +86,8 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
         }
     }
 
-
     ASSERT_IN_RANGE(bf.maxflow, result->maxflow, 1e-4);
     ASSERT(is_valid_section);
-
 
     // Cleanup
     {

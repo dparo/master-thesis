@@ -327,11 +327,53 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
         assert(result->bipartition.nnodes == net->nnodes);
         assert(result->bipartition.data);
 
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            result->bipartition.data[i] = (height[i] >= height[s]);
-        }
+        int32_t h;
+        {
+            // Reconstruct and output the bipartition
+            result->maxflow = max_flow;
 
-        result->maxflow = max_flow;
+
+            for (h = net->nnodes; h >= 0; h--) {
+                bool found = false;
+                for (int32_t i = 0; i < net->nnodes; i++) {
+                    if (height[i] == h) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    for (int32_t i = 0; i < net->nnodes; i++) {
+                        result->bipartition.data[i] = height[i] > h;
+                    }
+                    break;
+                }
+            }
+
+#if 0
+
+            int32_t *bfs = malloc(net->nnodes * sizeof(*bfs));
+            int32_t bfs_begin = 0;
+            int32_t bfs_end = 0;
+            bfs[bfs_end++] = s;
+
+            for (int32_t i = 0; i < net->nnodes; i++) {
+                result->bipartition.data[i] = 0;
+            }
+            result->bipartition.data[s] = 1;
+
+            while ((bfs_end - bfs_begin) > 0) {
+                int32_t u = bfs[bfs_begin++];
+                for (int32_t v = 0; v > net->nnodes; v++) {
+                    int32_t d = height[v] - height[u];
+
+                    if (abs(d) <= 1 && result->bipartition.data[v] == 0) {
+                        result->bipartition.data[v] = 1;
+                        bfs[bfs_end++] = v;
+                    }
+                }
+            }
+#endif
+        }
 
 #ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
