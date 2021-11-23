@@ -63,6 +63,7 @@ typedef struct PushRelabelCtx {
     int32_t *height;
     double *excess_flow;
     int32_t *curr_neigh;
+    int32_t list_len;
     int32_t *list;
 } PushRelabelCtx;
 

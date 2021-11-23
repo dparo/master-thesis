@@ -347,22 +347,21 @@ double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
     flow_network_clear(net, false);
     greedy_preflow(net, ctx);
 
-    int32_t list_len = 0;
-
     for (int32_t i = 0; i < net->nnodes; i++) {
         ctx->curr_neigh[i] = 0;
     }
 
+    ctx->list_len = 0;
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i != s && i != t) {
-            ctx->list[list_len++] = i;
+            ctx->list[ctx->list_len++] = i;
         }
     }
 
     // MAIN LOOP
     {
         int32_t curr_node = 0;
-        while (curr_node < list_len) {
+        while (curr_node < ctx->list_len) {
             int32_t u = ctx->list[curr_node];
             int32_t old_height = ctx->height[u];
             discharge(net, ctx, u);
