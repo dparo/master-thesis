@@ -85,7 +85,7 @@ static inline double *cap(FlowNetwork *net, int32_t i, int32_t j) {
 }
 
 static inline double residual_cap(FlowNetwork *net, int32_t i, int32_t j) {
-    assert(fcmp(*flow(net, i, j), -*flow(net, j, i), EPS));
+    assert(feq(*flow(net, i, j), -*flow(net, j, i), EPS));
     double result = *cap(net, i, j) - *flow(net, i, j);
     return result;
 }
@@ -137,14 +137,14 @@ static void push(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u, int32_t v) {
     assert(rescap > 0.0);
     double delta = MIN(ctx->excess_flow[u], rescap);
 
-    assert(fcmp(*flow(net, u, v), -*flow(net, v, u), EPS));
+    assert(feq(*flow(net, u, v), -*flow(net, v, u), EPS));
     assert(flte(*flow(net, u, v), *cap(net, u, v), EPS));
     assert(flte(*flow(net, v, u), *cap(net, v, u), EPS));
     *flow(net, u, v) += delta;
     *flow(net, v, u) -= delta;
     assert(flte(*flow(net, u, v), *cap(net, u, v), EPS));
     assert(flte(*flow(net, v, u), *cap(net, v, u), EPS));
-    assert(fcmp(*flow(net, u, v), -*flow(net, v, u), EPS));
+    assert(feq(*flow(net, u, v), -*flow(net, v, u), EPS));
 
     ctx->excess_flow[u] -= delta;
     ctx->excess_flow[v] += delta;
@@ -258,7 +258,7 @@ static double get_flow_from_s_node(FlowNetwork *net) {
     }
 
     // Round to 0.0 if close
-    if (fcmp(max_flow, 0.0, EPS)) {
+    if (feq(max_flow, 0.0, EPS)) {
         max_flow = 0.0;
     }
 
@@ -276,15 +276,15 @@ static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
         double fexit = flow_exiting(net, i);
 
         if (i == s) {
-            assert(fcmp(fexit - fenter, max_flow, EPS));
+            assert(feq(fexit - fenter, max_flow, EPS));
         } else if (i == t) {
-            assert(fcmp(fenter - fexit, max_flow, EPS));
+            assert(feq(fenter - fexit, max_flow, EPS));
         } else {
             // This assertion is only valid for all vertices except {s, t}.
             // This is verified in the CLRS (Introduction to algorithms) book
-            assert(fcmp(ctx->excess_flow[i], 0.0, EPS));
+            assert(feq(ctx->excess_flow[i], 0.0, EPS));
             // Verify flow entering node i is equal to flow exiting node i
-            assert(fcmp(fenter, fexit, EPS));
+            assert(feq(fenter, fexit, EPS));
         }
     }
 
@@ -293,7 +293,7 @@ static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
             // Assert flow on edge (i, j) does not exceed the capacity of edge
             // (i, j)
             assert(flte(*flow(net, i, j), *cap(net, i, j), EPS));
-            assert(fcmp(*flow(net, i, j), -*flow(net, j, i), EPS));
+            assert(feq(*flow(net, i, j), -*flow(net, j, i), EPS));
         }
     }
 }
@@ -305,7 +305,7 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
         for (int32_t j = 0; j < net->nnodes; j++) {
             int32_t li = (int32_t)result->bipartition.data[i];
             int32_t lj = (int32_t)result->bipartition.data[j];
-            assert(fcmp(*flow(net, i, j), -*flow(net, j, i), EPS));
+            assert(feq(*flow(net, i, j), -*flow(net, j, i), EPS));
             double f = *flow(net, i, j);
             double c = *cap(net, i, j);
             assert(c >= 0.0);
@@ -314,17 +314,17 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
                 if (li == 1 && lj == 0) {
                     // All edges should be saturated
                     double r = residual_cap(net, i, j);
-                    assert(fcmp(0.0, r, EPS));
+                    assert(feq(0.0, r, EPS));
                     section_flow += f;
                 } else if (li == 0 && lj == 1) {
                     // All edges should be drained
-                    assert(fcmp(f, 0, EPS));
+                    assert(feq(f, 0, EPS));
                     section_flow -= f;
                 }
             }
         }
     }
-    assert(fcmp(section_flow, max_flow, EPS));
+    assert(feq(section_flow, max_flow, EPS));
 }
 
 double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
@@ -370,7 +370,7 @@ double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
                 memmove(ctx->list + 1, ctx->list,
                         curr_node * sizeof(*ctx->list));
                 ctx->list[0] = u;
-                assert(fcmp(ctx->excess_flow[u], 0.0, EPS));
+                assert(feq(ctx->excess_flow[u], 0.0, EPS));
                 curr_node = 1;
             } else {
                 curr_node += 1;
@@ -482,7 +482,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
 
         double flow = compute_flow_from_labels(net, labels);
         if (flte(flow, max_flow, EPS)) {
-            if (fcmp(flow, max_flow, EPS)) {
+            if (feq(flow, max_flow, EPS)) {
                 num_sections += 1;
             } else {
                 max_flow = MIN(max_flow, flow);
@@ -516,7 +516,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
 
         double flow = compute_flow_from_labels(net, labels);
 
-        if (fcmp(flow, max_flow, EPS)) {
+        if (feq(flow, max_flow, EPS)) {
             for (int32_t i = 0; i < net->nnodes; i++) {
                 assert(cut_idx < num_sections);
                 result.sections[cut_idx].bipartition.data[i] = labels[i];

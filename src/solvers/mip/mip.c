@@ -478,6 +478,9 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
             // NOTE: Fix floating point rounding errors. In fact cap may be
             // slightly negative...
             cap = MAX(0.0, cap);
+            if (feq(cap, 0.0, 1e-6)) {
+                cap = 0.0;
+            }
             assert(cap >= 0.0);
             *network_cap(&network, i, j) = cap;
         }
@@ -854,7 +857,7 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 
     CPXCNT nodecnt = CPXXgetnodecnt(self->data->env, self->data->lp);
 
-    assert(fcmp(gap, solution_relgap(solution), 1e-6));
+    assert(feq(gap, solution_relgap(solution), 1e-6));
 
     log_info("Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
              "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "

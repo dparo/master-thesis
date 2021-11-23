@@ -409,7 +409,7 @@ static void postprocess_solver_solution(const Instance *instance,
             // If solution is optimal it should remain within a 6% optimal
             // gap
             double gap = solution_relgap(solution);
-            assert(fcmp(gap, 0.0, 6.0 / 100));
+            assert(feq(gap, 0.0, 6.0 / 100));
 #endif
         }
 

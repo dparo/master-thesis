@@ -40,33 +40,33 @@ typedef struct Mat2d {
     double *data;
 } Mat2d;
 
-static inline bool fcmp(double a, double b, double epsilon) {
+static inline bool feq(double a, double b, double epsilon) {
     return fabs(a - b) <= epsilon;
 }
 
 static inline bool flt(double a, double b, double epsilon) {
-    if (fcmp(a, b, epsilon)) {
+    if (feq(a, b, epsilon)) {
         return false;
     }
     return a < b;
 }
 
 static inline bool fgt(double a, double b, double epsilon) {
-    if (fcmp(a, b, epsilon)) {
+    if (feq(a, b, epsilon)) {
         return false;
     }
     return a > b;
 }
 
 static inline bool flte(double a, double b, double epsilon) {
-    if (fcmp(a, b, epsilon)) {
+    if (feq(a, b, epsilon)) {
         return true;
     }
     return a < b;
 }
 
 static inline bool fgte(double a, double b, double epsilon) {
-    if (fcmp(a, b, epsilon)) {
+    if (feq(a, b, epsilon)) {
         return true;
     }
     return a > b;
@@ -95,6 +95,7 @@ int32_t *veci32_copy(int32_t *other, int32_t len);
 int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h);
 
 static inline int32_t *veci32_access(int32_t *vec, int32_t idx, int32_t len) {
+    UNUSED_PARAM(len);
     assert(idx >= 0 && idx < len);
     return &vec[idx];
 }
