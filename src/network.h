@@ -59,14 +59,26 @@ typedef struct BruteforceMaxFlowResult {
     MaxFlowResult *sections;
 } BruteforceMaxFlowResult;
 
+typedef struct PushRelabelCtx {
+    int32_t *height;
+    double *excess_flow;
+    int32_t *curr_neigh;
+    int32_t *list;
+} PushRelabelCtx;
+
 FlowNetwork flow_network_create(int32_t nnodes);
-void flow_network_clear(FlowNetwork *net);
+void flow_network_clear(FlowNetwork *net, bool clear_cap);
 void flow_network_destroy(FlowNetwork *net);
 
 MaxFlowResult max_flow_result_create(int32_t nnodes);
 void max_flow_result_destroy(MaxFlowResult *m);
 
+PushRelabelCtx push_relabel_ctx_create(int32_t nnodes);
+void push_relabel_ctx_destroy(PushRelabelCtx *ctx);
+
 double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result);
+double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
+                              PushRelabelCtx *ctx);
 
 BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net);
 

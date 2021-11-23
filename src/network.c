@@ -50,10 +50,10 @@ FlowNetwork flow_network_create(int32_t nnodes) {
     return net;
 }
 
-void flow_network_clear(FlowNetwork *net) {
+void flow_network_clear(FlowNetwork *net, bool clear_cap) {
     int32_t nsquared = net->nnodes * net->nnodes;
     memset(net->flow, 0, nsquared * sizeof(*net->flow));
-    if (0) {
+    if (clear_cap) {
         // NOTE: We do not need to pay for the reset since in most cases
         //       we are going to manually populate the matrix in its entirety
         //       anyway.
@@ -114,9 +114,10 @@ static inline double flow_exiting(FlowNetwork *net, int32_t i) {
     return sum;
 }
 
-static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
-                     int32_t u, int32_t v) {
-    if ((height[u] == (height[v] + 1)) && (residual_cap(net, u, v) > 0.0)) {
+static bool can_push(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u,
+                     int32_t v) {
+    if ((ctx->height[u] == (ctx->height[v] + 1)) &&
+        (residual_cap(net, u, v) > 0.0)) {
         return true;
     } else {
         return false;
@@ -124,17 +125,15 @@ static bool can_push(FlowNetwork *net, double *excess_flow, int32_t *height,
 }
 
 // Push flow
-static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
-                 int32_t u, int32_t v) {
-    UNUSED_PARAM(height);
-    assert(excess_flow[u] > 0.0);
+static void push(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u, int32_t v) {
+    assert(ctx->excess_flow[u] > 0.0);
 
     assert(u != v);
 
-    assert(height[u] == height[v] + 1);
+    assert(ctx->height[u] == ctx->height[v] + 1);
     double rescap = residual_cap(net, u, v);
     assert(rescap > 0.0);
-    double delta = MIN(excess_flow[u], rescap);
+    double delta = MIN(ctx->excess_flow[u], rescap);
 
     assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
     assert(flte(*flow(net, u, v), *cap(net, u, v), 1e-4));
@@ -145,19 +144,18 @@ static void push(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(flte(*flow(net, v, u), *cap(net, v, u), 1e-4));
     assert(fcmp(*flow(net, u, v), -*flow(net, v, u), 1e-4));
 
-    excess_flow[u] -= delta;
-    excess_flow[v] += delta;
+    ctx->excess_flow[u] -= delta;
+    ctx->excess_flow[v] += delta;
 }
 
 // Increase the node height
-static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
-                    int32_t u) {
-    assert(excess_flow[u] > 0.0);
+static void relabel(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
+    assert(ctx->excess_flow[u] > 0.0);
 
 #ifndef NDEBUG
     for (int32_t v = 0; v < net->nnodes; v++) {
         if (u != v && residual_cap(net, u, v) > 0.0) {
-            assert(height[u] <= height[v]);
+            assert(ctx->height[u] <= ctx->height[v]);
         }
     }
 #endif
@@ -167,7 +165,7 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
         if (residual_cap(net, u, v) > 0) {
-            min_height = MIN(min_height, height[v]);
+            min_height = MIN(min_height, ctx->height[v]);
             found = true;
         }
     }
@@ -175,34 +173,32 @@ static void relabel(FlowNetwork *net, int32_t *height, double *excess_flow,
     assert(found);
     assert(min_height != INT32_MAX);
     int32_t new_height = 1 + min_height;
-    assert(new_height >= height[u] + 1);
-    height[u] = new_height;
-    assert(height[u] < 2 * net->nnodes - 1);
+    assert(new_height >= ctx->height[u] + 1);
+    ctx->height[u] = new_height;
+    assert(ctx->height[u] < 2 * net->nnodes - 1);
 }
 
-static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
-                      int32_t u, int32_t *curr_neigh) {
+static void discharge(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
     assert(u != net->source_vertex && u != net->sink_vertex);
-    while (fgt(excess_flow[u], 0.0, 1e-5)) {
-        int32_t v = curr_neigh[u];
+    while (fgt(ctx->excess_flow[u], 0.0, 1e-5)) {
+        int32_t v = ctx->curr_neigh[u];
         if (v >= net->nnodes) {
-            relabel(net, height, excess_flow, u);
-            curr_neigh[u] = 0;
-        } else if (can_push(net, excess_flow, height, u, v)) {
-            push(net, height, excess_flow, u, v);
+            relabel(net, ctx, u);
+            ctx->curr_neigh[u] = 0;
+        } else if (can_push(net, ctx, u, v)) {
+            push(net, ctx, u, v);
         } else {
-            curr_neigh[u] += 1;
+            ctx->curr_neigh[u] += 1;
         }
     }
 }
 
-static void greedy_preflow(FlowNetwork *net, double *excess_flow,
-                           int32_t *height) {
+static void greedy_preflow(FlowNetwork *net, PushRelabelCtx *ctx) {
     int32_t s = net->source_vertex;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
-        excess_flow[i] = 0.0;
-        height[i] = 0;
+        ctx->excess_flow[i] = 0.0;
+        ctx->height[i] = 0;
     }
 
     for (int32_t i = 0; i < net->nnodes; i++) {
@@ -221,28 +217,28 @@ static void greedy_preflow(FlowNetwork *net, double *excess_flow,
         assert(c >= 0.0);
         *flow(net, s, v) = c;
         *flow(net, v, s) = -c;
-        excess_flow[v] = c;
-        excess_flow[s] -= c;
+        ctx->excess_flow[v] = c;
+        ctx->excess_flow[s] -= c;
     }
 
-    height[s] = net->nnodes;
+    ctx->height[s] = net->nnodes;
 }
 
 static void compute_bipartition_from_height(FlowNetwork *net,
                                             MaxFlowResult *result,
-                                            int32_t *height) {
+                                            PushRelabelCtx *ctx) {
 
     for (int32_t h = net->nnodes; h >= 0; h--) {
         bool found = false;
         for (int32_t i = 0; i < net->nnodes; i++) {
-            if (height[i] == h) {
+            if (ctx->height[i] == h) {
                 found = true;
                 break;
             }
         }
         if (!found) {
             for (int32_t i = 0; i < net->nnodes; i++) {
-                result->bipartition.data[i] = height[i] > h;
+                result->bipartition.data[i] = ctx->height[i] > h;
             }
             break;
         }
@@ -268,8 +264,8 @@ static double get_flow_from_s_node(FlowNetwork *net) {
     return max_flow;
 }
 
-static void validate_flow(FlowNetwork *net, double max_flow,
-                          double *excess_flow) {
+static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
+                          double max_flow) {
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -284,7 +280,7 @@ static void validate_flow(FlowNetwork *net, double max_flow,
         } else {
             // This assertion is only valid for all vertices except {s, t}.
             // This is verified in the CLRS (Introduction to algorithms) book
-            assert(fcmp(excess_flow[i], 0.0, 1e-5));
+            assert(fcmp(ctx->excess_flow[i], 0.0, 1e-5));
             // Verify flow entering node i is equal to flow exiting node i
             assert(fcmp(fenter, fexit, 1e-4));
         }
@@ -329,12 +325,8 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
     assert(fcmp(section_flow, max_flow, 1e-4));
 }
 
-// This implementation uses the relabel-to-front max flow algorithm version
-// See:
-// 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
-// 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
-//    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
+double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
+                              PushRelabelCtx *ctx) {
     assert(net->cap);
     assert(net->flow);
     assert(net->nnodes >= 2);
@@ -349,40 +341,39 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     }
 #endif
 
-    int32_t *height = malloc(net->nnodes * sizeof(*height));
-    double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
-
     // PREFLOW
-    greedy_preflow(net, excess_flow, height);
+    flow_network_clear(net, false);
+    greedy_preflow(net, ctx);
 
-    int32_t *curr_neigh = malloc(net->nnodes * sizeof(*curr_neigh));
-    int32_t *list = malloc((net->nnodes - 2) * sizeof(*list));
     int32_t list_len = 0;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
-        curr_neigh[i] = 0;
+        ctx->curr_neigh[i] = 0;
     }
 
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i != s && i != t) {
-            list[list_len++] = i;
+            ctx->list[list_len++] = i;
         }
     }
 
     // MAIN LOOP
-    int32_t curr_node = 0;
-    while (curr_node < list_len) {
-        int32_t u = list[curr_node];
-        int32_t old_height = height[u];
-        discharge(net, height, excess_flow, u, curr_neigh);
-        if (height[u] > old_height) {
-            // Make space at the start of the list to move u at the front
-            memmove(list + 1, list, curr_node * sizeof(*list));
-            list[0] = u;
-            assert(fcmp(excess_flow[u], 0.0, 1e-5));
-            curr_node = 1;
-        } else {
-            curr_node += 1;
+    {
+        int32_t curr_node = 0;
+        while (curr_node < list_len) {
+            int32_t u = ctx->list[curr_node];
+            int32_t old_height = ctx->height[u];
+            discharge(net, ctx, u);
+            if (ctx->height[u] > old_height) {
+                // Make space at the start of the list to move u at the front
+                memmove(ctx->list + 1, ctx->list,
+                        curr_node * sizeof(*ctx->list));
+                ctx->list[0] = u;
+                assert(fcmp(ctx->excess_flow[u], 0.0, 1e-5));
+                curr_node = 1;
+            } else {
+                curr_node += 1;
+            }
         }
     }
 
@@ -390,15 +381,16 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     double max_flow = get_flow_from_s_node(net);
 
 #ifndef NDEBUG
-    validate_flow(net, max_flow, excess_flow);
+    validate_flow(net, ctx, max_flow);
 #endif
 
     if (result) {
         assert(result->bipartition.data);
+        assert(result->bipartition.nnodes == net->nnodes);
 
         result->maxflow = max_flow;
         result->bipartition.nnodes = net->nnodes;
-        compute_bipartition_from_height(net, result, height);
+        compute_bipartition_from_height(net, result, ctx);
 
 #ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
@@ -406,12 +398,50 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
         validate_min_cut(net, result, max_flow);
 #endif
     }
+    return max_flow;
+}
 
-    free(curr_neigh);
-    free(list);
-    free(excess_flow);
-    free(height);
+PushRelabelCtx push_relabel_ctx_create(int32_t nnodes) {
+    PushRelabelCtx ctx = {0};
+    ctx.height = malloc(nnodes * sizeof(*ctx.height));
+    ctx.excess_flow = malloc(nnodes * sizeof(*ctx.excess_flow));
+    ctx.curr_neigh = malloc(nnodes * sizeof(*ctx.curr_neigh));
+    ctx.list = malloc((nnodes - 2) * sizeof(*ctx.list));
 
+#ifndef NDEBUG
+    // randomly initialize the array to make accumulation errors apparent
+    for (int32_t i = 0; i < nnodes; i++) {
+        ctx.height[i] = rand();
+        ctx.excess_flow[i] = (double)rand() / RAND_MAX;
+        ctx.curr_neigh[i] = rand();
+    }
+
+    for (int32_t i = 0; i < nnodes - 2; i++) {
+        ctx.list[i] = rand();
+    }
+#endif
+
+    return ctx;
+}
+
+void push_relabel_ctx_destroy(PushRelabelCtx *ctx) {
+    free(ctx->height);
+    free(ctx->excess_flow);
+    free(ctx->curr_neigh);
+    free(ctx->list);
+    memset(ctx, 0, sizeof(*ctx));
+}
+
+// This implementation uses the relabel-to-front max flow algorithm version
+// See:
+// 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
+// 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
+//    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
+double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
+
+    PushRelabelCtx ctx = push_relabel_ctx_create(net->nnodes);
+    double max_flow = push_relabel_max_flow2(net, result, &ctx);
+    push_relabel_ctx_destroy(&ctx);
     return max_flow;
 }
 
