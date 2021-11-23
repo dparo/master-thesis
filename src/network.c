@@ -332,7 +332,6 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             // Reconstruct and output the bipartition
             result->maxflow = max_flow;
 
-
             for (h = net->nnodes; h >= 0; h--) {
                 bool found = false;
                 for (int32_t i = 0; i < net->nnodes; i++) {
@@ -435,7 +434,7 @@ static double compute_flow_from_labels(FlowNetwork *net, int32_t *labels) {
 }
 
 BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
-    assert(net->nnodes >= 2 && net->nnodes <= 8);
+    assert(net->nnodes >= 2 && net->nnodes <= 10);
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
 
     int32_t num_sections = 0;

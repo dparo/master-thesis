@@ -48,7 +48,6 @@ static void print_network(FlowNetwork *net) {
 }
 
 TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
-    ASSERT(net->nnodes >= 2 && net->nnodes <= 8);
     BruteforceMaxFlowResult bf = max_flow_bruteforce(net);
 
     printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
@@ -519,19 +518,17 @@ TEST two_path_flow(void) {
 }
 
 TEST random_networks(void) {
-    for (int32_t nnodes = 2; nnodes <= 7; nnodes++) {
-        for (int32_t try_it = 0; try_it < 8192; try_it++) {
+    for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
+        for (int32_t try_it = 0; try_it < 2048; try_it++) {
             FlowNetwork network = flow_network_create(nnodes);
             MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-            network.source_vertex = rand() % nnodes;
-            do {
-                network.sink_vertex = rand() % nnodes;
-            } while (network.sink_vertex == network.source_vertex);
+            network.source_vertex = 0;
+            network.sink_vertex = nnodes - 1;
 
             for (int32_t i = 0; i < nnodes; i++) {
                 for (int32_t j = 0; j < nnodes; j++) {
                     if (i != j) {
-                        *network_cap(&network, i, j) = (double)(rand() % 5) / 5;
+                        *network_cap(&network, i, j) = (double)(rand() % 3);
                     }
                 }
             }
