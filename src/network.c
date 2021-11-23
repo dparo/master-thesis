@@ -163,16 +163,13 @@ static void relabel(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
 #endif
     assert(u != net->source_vertex && u != net->sink_vertex);
 
-    bool found = false;
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
         if (residual_cap(net, u, v) > 0) {
             min_height = MIN(min_height, ctx->height[v]);
-            found = true;
         }
     }
 
-    assert(found);
     assert(min_height != INT32_MAX);
     int32_t new_height = 1 + min_height;
     assert(new_height >= ctx->height[u] + 1);
@@ -268,6 +265,7 @@ static double get_flow_from_s_node(FlowNetwork *net) {
 
 static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
                           double max_flow) {
+#ifndef NDEBUG
     int32_t s = net->source_vertex;
     int32_t t = net->sink_vertex;
 
@@ -296,10 +294,16 @@ static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
             assert(feq(*flow(net, i, j), -*flow(net, j, i), EPS));
         }
     }
+#else
+    UNUSED_PARAM(net);
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(max_flow);
+#endif
 }
 
 static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
                              double max_flow) {
+#ifndef NDEBUG
     double section_flow = 0.0;
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = 0; j < net->nnodes; j++) {
@@ -325,6 +329,11 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
         }
     }
     assert(feq(section_flow, max_flow, EPS));
+#else
+    UNUSED_PARAM(net);
+    UNUSED_PARAM(result);
+    UNUSED_PARAM(max_flow);
+#endif
 }
 
 double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
@@ -381,9 +390,7 @@ double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
     // COMPUTE maxflow: Sum the flow of outgoing edges from s
     double max_flow = get_flow_from_s_node(net);
 
-#ifndef NDEBUG
     validate_flow(net, ctx, max_flow);
-#endif
 
     if (result) {
         assert(result->bipartition.data);
@@ -393,11 +400,9 @@ double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
         result->bipartition.nnodes = net->nnodes;
         compute_bipartition_from_height(net, result, ctx);
 
-#ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
         // consistent with the computed maxflow
         validate_min_cut(net, result, max_flow);
-#endif
     }
     return max_flow;
 }

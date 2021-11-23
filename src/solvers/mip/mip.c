@@ -443,6 +443,9 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
                                    int32_t threadid, int32_t numthreads) {
+    UNUSED_PARAM(threadid);
+    UNUSED_PARAM(numthreads);
+
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
@@ -506,7 +509,9 @@ terminate:
 
 static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
-                                   int32_t thread, int32_t numthreads) {
+                                   int32_t threadid, int32_t numthreads) {
+    UNUSED_PARAM(threadid);
+    UNUSED_PARAM(numthreads);
 
     assert(tour->num_comps != 1);
 
@@ -676,6 +681,8 @@ terminate:
 
 static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
                                     Solver *solver, const Instance *instance) {
+    UNUSED_PARAM(solver);
+    UNUSED_PARAM(instance);
 
     // NOTE: Global progress is inherently thread safe
     //            See:
@@ -714,6 +721,9 @@ static int cplex_on_thread_activation(int activation,
                                       CPXCALLBACKCONTEXTptr context,
                                       Solver *solver, const Instance *instance,
                                       CPXLONG threadid, CPXLONG numthreads) {
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(solver);
+    UNUSED_PARAM(instance);
     assert(activation == -1 || activation == 1);
 
     if (activation > 0) {
@@ -808,6 +818,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
 
 static bool on_solve_start(Solver *self, const Instance *instance,
                            CplexCallbackCtx *callback_ctx) {
+    UNUSED_PARAM(instance);
 
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_CANDIDATE | CPX_CALLBACKCONTEXT_RELAXATION |
@@ -1014,6 +1025,7 @@ fail:
 
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                          double timelimit, int32_t randomseed) {
+    UNUSED_PARAM(tparams);
     log_trace("%s", __func__);
 
     Solver solver = {0};

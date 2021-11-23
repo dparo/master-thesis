@@ -73,8 +73,10 @@ static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
             return floor(distance);
         default:
             assert(!"Invalid code path!");
+            return INFINITY;
         }
     }
+    return INFINITY;
 }
 
 static inline int32_t *tsucc(Tour *tour, int32_t customer_idx) {

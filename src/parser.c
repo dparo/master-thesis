@@ -563,7 +563,7 @@ static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
 }
 
 static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
-
+    UNUSED_PARAM(instance);
     bool result = true;
     for (int32_t i = 0; result && (i <= 1); i++) {
         char *lexeme = get_token_lexeme(p);

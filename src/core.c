@@ -379,8 +379,8 @@ static void log_solve_status(SolveStatus status, const char *solver_name) {
 }
 
 static void postprocess_solver_solution(const Instance *instance,
-                                        SolveStatus status, Solution *solution,
-                                        const char *solver_name) {
+                                        SolveStatus status,
+                                        Solution *solution) {
     switch (status) {
     case SOLVE_STATUS_ERR:
     case SOLVE_STATUS_ABORTED_ERR:
@@ -505,7 +505,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 
     solver.destroy(&solver);
     log_solve_status(status, solver_name);
-    postprocess_solver_solution(instance, status, solution, solver_name);
+    postprocess_solver_solution(instance, status, solution);
     solver_typed_params_destroy(&tparams);
     return status;
 

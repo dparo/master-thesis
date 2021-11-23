@@ -94,8 +94,8 @@ int32_t *mati32_create(int32_t w, int32_t h);
 int32_t *veci32_copy(int32_t *other, int32_t len);
 int32_t *mati32_copy(int32_t *other, int32_t w, int32_t h);
 
-static inline int32_t *veci32_access(int32_t *vec, int32_t idx, int32_t len) {
-    UNUSED_PARAM(len);
+static inline int32_t *veci32_access(int32_t *vec, int32_t idx,
+                                     ATTRIB_MAYBE_UNUSED int32_t len) {
     assert(idx >= 0 && idx < len);
     return &vec[idx];
 }

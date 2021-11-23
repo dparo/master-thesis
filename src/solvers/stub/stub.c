@@ -22,9 +22,12 @@
 
 #include "solvers.h"
 
-static SolveStatus solve(ATTRIB_MAYBE_UNUSED Solver *self,
-                         ATTRIB_MAYBE_UNUSED const Instance *instance,
+static SolveStatus solve(Solver *self, const Instance *instance,
                          Solution *solution, int64_t begin_time) {
+    UNUSED_PARAM(self);
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(solution);
+    UNUSED_PARAM(begin_time);
     return SOLVE_STATUS_INVALID;
 }
 

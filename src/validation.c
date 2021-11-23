@@ -40,6 +40,7 @@ void validate_solution(const Instance *instance, Solution *solution) {
     assert(fgapcmp(obj, solution->upper_bound, 1e-3));
 
 #else
+    UNUSED_PARAM(instance);
     UNUSED_PARAM(solution);
 #endif
 }
@@ -149,6 +150,7 @@ void validate_tour(const Instance *instance, Tour *tour) {
     }
 
 #else
+    UNUSED_PARAM(instance);
     UNUSED_PARAM(tour);
 #endif
 }
