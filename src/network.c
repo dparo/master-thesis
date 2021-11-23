@@ -196,91 +196,62 @@ static void discharge(FlowNetwork *net, int32_t *height, double *excess_flow,
     }
 }
 
-// This implementation uses the relabel-to-front max flow algorithm version
-// See:
-// 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
-// 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
-//    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
-    assert(net->cap);
-    assert(net->flow);
-    assert(net->nnodes >= 2);
-    assert(net->sink_vertex != net->source_vertex);
-
+static void greedy_preflow(FlowNetwork *net, double *excess_flow,
+                           int32_t *height) {
     int32_t s = net->source_vertex;
-    int32_t t = net->sink_vertex;
 
-#ifndef NDEBUG
     for (int32_t i = 0; i < net->nnodes; i++) {
-        assert(*cap(net, i, i) == 0.0);
+        excess_flow[i] = 0.0;
+        height[i] = 0;
     }
-#endif
 
-    int32_t *height = malloc(net->nnodes * sizeof(*height));
-    double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        for (int32_t j = 0; j < net->nnodes; j++) {
+            *flow(net, i, j) = 0.0;
+        }
+    }
 
-    // PREFLOW
-    {
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            excess_flow[i] = 0.0;
-            height[i] = 0;
+    // For each edge leaving the source s, saturate all out-arcs of s
+    for (int32_t v = 0; v < net->nnodes; v++) {
+        if (v == s) {
+            continue;
         }
 
+        double c = *cap(net, s, v);
+        assert(c >= 0.0);
+        *flow(net, s, v) = c;
+        *flow(net, v, s) = -c;
+        excess_flow[v] = c;
+        excess_flow[s] -= c;
+    }
+
+    height[s] = net->nnodes;
+}
+
+static void compute_bipartition_from_height(FlowNetwork *net,
+                                            MaxFlowResult *result,
+                                            int32_t *height) {
+
+    for (int32_t h = net->nnodes; h >= 0; h--) {
+        bool found = false;
         for (int32_t i = 0; i < net->nnodes; i++) {
-            for (int32_t j = 0; j < net->nnodes; j++) {
-                *flow(net, i, j) = 0.0;
+            if (height[i] == h) {
+                found = true;
+                break;
             }
         }
-
-        // For each edge leaving the source s, saturate all out-arcs of s
-        for (int32_t v = 0; v < net->nnodes; v++) {
-            if (v == s) {
-                continue;
+        if (!found) {
+            for (int32_t i = 0; i < net->nnodes; i++) {
+                result->bipartition.data[i] = height[i] > h;
             }
-
-            double c = *cap(net, s, v);
-            assert(c >= 0.0);
-            *flow(net, s, v) = c;
-            *flow(net, v, s) = -c;
-            excess_flow[v] = c;
-            excess_flow[s] -= c;
-        }
-
-        height[s] = net->nnodes;
-    }
-
-    int32_t *curr_neigh = malloc(net->nnodes * sizeof(*curr_neigh));
-    int32_t *list = malloc((net->nnodes - 2) * sizeof(*list));
-    int32_t list_len = 0;
-
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        curr_neigh[i] = 0;
-    }
-
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        if (i != s && i != t) {
-            list[list_len++] = i;
+            break;
         }
     }
+}
 
-    int32_t curr_node = 0;
-    while (curr_node < list_len) {
-        int32_t u = list[curr_node];
-        int32_t old_height = height[u];
-        discharge(net, height, excess_flow, u, curr_neigh);
-        if (height[u] > old_height) {
-            // Make space at the start of the list to move u at the front
-            memmove(list + 1, list, curr_node * sizeof(*list));
-            list[0] = u;
-            assert(fcmp(excess_flow[u], 0.0, 1e-5));
-            curr_node = 1;
-        } else {
-            curr_node += 1;
-        }
-    }
-
+static double get_flow_from_s_node(FlowNetwork *net) {
+    int32_t s = net->source_vertex;
     double max_flow = 0.0;
-    // Sum the flow of outgoing edges from s
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i == s) {
             continue;
@@ -294,8 +265,14 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     }
 
     assert(max_flow >= 0.0);
+    return max_flow;
+}
 
-#ifndef NDEBUG
+static void validate_flow(FlowNetwork *net, double max_flow,
+                          double *excess_flow) {
+    int32_t s = net->source_vertex;
+    int32_t t = net->sink_vertex;
+
     for (int32_t i = 0; i < net->nnodes; i++) {
         double fenter = flow_entering(net, i);
         double fexit = flow_exiting(net, i);
@@ -321,90 +298,112 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
             assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
         }
     }
+}
+
+static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
+                             double max_flow) {
+    double section_flow = 0.0;
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        for (int32_t j = 0; j < net->nnodes; j++) {
+            int32_t li = (int32_t)result->bipartition.data[i];
+            int32_t lj = (int32_t)result->bipartition.data[j];
+            assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
+            double f = *flow(net, i, j);
+            double c = *cap(net, i, j);
+            assert(c >= 0.0);
+            assert(flte(f, c, 1e-4));
+            if (f >= 0) {
+                if (li == 1 && lj == 0) {
+                    // All edges should be saturated
+                    double r = residual_cap(net, i, j);
+                    assert(fcmp(0.0, r, 1e-4));
+                    section_flow += f;
+                } else if (li == 0 && lj == 1) {
+                    // All edges should be drained
+                    assert(fcmp(f, 0, 1e-4));
+                    section_flow -= f;
+                }
+            }
+        }
+    }
+    assert(fcmp(section_flow, max_flow, 1e-4));
+}
+
+// This implementation uses the relabel-to-front max flow algorithm version
+// See:
+// 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
+// 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
+//    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
+double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
+    assert(net->cap);
+    assert(net->flow);
+    assert(net->nnodes >= 2);
+    assert(net->sink_vertex != net->source_vertex);
+
+    int32_t s = net->source_vertex;
+    int32_t t = net->sink_vertex;
+
+#ifndef NDEBUG
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        assert(*cap(net, i, i) == 0.0);
+    }
+#endif
+
+    int32_t *height = malloc(net->nnodes * sizeof(*height));
+    double *excess_flow = malloc(net->nnodes * sizeof(*excess_flow));
+
+    // PREFLOW
+    greedy_preflow(net, excess_flow, height);
+
+    int32_t *curr_neigh = malloc(net->nnodes * sizeof(*curr_neigh));
+    int32_t *list = malloc((net->nnodes - 2) * sizeof(*list));
+    int32_t list_len = 0;
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        curr_neigh[i] = 0;
+    }
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        if (i != s && i != t) {
+            list[list_len++] = i;
+        }
+    }
+
+    // MAIN LOOP
+    int32_t curr_node = 0;
+    while (curr_node < list_len) {
+        int32_t u = list[curr_node];
+        int32_t old_height = height[u];
+        discharge(net, height, excess_flow, u, curr_neigh);
+        if (height[u] > old_height) {
+            // Make space at the start of the list to move u at the front
+            memmove(list + 1, list, curr_node * sizeof(*list));
+            list[0] = u;
+            assert(fcmp(excess_flow[u], 0.0, 1e-5));
+            curr_node = 1;
+        } else {
+            curr_node += 1;
+        }
+    }
+
+    // COMPUTE maxflow: Sum the flow of outgoing edges from s
+    double max_flow = get_flow_from_s_node(net);
+
+#ifndef NDEBUG
+    validate_flow(net, max_flow, excess_flow);
 #endif
 
     if (result) {
-        assert(result->bipartition.nnodes == net->nnodes);
         assert(result->bipartition.data);
 
-        int32_t h;
-        {
-            // Reconstruct and output the bipartition
-            result->maxflow = max_flow;
-
-            for (h = net->nnodes; h >= 0; h--) {
-                bool found = false;
-                for (int32_t i = 0; i < net->nnodes; i++) {
-                    if (height[i] == h) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    for (int32_t i = 0; i < net->nnodes; i++) {
-                        result->bipartition.data[i] = height[i] > h;
-                    }
-                    break;
-                }
-            }
-
-#if 0
-
-            int32_t *bfs = malloc(net->nnodes * sizeof(*bfs));
-            int32_t bfs_begin = 0;
-            int32_t bfs_end = 0;
-            bfs[bfs_end++] = s;
-
-            for (int32_t i = 0; i < net->nnodes; i++) {
-                result->bipartition.data[i] = 0;
-            }
-            result->bipartition.data[s] = 1;
-
-            while ((bfs_end - bfs_begin) > 0) {
-                int32_t u = bfs[bfs_begin++];
-                for (int32_t v = 0; v > net->nnodes; v++) {
-                    int32_t d = height[v] - height[u];
-
-                    if (abs(d) <= 1 && result->bipartition.data[v] == 0) {
-                        result->bipartition.data[v] = 1;
-                        bfs[bfs_end++] = v;
-                    }
-                }
-            }
-#endif
-        }
+        result->maxflow = max_flow;
+        result->bipartition.nnodes = net->nnodes;
+        compute_bipartition_from_height(net, result, height);
 
 #ifndef NDEBUG
         // Assert that the cross section induced from the bipartition is
         // consistent with the computed maxflow
-
-        {
-            double section_flow = 0.0;
-            for (int32_t i = 0; i < net->nnodes; i++) {
-                for (int32_t j = 0; j < net->nnodes; j++) {
-                    int32_t li = (int32_t)result->bipartition.data[i];
-                    int32_t lj = (int32_t)result->bipartition.data[j];
-                    assert(fcmp(*flow(net, i, j), -*flow(net, j, i), 1e-4));
-                    double f = *flow(net, i, j);
-                    double c = *cap(net, i, j);
-                    assert(c >= 0.0);
-                    assert(flte(f, c, 1e-4));
-                    if (f >= 0) {
-                        if (li == 1 && lj == 0) {
-                            // All edges should be saturated
-                            double r = residual_cap(net, i, j);
-                            assert(fcmp(0.0, r, 1e-4));
-                            section_flow += f;
-                        } else if (li == 0 && lj == 1) {
-                            // All edges should be drained
-                            assert(fcmp(f, 0, 1e-4));
-                            section_flow -= f;
-                        }
-                    }
-                }
-            }
-            assert(fcmp(section_flow, max_flow, 1e-4));
-        }
+        validate_min_cut(net, result, max_flow);
 #endif
     }
 
@@ -413,7 +412,6 @@ double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
     free(excess_flow);
     free(height);
 
-    // printf(" -- - - - - --- max_flow = %g\n", max_flow);
     return max_flow;
 }
 
@@ -500,149 +498,4 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
     free(labels);
 
     return result;
-}
-
-static bool is_sink_node_reachable(FlowNetwork *net, int32_t *parent,
-                                   bool *visited, int32_t *queue) {
-    int32_t s = net->source_vertex;
-    int32_t t = net->sink_vertex;
-
-    int32_t queue_begin = 0;
-    int32_t queue_end = 0;
-
-    // Enqueue
-    queue[queue_end++] = s;
-    visited[s] = s;
-
-    while (queue_end - queue_begin > 0) {
-        // Dequeue
-        int32_t u = queue[queue_begin++];
-        for (int32_t j = 0; j < net->nnodes; j++) {
-            if (visited[j] == false && *flow(net, u, j) > 0) {
-                // Enqueue
-                queue[queue_end++] = j;
-                visited[j] = true;
-                parent[j] = u;
-            }
-        }
-    }
-
-    return visited[t];
-}
-
-// See: https://en.wikipedia.org/wiki/Ford%E2%80%93Fulkerson_algorithm
-double edmond_karp_max_flow(FlowNetwork *net) {
-    int32_t *parent = malloc(net->nnodes * sizeof(*parent));
-    int32_t *queue = malloc(net->nnodes * sizeof(*queue));
-    bool *visited = calloc(net->nnodes, sizeof(*visited));
-
-    double max_flow = 0.0;
-
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        parent[i] = -1;
-    }
-
-    while (is_sink_node_reachable(net, parent, visited, queue)) {
-        double path_flow = INFINITY;
-        int32_t i = net->sink_vertex;
-
-        // Walk backwards
-        while (i != net->source_vertex) {
-            path_flow = MIN(path_flow, *flow(net, parent[i], i));
-            i = parent[i];
-        }
-
-        max_flow += path_flow;
-
-        // Update residual capacities of the edges and reverse edges
-        int32_t v = net->sink_vertex;
-        while (v != net->source_vertex) {
-            int32_t u = parent[v];
-            *flow(net, u, v) -= path_flow;
-            *flow(net, v, u) += path_flow;
-            v = parent[v];
-        }
-
-        memset(visited, 0, sizeof(*visited) * net->nnodes);
-    }
-
-    free(parent);
-    free(visited);
-    free(queue);
-    return max_flow;
-}
-
-MaxFlowResult ford_fulkerson_max_flow(FlowNetwork *net, double initial_flow) {
-    int32_t s = net->source_vertex;
-    int32_t t = net->sink_vertex;
-
-    double max_flow = initial_flow;
-    if (max_flow < 0.0) {
-        max_flow = 0.0;
-        // Compute it ourselves
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            for (int32_t j = 0; j < net->nnodes; j++) {
-                max_flow += *flow(net, i, j);
-            }
-        }
-    }
-    int32_t *pred = malloc(net->nnodes * sizeof(*pred));
-    double *eps = malloc(net->nnodes * sizeof(*eps));
-    int32_t *queue = malloc(net->nnodes * sizeof(*queue));
-
-    int32_t queue_begin = 0;
-    int32_t queue_end = 0;
-
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        pred[i] = -1;
-    }
-
-    do {
-        eps[s] = INFINITY;
-        pred[s] = s;
-        // Enqueue s
-        queue[queue_end++] = s;
-
-        while ((queue_end - queue_begin > 0) && pred[t] < 0) {
-            // Dequeue node
-            int32_t h = queue[queue_begin++];
-            for (int32_t j = 0; j < net->nnodes; j++) {
-                double f = *flow(net, h, j);
-                double c = *cap(net, h, j);
-                if (f < c && pred[j] < 0) {
-                    // Non saturated directed edges
-                    eps[j] = MIN(eps[h], c - f);
-                    pred[j] = h;
-                    queue[queue_end++] = j;
-                }
-            }
-
-            for (int32_t i = 0; i < net->nnodes; i++) {
-                double f = *flow(net, i, h);
-                if (f > 0 && pred[i] < 0) {
-                    eps[i] = MIN(eps[h], f);
-                    pred[i] = h;
-                    queue[queue_end++] = i;
-                }
-            }
-        }
-
-        if (pred[t] >= 0) {
-            double delta = eps[t];
-            max_flow += delta;
-            int32_t j = t;
-            while (j != s) {
-                int32_t i = pred[j];
-                if (i > 0) {
-                }
-                j = i;
-            }
-        }
-    } while (pred[t] < 0);
-
-    free(pred);
-    free(eps);
-    free(queue);
-
-    return (MaxFlowResult){0};
 }

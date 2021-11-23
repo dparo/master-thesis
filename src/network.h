@@ -66,7 +66,6 @@ void flow_network_destroy(FlowNetwork *net);
 MaxFlowResult max_flow_result_create(int32_t nnodes);
 void max_flow_result_destroy(MaxFlowResult *m);
 
-double edmond_karp_max_flow(FlowNetwork *net);
 double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result);
 
 BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net);
