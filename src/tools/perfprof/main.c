@@ -8,7 +8,7 @@
 #include <assert.h>
 
 #define SHARE_PROCESS_GROUP (true)
-#define SHARE_STDIN (true)
+#define SHARE_STDIN (false)
 #define SHARE_STDOUT (true)
 #define SHARE_STDERR (true)
 
@@ -43,6 +43,7 @@ pid_t spawn(char *const argv[]) {
 int wstatus_to_exit_status(pid_t pid, int wstatus) {
     int result = EXIT_FAILURE;
     assert(WIFEXITED(wstatus) || WIFSIGNALED(wstatus));
+
     if (WIFEXITED(wstatus)) {
         result = WEXITSTATUS(wstatus);
     } else if (WIFSIGNALED(wstatus)) {
@@ -56,6 +57,7 @@ int wstatus_to_exit_status(pid_t pid, int wstatus) {
             result = EXIT_FAILURE;
         }
     }
+
     return result;
 }
 
@@ -67,8 +69,11 @@ bool terminated(pid_t pid, int *exit_status) {
         exit(EXIT_FAILURE);
     }
 
+    if (w != pid) {
+        return false;
+    }
+
     if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) {
-        assert(w == 1);
         *exit_status = wstatus_to_exit_status(pid, wstatus);
         return true;
     } else {
@@ -92,8 +97,13 @@ int spawn_sync(char *const argv[]) {
 }
 
 int main(int argc, char **argv) {
-    char *args[] = {"nvim", NULL};
-    int exit_status = spawn_sync(args);
+    char *args[] = {"alacritty", "-e", "zsh", NULL};
+    pid_t pid = spawn(args);
+    int exit_status;
+    while (!terminated(pid, &exit_status)) {
+        usleep(1000);
+    }
+
     printf("exit_status: %d\n", exit_status);
     return 0;
 }
