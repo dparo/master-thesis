@@ -1,0 +1,38 @@
+{
+    "name": "perf-prof",
+    "private": true,
+    "version": "1.0.0",
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/dparo/dpcc"
+    },
+    "description": "The performance profile for CPTP solver against the VRPSolver exntesion of BaPCod",
+    "author": "Davide Paro <davide.paro@studenti.unipd.it>",
+    "keywords": [
+      "typescript",
+      "cli"
+    ],
+    "license": "MIT",
+    "main": "./dist/index.js",
+    "bin": "./dist/cli.js",
+    "files": [
+      "dist/**/*",
+      "!dist/**/*.test.js"
+    ],
+    "scripts": {
+      "build": "npx tsc",
+      "watch-build-ts": "npx tsc -w",
+      "run": "npm run build && node dist/main.js",
+      "clean": "rimraf ./dist/ ./exec/",
+      "test": "npm run build && ava --verbose",
+      "bundle": "npm run build && pkg . --out-dir ./exec/",
+      "lint": "npx tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix"
+    },
+    "devDependencies": {
+      "ava": "^3.15.0",
+      "typescript": "^3.5.3",
+      "eslint": "^8.2.0"
+    },
+    "dependencies": {
+    }
+  }
