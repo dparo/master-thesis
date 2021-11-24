@@ -1,4 +1,8 @@
 #include "proc.h"
+#include <string.h>
+#include <stdint.h>
+#include "misc.h"
+#include "utils.h"
 
 #define SHARE_PROCESS_GROUP (true)
 #define SHARE_STDIN (false)
@@ -87,4 +91,94 @@ bool proc_terminated(pid_t pid, int *exit_status) {
     }
 
     return false;
+}
+
+static void proc_destroy(Process *proc) {
+    proc->pid = INT32_MIN;
+    for (int32_t i = 0; i < PROC_MAX_ARGS; i++) {
+        free(proc->args[i]);
+    }
+    memset(proc, 0, sizeof(*proc));
+}
+
+static void insert_proc_in_pool(ProcPool *pool, int32_t idx, char *args[]) {
+    if (pool->procs[idx].valid) {
+        proc_destroy(&pool->procs[idx]);
+    }
+
+    pid_t pid = proc_spawn(args);
+
+    pool->procs[idx].valid = true;
+    pool->procs[idx].pid = pid;
+    int32_t i = 0;
+    for (i = 0; i < PROC_MAX_ARGS - 1 && args[i] != NULL; i++) {
+        pool->procs[idx].args[i] = strdup(args[i]);
+    }
+    pool->procs[idx].args[i] = NULL;
+}
+
+static int32_t pool_sync2(ProcPool *pool) {
+    bool any_valid = false;
+    do {
+        for (int32_t idx = 0; idx < MIN(pool->max_num_procs, PROC_POOL_SIZE);
+             idx++) {
+            Process *p = &pool->procs[idx];
+            if (!p->valid) {
+                continue;
+            } else {
+                any_valid = true;
+            }
+
+            int exit_status;
+            if (proc_terminated(p->pid, &exit_status)) {
+                printf("Process %s [status: %d]: ",
+                       exit_status == 0 ? "exited correctly" : "failed",
+                       exit_status);
+                printf("(cmd");
+
+                for (int32_t i = 0; i < PROC_MAX_ARGS - 1 && p->args[i] != NULL;
+                     i++) {
+                    printf(" %s", p->args[i]);
+                }
+                printf(")\n");
+                proc_destroy(p);
+                return idx;
+            }
+        }
+        usleep(PROC_POOL_UPDATE_PERIOD_MSEC * 1000);
+    } while (any_valid);
+
+    return INT32_MIN;
+}
+
+void queue_process(ProcPool *pool, char *args[]) {
+    for (int32_t idx = 0; idx < MIN(pool->max_num_procs, PROC_POOL_SIZE);
+         idx++) {
+        Process *p = &pool->procs[idx];
+        if (!p->valid) {
+            insert_proc_in_pool(pool, idx, args);
+            return;
+        }
+    }
+
+    int32_t idx = pool_sync2(pool);
+    assert(idx >= 0);
+    insert_proc_in_pool(pool, idx, args);
+}
+
+void pool_sync(ProcPool *pool) { (void)pool_sync2(pool); }
+
+void pool_join(ProcPool *pool) {
+    while ((pool_sync2(pool) >= 0)) {
+    }
+
+    // NOTE: Technically this loop is not necessary since `pool_sync` will take
+    //       care of destroying terminated process. But we live it here for
+    //       the sake of clarity
+    for (int32_t idx = 0; idx < MIN(pool->max_num_procs, PROC_POOL_SIZE);
+         idx++) {
+        if (pool->procs[idx].valid) {
+            proc_destroy(&pool->procs[idx]);
+        }
+    }
 }
