@@ -65,7 +65,7 @@ add_library(libcptp
     solvers/mip/mip.c
     )
 target_include_directories(libcptp PUBLIC ./)
-target_link_libraries(libcptp PUBLIC logc libstb)
+target_link_libraries(libcptp PUBLIC logc libstb cjson-static)
 
 if (NOT WIN32)
     target_link_libraries(libcptp PUBLIC m)

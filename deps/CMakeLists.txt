@@ -76,6 +76,14 @@ set(ARGTABLE3_ENABLE_TESTS OFF CACHE BOOL "Enable unit tests")
 set(ARGTABLE3_ENABLE_EXAMPLES OFF CACHE BOOL "Enable examples")
 
 
+# Set cJSON to enable sanitizers
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_ADRESS_SANITIZER)
+    set(ENABLE_SANITIZERS ON CACHE INTERNAL "Enable sanitizers")
+endif()
+
+# Set cJSON to built both shared and static libraries
+set(BUILD_SHARED_AND_STATIC_LIBS ON CACHE INTERNAL "Build both shared and static libraries")
+
 if (BUILD_DOC)
     fetchgitsubmodule("${DEPS_DIR}/doxygen-awesome-css")
 endif()
@@ -84,6 +92,7 @@ fetchgitsubmodule("${DEPS_DIR}/log.c")
 fetchgitsubmodule("${DEPS_DIR}/greatest")
 fetchgitsubmodule("${DEPS_DIR}/argtable3")
 fetchgitsubmodule("${DEPS_DIR}/stb")
+fetchgitsubmodule("${DEPS_DIR}/cJSON")
 
 
 
@@ -97,8 +106,10 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Relase")
     target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_INFO")
 endif()
 
-# Customize stb
+# Customize cJSON
+target_include_directories(cjson-static PUBLIC "${DEPS_DIR}/cJSON")
 
+# Customize stb
 add_library(libstb STATIC
   stb_impl.c
 )
