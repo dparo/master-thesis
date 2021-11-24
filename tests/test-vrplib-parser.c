@@ -77,7 +77,7 @@ TEST parsing_single_instance(void) {
     PASS();
 }
 
-#define EPS ((double)1e-4)
+#define EPS ((double)1e-2)
 
 struct BapCodGeneratedInstanceTest {
     int32_t column_generation_it;
@@ -113,10 +113,13 @@ TEST parsing_bapcod_output_instances(void) {
             ASSERT_EQ(4, instance.demands[19 - 1]);
             ASSERT_EQ(19, instance.demands[33 - 1]);
 
-            ASSERT_IN_RANGE(22.2962, cptp_dist(&instance, 1 - 1, 2 - 1), EPS);
-            ASSERT_IN_RANGE(-6.33531, cptp_dist(&instance, 1 - 1, 4 - 1), EPS);
-            ASSERT_IN_RANGE(28.2942, cptp_dist(&instance, 3 - 1, 32 - 1), EPS);
-            ASSERT_IN_RANGE(40.6364, cptp_dist(&instance, 19 - 1, 34 - 1), EPS);
+            ASSERT_IN_RANGE(-8571.7396, cptp_dist(&instance, 1 - 1, 2 - 1),
+                            EPS);
+            ASSERT_IN_RANGE(66.0574, cptp_dist(&instance, 1 - 1, 4 - 1), EPS);
+            ASSERT_IN_RANGE(-12234.9475, cptp_dist(&instance, 3 - 1, 32 - 1),
+                            EPS);
+            ASSERT_IN_RANGE(1435.0446, cptp_dist(&instance, 19 - 1, 34 - 1),
+                            EPS);
         }
 
         instance_destroy(&instance);
