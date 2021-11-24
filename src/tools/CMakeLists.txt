@@ -1,3 +1,5 @@
+add_subdirectory(perfprof)
+
 add_executable(simplified-instance-converter
     simplified-instance-converter.c
     )
