@@ -1,0 +1,26 @@
+{
+    "instanceName": "A-n37-k5",
+    "comment": "(Augerat:et al, No of trucks: 5, Optimal value: 669)",
+    "type": "CVRP",
+    "dimension": 37,
+    "vehicles": 5,
+    "capacity": 100,
+    "columnGenerationIteration": 108,
+    "zeroReducedCostThreshold": -18.321372264402534,
+    "rcsp-infos": {
+         "seconds": 0.020840999999999998,
+         "generatedColumns": 1,
+         "columns-cost": [-63.164134880912421],
+         "columns-relative-cost": [-44.842762616509887],
+         "columns": [
+                [
+                    { "id": "X[1,0,8]", "name": "Xd1i0j8_1_OspV", "val": 1 },
+                    { "id": "X[1,0,24]", "name": "Xd1i0j24_1_OspV", "val": 1 },
+                    { "id": "X[1,8,24]", "name": "Xd1i8j24_1_OspV", "val": 1 },
+                    { "id": "X[1,8,27]", "name": "Xd1i8j27_1_OspV", "val": 2 },
+                    { "id": "X[1,11,20]", "name": "Xd1i11j20_1_OspV", "val": 2 },
+                    { "id": "X[1,11,27]", "name": "Xd1i11j27_1_OspV", "val": 2 }
+                ]
+        ]
+    }
+}

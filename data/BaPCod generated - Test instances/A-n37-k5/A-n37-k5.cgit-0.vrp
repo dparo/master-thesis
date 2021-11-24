@@ -1,8 +1,10 @@
 # Generated from: A-n37-k5
 # Column generation iteration: 0
-# Zero Reduced Cost Threshold: 12000.000000
-# RCSP solver took (seconds): 0.023057
-# RCSP solver generated 35 columns
+# Zero Reduced Cost Threshold: 12000
+# RCSP solver took (seconds): 0.014271000000000001
+# RCSP solver generated 1 columns
+# RCSP solver costs: [-2396385]
+# RCSP solver relative costs: [-2408385]
 
 NAME : A-n37-k5.cgit-0
 COMMENT : (Augerat:et al, No of trucks: 5, Optimal value: 669)
