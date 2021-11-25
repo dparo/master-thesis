@@ -29,6 +29,8 @@ extern "C" {
 
 #include "misc.h"
 #include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
 
 #define ABS(x) ((x) > 0 ? (x) : -(x))
 
@@ -96,6 +98,16 @@ static inline size_t get_file_size(FILE *f) {
     size_t result = ftell(f);
     fseek(f, 0L, SEEK_SET);
     return result;
+}
+
+ATTRIB_PRINTF(3, 4)
+static inline int snprintf_safe(char *str, size_t size, const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    int amt = vsnprintf(str, size, fmt, ap);
+    va_end(ap);
+    str[size - 1] = 0;
+    return amt;
 }
 
 #if __cplusplus

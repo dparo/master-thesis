@@ -59,6 +59,7 @@ static inline TimeRepr timerepr_from_nanosecs(int64_t nsecs) {
 
 double os_get_elapsed_secs(int64_t usecs_begin);
 
+void timerepr_to_string(const TimeRepr *repr, char *string, size_t n);
 void print_timerepr(FILE *f, const TimeRepr *repr);
 
 const char *os_get_fext(const char *filepath);

@@ -135,6 +135,47 @@ TimeRepr timerepr_from_usecs(int64_t usecs) {
     return result;
 }
 
+void timerepr_to_string(const TimeRepr *repr, char *string, size_t n) {
+    char *s = string;
+    size_t rem = n;
+    if (repr->days > 0) {
+        int amt = snprintf(s, rem, "%d day(s), ", repr->days);
+        s += amt;
+        rem -= amt;
+    }
+
+    if (repr->hours > 0) {
+        int amt = snprintf(s, rem, "%d hours(s), ", repr->hours);
+        s += amt;
+        rem -= amt;
+    }
+
+    if (repr->minutes > 0) {
+        int amt = snprintf(s, rem, "%d minutes(s), ", repr->minutes);
+        s += amt;
+        rem -= amt;
+    }
+
+    if (repr->seconds > 0) {
+        int amt = snprintf(s, rem, "%d seconds(s), ", repr->seconds);
+        s += amt;
+        rem -= amt;
+    }
+
+    if (repr->milliseconds > 0) {
+        int amt = snprintf(s, rem, "%d msec(s), ", repr->milliseconds);
+        s += amt;
+        rem -= amt;
+    }
+
+    if (repr->microseconds > 0) {
+        int amt = snprintf(s, rem, "%d usec(s)", repr->microseconds);
+        s += amt;
+        rem -= amt;
+    }
+    string[n - 1] = 0;
+}
+
 void print_timerepr(FILE *f, const TimeRepr *repr) {
     if (repr->days > 0) {
         fprintf(f, "%d day(s), ", repr->days);

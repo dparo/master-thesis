@@ -98,6 +98,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
 
     fprintf(fh, "%-16s %s\n", "SOLVER:", ctx->solver);
     fprintf(fh, "%-16s %f\n", "TIMELIM:", ctx->timelimit);
+    fprintf(fh, "%-16s %d\n", "SEED:", ctx->randomseed);
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
 
     if (success) {
@@ -140,7 +141,82 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
         return;
     }
 
-    fprintf(fh, "Hello world\n");
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        log_fatal("%s :: Failed to create JSON root object", __func__);
+        fclose(fh);
+        return;
+    }
+
+    bool s = true;
+    s &= cJSON_AddItemToObject(root, "solverName",
+                               cJSON_CreateString(ctx->solver));
+    s &= cJSON_AddItemToObject(root, "timeLimit",
+                               cJSON_CreateNumber(ctx->timelimit));
+    s &= cJSON_AddItemToObject(root, "randomSeed",
+                               cJSON_CreateNumber(ctx->randomseed));
+    s &= cJSON_AddItemToObject(
+        root, "cmdLineDefines",
+        cJSON_CreateStringArray(ctx->defines, ctx->num_defines));
+    s &= cJSON_AddItemToObject(root, "inputFile",
+                               cJSON_CreateString(ctx->instance_filepath));
+
+    s &= cJSON_AddItemToObject(root, "instanceName",
+                               cJSON_CreateString(instance->name));
+    s &= cJSON_AddItemToObject(root, "instanceComment",
+                               cJSON_CreateString(instance->comment));
+    s &= cJSON_AddItemToObject(root, "vehicleCap",
+                               cJSON_CreateNumber(instance->vehicle_cap));
+    s &= cJSON_AddItemToObject(root, "numCustomers",
+                               cJSON_CreateNumber(instance->num_customers));
+    s &= cJSON_AddItemToObject(root, "numVehicles",
+                               cJSON_CreateNumber(instance->num_vehicles));
+
+    double obj[2] = {solution->lower_bound, solution->upper_bound};
+    s &= cJSON_AddItemToObject(root, "obj",
+                               cJSON_CreateDoubleArray(obj, ARRAY_LEN(obj)));
+
+    double cost = tour_eval(instance, &solution->tour);
+    s &= cJSON_AddItemToObject(root, "cost", cJSON_CreateNumber(cost));
+
+    if (instance->zero_reduced_cost_threshold != 0) {
+        s &= cJSON_AddItemToObject(
+            root, "zeroReducedCostThreshold",
+            cJSON_CreateNumber(instance->zero_reduced_cost_threshold));
+        s &= cJSON_AddItemToObject(
+            root, "relativeCost",
+            cJSON_CreateNumber(cost - instance->zero_reduced_cost_threshold));
+    }
+
+    char *time = ctime(&timing.started);
+    // Remove newline introduced from ctime
+    time[strlen(time) - 1] = 0;
+
+    s &= cJSON_AddItemToObject(root, "started", cJSON_CreateString(time));
+
+    time = ctime(&timing.ended);
+    // Remove newline introduced from ctime
+    time[strlen(time) - 1] = 0;
+    s &= cJSON_AddItemToObject(root, "ended", cJSON_CreateString(time));
+
+    char timerepr_str[4096];
+    TimeRepr timerepr = timerepr_from_usecs(timing.took_usecs);
+    timerepr_to_string(&timerepr, timerepr_str, ARRAY_LEN(timerepr_str));
+
+    s &= cJSON_AddItemToObject(
+        root, "took", cJSON_CreateNumber(timing.took_usecs / (double)1000000));
+    s &= cJSON_AddItemToObject(root, "tookRepr",
+                               cJSON_CreateString(timerepr_str));
+
+    if (!s) {
+        log_fatal("%s :: Failed to create JSON root object", __func__);
+        fclose(fh);
+        return;
+    }
+    char *content = cJSON_Print(root);
+    fprintf(fh, "%s", content);
+    cJSON_Delete(root);
+    free(content);
     fclose(fh);
 }
 

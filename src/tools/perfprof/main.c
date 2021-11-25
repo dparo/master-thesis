@@ -122,30 +122,43 @@ void handle_vrp_instance(const char *fpath) {
     int32_t argidx = 0;
 
     char timelimit[128];
-    snprintf(timelimit, ARRAY_LEN(timelimit), "%gs",
-             G_active_bgroup->timelimit);
-    timelimit[ARRAY_LEN(timelimit) - 1] = 0;
+    snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
+                  G_active_bgroup->timelimit);
+
+    char timelimit_extended[128];
+    snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
+                  G_active_bgroup->timelimit * 1.05 + 2);
+
+    char killafter[128];
+    snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
+                  G_active_bgroup->timelimit * 1.1 + 2 -
+                      G_active_bgroup->timelimit);
 
     Path p;
-    char outdir[OS_MAX_PATH] = "perfprof-dump";
+    char outdir[] = "perfprof-dump";
     os_mkdir(outdir, true);
-    char json_report_path[OS_MAX_PATH];
 
-    snprintf(json_report_path, ARRAY_LEN(json_report_path), "%s/%s.json",
-             outdir, os_basename(fpath, &p));
-    json_report_path[ARRAY_LEN(json_report_path) - 1] = 0;
+    char json_report_path[OS_MAX_PATH + 32];
+    snprintf_safe(json_report_path, ARRAY_LEN(json_report_path), "%s/%s.json",
+                  outdir, os_basename(fpath, &p));
 
     args[argidx++] = "timeout";
     args[argidx++] = "-k";
-    args[argidx++] = "5s";
-    args[argidx++] = timelimit;
+    args[argidx++] = killafter;
+    args[argidx++] = timelimit_extended;
     args[argidx++] = CPTP_EXE;
+    args[argidx++] = "-t";
+    args[argidx++] = timelimit;
     args[argidx++] = "-i";
     args[argidx++] = (char *)fpath;
     args[argidx++] = "-w";
     args[argidx++] = (char *)json_report_path;
     args[argidx++] = NULL;
+
     proc_pool_queue(&G_pool, args);
+    if (G_pool.max_num_procs == 1) {
+        proc_pool_join(&G_pool);
+    }
 }
 
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
