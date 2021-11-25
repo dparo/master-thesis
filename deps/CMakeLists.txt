@@ -93,7 +93,7 @@ fetchgitsubmodule("${DEPS_DIR}/greatest")
 fetchgitsubmodule("${DEPS_DIR}/argtable3")
 fetchgitsubmodule("${DEPS_DIR}/stb")
 fetchgitsubmodule("${DEPS_DIR}/cJSON")
-
+fetchgitsubmodule("${DEPS_DIR}/crypto-algorithms")
 
 
 # Customize logc
@@ -114,6 +114,12 @@ add_library(libstb STATIC
   stb_impl.c
 )
 target_include_directories(libstb PUBLIC "${DEPS_DIR}/stb")
+
+# Customize crypto-algorithms
+add_library(libcrypto STATIC
+    "${DEPS_DIR}/crypto-algorithms/sha256.c"
+)
+target_include_directories(libcrypto PUBLIC "${DEPS_DIR}/crypto-algorithms")
 
 
 # Customize argtable3

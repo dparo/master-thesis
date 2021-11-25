@@ -95,12 +95,11 @@ static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
 
 typedef struct {
     char *name;
-    char *exe_path;
     char *args[PROC_MAX_ARGS];
 } Solver;
 
 #define BAPCOD_SOLVER_NAME ("BaPCod")
-static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, NULL, {0}});
+static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, {0}});
 
 #define MAX_NUM_SOLVERS_PER_GROUP 16
 
@@ -135,49 +134,59 @@ static void my_sighandler(int signum) {
 }
 
 void handle_vrp_instance(const char *fpath, int32_t seed) {
-    char *args[PROC_MAX_ARGS];
-    int32_t argidx = 0;
+    for (int32_t solver_idx = 0;
+         G_active_bgroup->solvers[solver_idx].name != NULL; solver_idx++) {
+        Solver *solver = &G_active_bgroup->solvers[solver_idx];
+        char *args[PROC_MAX_ARGS];
+        int32_t argidx = 0;
 
-    char timelimit[128];
-    snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
-                  G_active_bgroup->timelimit);
-
-    char timelimit_extended[128];
-    snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
-                  G_active_bgroup->timelimit * 1.05 + 2);
-
-    char killafter[128];
-    snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
-                  G_active_bgroup->timelimit * 1.05 + 2 -
+        char timelimit[128];
+        snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
                       G_active_bgroup->timelimit);
 
-    char seed_str[128];
-    snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
+        char timelimit_extended[128];
+        snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
+                      G_active_bgroup->timelimit * 1.05 + 2);
 
-    Path p;
+        char killafter[128];
+        snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
+                      G_active_bgroup->timelimit * 1.05 + 2 -
+                          G_active_bgroup->timelimit);
 
-    char json_report_path[OS_MAX_PATH + 32];
-    snprintf_safe(json_report_path, ARRAY_LEN(json_report_path), "%s/%s.json",
-                  PERFPROF_DUMP_ROOTDIR, os_basename(fpath, &p));
+        char seed_str[128];
+        snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
 
-    args[argidx++] = "timeout";
-    args[argidx++] = "-k";
-    args[argidx++] = killafter;
-    args[argidx++] = timelimit_extended;
-    args[argidx++] = CPTP_EXE;
-    args[argidx++] = "-t";
-    args[argidx++] = timelimit;
-    args[argidx++] = "--seed";
-    args[argidx++] = seed_str;
-    args[argidx++] = "-i";
-    args[argidx++] = (char *)fpath;
-    args[argidx++] = "-w";
-    args[argidx++] = (char *)json_report_path;
-    args[argidx++] = NULL;
+        Path p;
 
-    proc_pool_queue(&G_pool, args);
-    if (G_pool.max_num_procs == 1) {
-        proc_pool_join(&G_pool);
+        char json_report_path[OS_MAX_PATH + 32];
+        snprintf_safe(json_report_path, ARRAY_LEN(json_report_path),
+                      "%s/%s.json", PERFPROF_DUMP_ROOTDIR,
+                      os_basename(fpath, &p));
+
+        args[argidx++] = "timeout";
+        args[argidx++] = "-k";
+        args[argidx++] = killafter;
+        args[argidx++] = timelimit_extended;
+        args[argidx++] = CPTP_EXE;
+        args[argidx++] = "-t";
+        args[argidx++] = timelimit;
+        args[argidx++] = "--seed";
+        args[argidx++] = seed_str;
+        args[argidx++] = "-i";
+        args[argidx++] = (char *)fpath;
+
+        for (int32_t i = 0; solver->args[i] != NULL; i++) {
+            args[argidx++] = solver->args[i];
+        }
+
+        args[argidx++] = "-w";
+        args[argidx++] = (char *)json_report_path;
+        args[argidx++] = NULL;
+
+        proc_pool_queue(&G_pool, args);
+        if (G_pool.max_num_procs == 1) {
+            proc_pool_join(&G_pool);
+        }
     }
 }
 
@@ -234,7 +243,11 @@ int main(int argc, char *argv[]) {
                              DEFAULT_FILTER,
                              600.0,
                              3,
-                             {}}};
+                             {{"cptp",
+                               {
+                                   "--solver",
+                                   "mip",
+                               }}}}};
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         do_batch(&batches[i]);
