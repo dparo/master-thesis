@@ -53,7 +53,7 @@ add_library(libcptp
     parser.c
     parsing-utils.c
     core.c
-    timing.c
+    os.c
     validation.c
     visualization.c
     network.c

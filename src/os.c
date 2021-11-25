@@ -20,10 +20,12 @@
  * SOFTWARE.
  */
 
-#include "timing.h"
+#include "os.h"
 #include <math.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
+
 //
 // Includes per platform
 //
@@ -151,4 +153,17 @@ void print_timerepr(FILE *f, const TimeRepr *repr) {
     if (repr->microseconds > 0) {
         fprintf(f, "%d usec(s)", repr->microseconds);
     }
+}
+
+const char *os_get_fext(const char *filepath) {
+
+    for (int32_t i = strlen(filepath) - 1; i >= 0; i--) {
+        if (filepath[i] == '/' || filepath[i] == '\\') {
+            return NULL;
+        } else if (filepath[i] == '.') {
+            const char *extstr = &filepath[i + 1];
+            return extstr;
+        }
+    }
+    return NULL;
 }

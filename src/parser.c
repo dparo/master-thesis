@@ -834,15 +834,9 @@ static Instance parse_impl(const char *filepath, ParsingFileExt ext) {
         // Default to VRPLIB parsing
         ext = PARSING_FILE_EXT_VRPLIB;
 
-        // Walk string backward to determine file extension
-        for (int32_t i = strlen(filepath) - 1; i >= 0; i--) {
-            if (filepath[i] == '.') {
-                const char *extstr = &filepath[i + 1];
-                if (0 == strcmp(extstr, "simplified-vrp")) {
-                    ext = PARSING_FILE_EXT_SIMPLIFIED_VRP;
-                }
-                break;
-            }
+        const char *extstring = os_get_fext(filepath);
+        if (extstring && 0 == strcmp(extstring, "simplified-vrp")) {
+            ext = PARSING_FILE_EXT_SIMPLIFIED_VRP;
         }
     }
 

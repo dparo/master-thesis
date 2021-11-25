@@ -28,7 +28,7 @@
 #include "types.h"
 #include "core.h"
 #include "parser.h"
-#include "timing.h"
+#include "os.h"
 #include "core-utils.h"
 #include "visualization.h"
 
