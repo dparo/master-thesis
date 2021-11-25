@@ -50,6 +50,7 @@ typedef struct {
 } Process;
 
 typedef struct ProcPool {
+    bool aborted;
     int32_t max_num_procs;
     Process procs[PROC_POOL_SIZE];
 } ProcPool;

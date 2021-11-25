@@ -26,6 +26,8 @@
 extern "C" {
 #endif
 
+#define OS_MAX_PATH 4096
+
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -39,6 +41,10 @@ typedef struct TimeRepr {
     int32_t milliseconds;
     int32_t microseconds;
 } TimeRepr;
+
+typedef struct {
+    char cstr[OS_MAX_PATH];
+} Path;
 
 void os_sleep(int64_t usecs);
 
@@ -61,6 +67,9 @@ bool os_fexists(char *filepath);
 bool os_direxists(char *filepath);
 
 bool os_mkdir(char *path, bool exist_ok);
+
+char *os_basename(char *path, Path *p);
+char *os_dirname(char *path, Path *p);
 
 #if __cplusplus
 }

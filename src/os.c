@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
+#include "misc.h"
 
 //
 // Includes per platform
@@ -41,6 +42,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <libgen.h>
 #elif defined _WIN64
 #include <windows.h>
 #include <profileapi.h>
@@ -231,7 +233,7 @@ bool os_direxists(char *filepath) {
 
 bool os_mkdir(char *path, bool exist_ok) {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
-    defined(__NetBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+    defined(__NetBSD__) || defined(__DragonFly__)
     if (exist_ok && os_direxists(path)) {
         return true;
     } else {
@@ -248,5 +250,35 @@ bool os_mkdir(char *path, bool exist_ok) {
 #error "TODO os_mkdir for APPLE platform"
 #else
 #error "TODO os_mkdir for WINDOWS platform"
+#endif
+}
+
+char *os_basename(char *path, Path *p) {
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
+    defined(__NetBSD__) || defined(__DragonFly__)
+    p->cstr[0] = 0;
+    strncpy(p->cstr, path, ARRAY_LEN(p->cstr));
+    char *c = basename(p->cstr);
+    assert(c >= p->cstr && c < p->cstr + strlen(p->cstr));
+    return c;
+#elif __APPLE__
+#error "TODO os_basename for APPLE platform"
+#else
+#error "TODO os_basename for WINDOWS platform"
+#endif
+}
+
+char *os_dirname(char *path, Path *p) {
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
+    defined(__NetBSD__) || defined(__DragonFly__)
+    p->cstr[0] = 0;
+    strncpy(p->cstr, path, ARRAY_LEN(p->cstr));
+    char *c = dirname(p->cstr);
+    assert(c >= p->cstr && c < p->cstr + strlen(p->cstr));
+    return p->cstr;
+#elif __APPLE__
+#error "TODO os_dirname for APPLE platform"
+#else
+#error "TODO os_dirname for WINDOWS platform"
 #endif
 }

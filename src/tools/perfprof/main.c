@@ -113,6 +113,7 @@ static void my_sighandler(int signum) {
     }
     if (signum == SIGTERM || signum == SIGINT) {
         G_should_terminate = true;
+        G_pool.aborted = true;
     }
 }
 
@@ -174,7 +175,6 @@ static void do_batch(BatchGroup *bgroup) {
 }
 
 int main(int argc, char *argv[]) {
-
     sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
     sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
 

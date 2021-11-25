@@ -186,7 +186,9 @@ void proc_pool_queue(ProcPool *pool, char *const args[]) {
 
     int32_t idx = pool_sync2(pool);
     assert(idx >= 0);
-    insert_proc_in_pool(pool, idx, args);
+    if (!pool->aborted) {
+        insert_proc_in_pool(pool, idx, args);
+    }
 }
 
 void proc_pool_sync(ProcPool *pool) { (void)pool_sync2(pool); }
