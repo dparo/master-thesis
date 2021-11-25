@@ -253,7 +253,7 @@ bool os_mkdir(char *path, bool exist_ok) {
 #endif
 }
 
-char *os_basename(char *path, Path *p) {
+char *os_basename(const char *path, Path *p) {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
     defined(__NetBSD__) || defined(__DragonFly__)
     p->cstr[0] = 0;
@@ -268,7 +268,7 @@ char *os_basename(char *path, Path *p) {
 #endif
 }
 
-char *os_dirname(char *path, Path *p) {
+char *os_dirname(const char *path, Path *p) {
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
     defined(__NetBSD__) || defined(__DragonFly__)
     p->cstr[0] = 0;

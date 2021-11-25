@@ -68,8 +68,8 @@ bool os_direxists(char *filepath);
 
 bool os_mkdir(char *path, bool exist_ok);
 
-char *os_basename(char *path, Path *p);
-char *os_dirname(char *path, Path *p);
+char *os_basename(const char *path, Path *p);
+char *os_dirname(const char *path, Path *p);
 
 #if __cplusplus
 }

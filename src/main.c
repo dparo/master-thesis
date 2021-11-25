@@ -34,6 +34,8 @@
 
 #include <log.h>
 #include <argtable3.h>
+#include <cJSON.h>
+#include <sha256.h>
 
 #define DEFAULT_TIME_LIMIT ((double)600.0) // 10 minutes
 
@@ -80,6 +82,7 @@ typedef struct {
     const char **defines;
     int32_t num_defines;
     const char *vis_path;
+    const char *json_report_path;
 } AppCtx;
 
 typedef struct {
@@ -123,6 +126,24 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
     printf("\n");
 }
 
+static void writeout_json_report(AppCtx *ctx, Instance *instance,
+                                 Solution *solution, SolveStatus status,
+                                 Timing timing) {
+    if (!ctx->json_report_path) {
+        return;
+    }
+
+    FILE *fh = fopen(ctx->json_report_path, "w");
+    if (!fh) {
+        log_fatal("%s: failed to open file for writing JSON report",
+                  ctx->json_report_path);
+        return;
+    }
+
+    fprintf(fh, "Hello world\n");
+    fclose(fh);
+}
+
 static int main2(AppCtx *ctx) {
     Instance instance = parse(ctx->instance_filepath);
     if (is_valid_instance(&instance)) {
@@ -149,6 +170,7 @@ static int main2(AppCtx *ctx) {
 
             printf("\n\n###\n###\n###\n\n");
             writeout_results(stdout, ctx, &instance, &solution, status, timing);
+            writeout_json_report(ctx, &instance, &solution, status, timing);
 
             if (ctx->vis_path) {
                 tour_plot(ctx->vis_path, &instance, &solution.tour, NULL);
@@ -205,12 +227,14 @@ int main(int argc, char **argv) {
 
     struct arg_file *vis_path =
         arg_file0(NULL, "visualize", NULL, "tour visualization output file");
+    struct arg_file *json_report_path = arg_file0(
+        "w", "write-report", NULL, "write a JSON report output file.");
 
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,      version,    verbose, logfile,
-                        timelimit, randomseed, defines, instance,
-                        vis_path,  solver,     end};
+    void *argtable[] = {help,      version,          verbose, logfile,
+                        timelimit, randomseed,       defines, instance,
+                        vis_path,  json_report_path, solver,  end};
 
     int nerrors;
     int exitcode = 0;
@@ -232,6 +256,8 @@ int main(int argc, char **argv) {
     logfile->filename[0] = NULL;
     // No tour visualization file by default
     vis_path->filename[0] = NULL;
+    // No JSON report output file by default
+    json_report_path->filename[0] = NULL;
 
     nerrors = arg_parse(argc, argv, argtable);
 
@@ -277,15 +303,14 @@ int main(int argc, char **argv) {
         }
     }
 
-    AppCtx ctx = {
-        .instance_filepath = instance->filename[0],
-        .solver = solver->sval[0],
-        .timelimit = timelimit->dval[0],
-        .randomseed = randomseed->ival[0],
-        .defines = defines->sval,
-        .num_defines = defines->count,
-        .vis_path = vis_path->filename[0],
-    };
+    AppCtx ctx = {.instance_filepath = instance->filename[0],
+                  .solver = solver->sval[0],
+                  .timelimit = timelimit->dval[0],
+                  .randomseed = randomseed->ival[0],
+                  .defines = defines->sval,
+                  .num_defines = defines->count,
+                  .vis_path = vis_path->filename[0],
+                  .json_report_path = json_report_path->filename[0]};
 
     exitcode = main2(&ctx);
 

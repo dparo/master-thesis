@@ -120,11 +120,20 @@ static void my_sighandler(int signum) {
 void handle_vrp_instance(const char *fpath) {
     char *args[PROC_MAX_ARGS];
     int32_t argidx = 0;
-    char timelimit[128];
 
+    char timelimit[128];
     snprintf(timelimit, ARRAY_LEN(timelimit), "%gs",
              G_active_bgroup->timelimit);
     timelimit[ARRAY_LEN(timelimit) - 1] = 0;
+
+    Path p;
+    char outdir[OS_MAX_PATH] = "perfprof-dump";
+    os_mkdir(outdir, true);
+    char json_report_path[OS_MAX_PATH];
+
+    snprintf(json_report_path, ARRAY_LEN(json_report_path), "%s/%s.json",
+             outdir, os_basename(fpath, &p));
+    json_report_path[ARRAY_LEN(json_report_path) - 1] = 0;
 
     args[argidx++] = "timeout";
     args[argidx++] = "-k";
@@ -133,8 +142,9 @@ void handle_vrp_instance(const char *fpath) {
     args[argidx++] = CPTP_EXE;
     args[argidx++] = "-i";
     args[argidx++] = (char *)fpath;
+    args[argidx++] = "-w";
+    args[argidx++] = (char *)json_report_path;
     args[argidx++] = NULL;
-
     proc_pool_queue(&G_pool, args);
 }
 
