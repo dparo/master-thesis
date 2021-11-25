@@ -29,6 +29,7 @@ extern "C" {
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef struct TimeRepr {
     int32_t days;
@@ -55,6 +56,11 @@ double os_get_elapsed_secs(int64_t usecs_begin);
 void print_timerepr(FILE *f, const TimeRepr *repr);
 
 const char *os_get_fext(const char *filepath);
+
+bool os_fexists(char *filepath);
+bool os_direxists(char *filepath);
+
+bool os_mkdir(char *path, bool exist_ok);
 
 #if __cplusplus
 }

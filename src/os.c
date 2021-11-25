@@ -25,6 +25,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <errno.h>
 
 //
 // Includes per platform
@@ -37,6 +39,8 @@
 #elif defined __unix__
 #include <time.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #elif defined _WIN64
 #include <windows.h>
 #include <profileapi.h>
@@ -166,4 +170,78 @@ const char *os_get_fext(const char *filepath) {
         }
     }
     return NULL;
+}
+
+bool os_fexists(char *filepath) {
+    bool result = false;
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
+    defined(__NetBSD__) || defined(__DragonFly__)
+    struct stat st;
+    int stres = stat(filepath, &st);
+    if (stres == -1) {
+        if (errno == ENOENT || errno == EACCES || errno == ENOTDIR) {
+            return false;
+        }
+        perror("fexists failure");
+        exit(EXIT_FAILURE);
+    } else {
+        // S_ISLNK(st.st_mode) // Check if is symbolic link
+        if (S_ISREG(st.st_mode)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+#elif __APPLE__
+#else
+#error "TODO os_fexists"
+#endif
+
+    return result;
+}
+
+bool os_direxists(char *filepath) {
+    bool result = false;
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
+    defined(__NetBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+    struct stat st;
+    int stres = stat(filepath, &st);
+
+    if (stres == -1) {
+        if (errno == ENOENT || errno == EACCES || errno == ENOTDIR) {
+            return false;
+        }
+        perror("fexists failure");
+        exit(EXIT_FAILURE);
+    } else {
+        if (S_ISDIR(st.st_mode)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+#else
+#error "TODO os_fexists"
+#endif
+
+    return result;
+}
+
+bool os_mkdir(char *path, bool exist_ok) {
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
+    defined(__NetBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+    if (exist_ok && os_direxists(path)) {
+        return true;
+    } else {
+        mode_t mode = S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH;
+        int mkres = mkdir(path, mode);
+        if (mkres == -1) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+#else
+#error "TODO os_mkdir"
+#endif
 }
