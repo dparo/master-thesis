@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdint.h>
+#include <signal.h>
 
 #include "utils.h"
 #include "misc.h"
@@ -87,6 +88,7 @@ static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, NULL, {0}});
 #define MAX_NUM_SOLVERS_PER_GROUP 16
 
 typedef struct {
+    int32_t max_num_procs;
     char *name;
     Filter filter;
     double timelimit;
@@ -94,8 +96,46 @@ typedef struct {
     Solver solvers[MAX_NUM_SOLVERS_PER_GROUP];
 } BatchGroup;
 
+bool G_should_terminate;
 ProcPool G_pool = {0};
 BatchGroup *G_active_bgroup = NULL;
+
+static void my_sighandler(int signum) {
+    switch (signum) {
+    case SIGTERM:
+        log_warn("Received SIGINT");
+        break;
+    case SIGINT:
+        log_warn("Received SIGTERM");
+        break;
+    default:
+        break;
+    }
+    if (signum == SIGTERM || signum == SIGINT) {
+        G_should_terminate = true;
+    }
+}
+
+void handle_vrp_instance(const char *fpath) {
+    char *args[PROC_MAX_ARGS];
+    int32_t argidx = 0;
+    char timelimit[128];
+
+    snprintf(timelimit, ARRAY_LEN(timelimit), "%gs",
+             G_active_bgroup->timelimit);
+    timelimit[ARRAY_LEN(timelimit) - 1] = 0;
+
+    args[argidx++] = "timeout";
+    args[argidx++] = "-k";
+    args[argidx++] = "5s";
+    args[argidx++] = timelimit;
+    args[argidx++] = CPTP_EXE;
+    args[argidx++] = "-i";
+    args[argidx++] = (char *)fpath;
+    args[argidx++] = NULL;
+
+    proc_pool_queue(&G_pool, args);
+}
 
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                  struct FTW *ftwbuf) {
@@ -104,30 +144,42 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
         const char *ext = os_get_fext(fpath);
         if (ext && (0 == strcmp(ext, "vrp"))) {
             printf("Found file: %s\n", fpath);
+            handle_vrp_instance(fpath);
         }
     } else if (typeflag == FTW_D) {
         printf("Found dir: %s\n", fpath);
     }
 
-    return FTW_CONTINUE;
+    return G_should_terminate ? FTW_STOP : FTW_CONTINUE;
 }
 
 void scan_dir_and_solve(char *dirpath) {
     int result = nftw(dirpath, file_walk_cb, 8, 0);
-    if (result != 0) {
+    if (result == FTW_STOP) {
+        proc_pool_join(&G_pool);
+        printf("Requested to stop scanning dirpath %s\n", dirpath);
+    } else if (result != 0) {
         perror("nftw walk");
+        exit(EXIT_FAILURE);
     }
 }
 
 static void do_batch(BatchGroup *bgroup) {
+    proc_pool_join(&G_pool);
     G_active_bgroup = bgroup;
-    scan_dir_and_solve("./data");
+    G_pool.max_num_procs = bgroup->max_num_procs;
+    if (!G_should_terminate) {
+        scan_dir_and_solve("./data/BaPCod generated - Test instances/A-n37-k5");
+    }
 }
 
 int main(int argc, char *argv[]) {
-    G_pool.max_num_procs = 1;
 
-    BatchGroup batches[] = {{"Integer separation vs Fractional separation",
+    sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
+    sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
+
+    BatchGroup batches[] = {{1,
+                             "Integer separation vs Fractional separation",
                              DEFAULT_FILTER,
                              600.0,
                              3,
@@ -137,6 +189,9 @@ int main(int argc, char *argv[]) {
         do_batch(&batches[i]);
     }
 
+    signal(SIGTERM, prev_sigterm_handler);
+    signal(SIGINT, prev_sigint_handler);
+
 #if 0
     for (int32_t i = 0; i < 20; i++) {
         char amt[2] = "5";
@@ -144,12 +199,12 @@ int main(int argc, char *argv[]) {
         amt[1] = '\0';
         char *args[] = {"sleep", amt, NULL};
 
-        queue_process(&G_pool, args);
+        proc_pool_queue(&G_pool, args);
     }
 
 #endif
 
-    pool_join(&G_pool);
+    proc_pool_join(&G_pool);
 
     return 0;
 }

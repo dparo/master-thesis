@@ -203,7 +203,7 @@ bool os_fexists(char *filepath) {
 bool os_direxists(char *filepath) {
     bool result = false;
 #if defined(__linux__) || defined(__FreeBSD__) || defined(__OpenBSD__) ||      \
-    defined(__NetBSD__) || defined(__DragonFly__) || defined(__APPLE__)
+    defined(__NetBSD__) || defined(__DragonFly__)
     struct stat st;
     int stres = stat(filepath, &st);
 
@@ -220,8 +220,10 @@ bool os_direxists(char *filepath) {
             return false;
         }
     }
+#elif __APPLE__
+#error "TODO os_fexists for APPLE platform"
 #else
-#error "TODO os_fexists"
+#error "TODO os_fexists for WINDOWS platform"
 #endif
 
     return result;
@@ -241,7 +243,10 @@ bool os_mkdir(char *path, bool exist_ok) {
             return true;
         }
     }
+
+#elif __APPLE__
+#error "TODO os_mkdir for APPLE platform"
 #else
-#error "TODO os_mkdir"
+#error "TODO os_mkdir for WINDOWS platform"
 #endif
 }

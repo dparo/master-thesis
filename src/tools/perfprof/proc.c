@@ -1,22 +1,23 @@
 /*
  * Copyright (c) 2021 Davide Paro
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #include "proc.h"
@@ -122,7 +123,8 @@ static void proc_destroy(Process *proc) {
     memset(proc, 0, sizeof(*proc));
 }
 
-static void insert_proc_in_pool(ProcPool *pool, int32_t idx, char *args[]) {
+static void insert_proc_in_pool(ProcPool *pool, int32_t idx,
+                                char *const args[]) {
     if (pool->procs[idx].valid) {
         proc_destroy(&pool->procs[idx]);
     }
@@ -172,7 +174,7 @@ static int32_t pool_sync2(ProcPool *pool) {
     return INT32_MIN;
 }
 
-void queue_process(ProcPool *pool, char *args[]) {
+void proc_pool_queue(ProcPool *pool, char *const args[]) {
     for (int32_t idx = 0; idx < MIN(pool->max_num_procs, PROC_POOL_SIZE);
          idx++) {
         Process *p = &pool->procs[idx];
@@ -187,9 +189,9 @@ void queue_process(ProcPool *pool, char *args[]) {
     insert_proc_in_pool(pool, idx, args);
 }
 
-void pool_sync(ProcPool *pool) { (void)pool_sync2(pool); }
+void proc_pool_sync(ProcPool *pool) { (void)pool_sync2(pool); }
 
-void pool_join(ProcPool *pool) {
+void proc_pool_join(ProcPool *pool) {
     while ((pool_sync2(pool) >= 0)) {
     }
 
