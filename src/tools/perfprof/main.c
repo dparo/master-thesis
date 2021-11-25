@@ -48,6 +48,8 @@
 #define CPTP_EXE "./build/Release/src/cptp"
 #endif
 
+#define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
+
 // 100 Random integer numbers from [0, 32767] range genrated from
 // https://www.random.org/integers/
 static const int32_t RANDOM_SEEDS[] = {
@@ -132,7 +134,7 @@ static void my_sighandler(int signum) {
     }
 }
 
-void handle_vrp_instance(const char *fpath) {
+void handle_vrp_instance(const char *fpath, int32_t seed) {
     char *args[PROC_MAX_ARGS];
     int32_t argidx = 0;
 
@@ -146,16 +148,17 @@ void handle_vrp_instance(const char *fpath) {
 
     char killafter[128];
     snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
-                  G_active_bgroup->timelimit * 1.1 + 2 -
+                  G_active_bgroup->timelimit * 1.05 + 2 -
                       G_active_bgroup->timelimit);
 
+    char seed_str[128];
+    snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
+
     Path p;
-    char outdir[] = "perfprof-dump";
-    os_mkdir(outdir, true);
 
     char json_report_path[OS_MAX_PATH + 32];
     snprintf_safe(json_report_path, ARRAY_LEN(json_report_path), "%s/%s.json",
-                  outdir, os_basename(fpath, &p));
+                  PERFPROF_DUMP_ROOTDIR, os_basename(fpath, &p));
 
     args[argidx++] = "timeout";
     args[argidx++] = "-k";
@@ -164,6 +167,8 @@ void handle_vrp_instance(const char *fpath) {
     args[argidx++] = CPTP_EXE;
     args[argidx++] = "-t";
     args[argidx++] = timelimit;
+    args[argidx++] = "--seed";
+    args[argidx++] = seed_str;
     args[argidx++] = "-i";
     args[argidx++] = (char *)fpath;
     args[argidx++] = "-w";
@@ -183,7 +188,13 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
         const char *ext = os_get_fext(fpath);
         if (ext && (0 == strcmp(ext, "vrp"))) {
             printf("Found file: %s\n", fpath);
-            handle_vrp_instance(fpath);
+
+            for (int32_t seedidx = 0;
+                 seedidx <
+                 MIN(G_active_bgroup->nseeds, (int32_t)ARRAY_LEN(RANDOM_SEEDS));
+                 seedidx++) {
+                handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx]);
+            }
         }
     } else if (typeflag == FTW_D) {
         printf("Found dir: %s\n", fpath);
@@ -213,6 +224,8 @@ static void do_batch(BatchGroup *bgroup) {
 }
 
 int main(int argc, char *argv[]) {
+    os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
+
     sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
     sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
 

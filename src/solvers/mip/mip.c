@@ -446,6 +446,9 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     UNUSED_PARAM(threadid);
     UNUSED_PARAM(numthreads);
 
+    // DELETE_ME: Short circuit for now
+    return 0;
+
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
