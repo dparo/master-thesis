@@ -178,13 +178,6 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
         char seed_str[128];
         snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
 
-        Path p;
-
-        char json_report_path[OS_MAX_PATH + 32];
-        snprintf_safe(json_report_path, ARRAY_LEN(json_report_path),
-                      "%s/%s.json", PERFPROF_DUMP_ROOTDIR,
-                      os_basename(fpath, &p));
-
         args[argidx++] = "timeout";
         args[argidx++] = "-k";
         args[argidx++] = killafter;
@@ -203,6 +196,16 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
         char hash_str[65];
         compute_sha256_hash_str_from_string_array(args, argidx, hash_str);
         printf("hash_str = %s\n", hash_str);
+
+        Path fpath_basename;
+        Path json_report_path_basename;
+        char json_report_path[OS_MAX_PATH + 32];
+
+        snprintf_safe(json_report_path, ARRAY_LEN(json_report_path),
+                      "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, hash_str,
+                      os_basename(fpath, &fpath_basename));
+        os_mkdir(os_dirname(json_report_path, &json_report_path_basename),
+                 true);
 
         args[argidx++] = "-w";
         args[argidx++] = (char *)json_report_path;
