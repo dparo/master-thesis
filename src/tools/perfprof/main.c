@@ -47,6 +47,56 @@
 #define CPTP_EXE "./build/Release/src/cptp"
 #endif
 
+typedef struct {
+    int32_t a, b;
+} int32_interval_t;
+
+typedef struct {
+    char *family;
+    int32_interval_t ncustomers;
+    int32_interval_t nvehicles;
+} Filter;
+static inline Filter make_filter(char *family, int32_interval_t ncustomers,
+                                 int32_interval_t nvehicles) {
+    Filter result = {0};
+    if (ncustomers.a == 0 && ncustomers.b == 0) {
+        ncustomers.b = 99999;
+    }
+
+    if (nvehicles.a == 0 && nvehicles.b == 0) {
+        nvehicles.b = 9999;
+    }
+
+    result.family = family;
+    result.ncustomers = ncustomers;
+    result.nvehicles = nvehicles;
+    return result;
+}
+
+static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
+
+typedef struct {
+    char *name;
+    char *exe_path;
+    char *args[PROC_MAX_ARGS];
+} Solver;
+
+#define BAPCOD_SOLVER_NAME ("BaPCod")
+static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, NULL, {0}});
+
+#define MAX_NUM_SOLVERS_PER_GROUP 16
+
+typedef struct {
+    char *name;
+    Filter filter;
+    double timelimit;
+    int32_t nseeds;
+    Solver solvers[MAX_NUM_SOLVERS_PER_GROUP];
+} BatchGroup;
+
+ProcPool G_pool = {0};
+BatchGroup *G_active_bgroup = NULL;
+
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                  struct FTW *ftwbuf) {
     if (typeflag == FTW_F || typeflag == FTW_SL) {
@@ -62,30 +112,44 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
     return FTW_CONTINUE;
 }
 
-void prova(void) {
-    int result = nftw("./data", file_walk_cb, 8, 0);
+void scan_dir_and_solve(char *dirpath) {
+    int result = nftw(dirpath, file_walk_cb, 8, 0);
     if (result != 0) {
         perror("nftw walk");
     }
 }
 
-int main(int argc, char **argv) {
+static void do_batch(BatchGroup *bgroup) {
+    G_active_bgroup = bgroup;
+    scan_dir_and_solve("./data");
+}
 
-    prova();
-    exit(0);
+int main(int argc, char *argv[]) {
+    G_pool.max_num_procs = 1;
 
-    ProcPool pool = {0};
-    pool.max_num_procs = 4;
+    BatchGroup batches[] = {{"Integer separation vs Fractional separation",
+                             DEFAULT_FILTER,
+                             600.0,
+                             3,
+                             {}}};
 
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
+        do_batch(&batches[i]);
+    }
+
+#if 0
     for (int32_t i = 0; i < 20; i++) {
         char amt[2] = "5";
         amt[0] = rand() % 10 + '0';
         amt[1] = '\0';
         char *args[] = {"sleep", amt, NULL};
 
-        queue_process(&pool, args);
+        queue_process(&G_pool, args);
     }
 
-    pool_join(&pool);
+#endif
+
+    pool_join(&G_pool);
+
     return 0;
 }
