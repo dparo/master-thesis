@@ -42,6 +42,9 @@
 
 #include <ftw.h>
 
+#include <sha256.h>
+#include <cJSON.h>
+
 #ifndef NDEBUG
 #define CPTP_EXE "./build/Debug/src/cptp"
 #else
@@ -133,6 +136,25 @@ static void my_sighandler(int signum) {
     }
 }
 
+void compute_sha256_hash_str_from_string_array(const char *args[],
+                                               int32_t num_args,
+                                               char hash_str[65]) {
+    SHA256_CTX shactx;
+    sha256_init(&shactx);
+    for (int32_t i = 0; i < num_args; i++) {
+        sha256_update(&shactx, (const BYTE *)args[i], strlen(args[i]));
+    }
+
+    BYTE hash[32];
+    sha256_final(&shactx, hash);
+
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(hash); i++) {
+        snprintf_safe(hash_str + 2 * i, 65 - 2 * i, "%02x", hash[i]);
+    }
+
+    hash_str[64] = 0;
+}
+
 void handle_vrp_instance(const char *fpath, int32_t seed) {
     for (int32_t solver_idx = 0;
          G_active_bgroup->solvers[solver_idx].name != NULL; solver_idx++) {
@@ -178,6 +200,9 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
         for (int32_t i = 0; solver->args[i] != NULL; i++) {
             args[argidx++] = solver->args[i];
         }
+        char hash_str[65];
+        compute_sha256_hash_str_from_string_array(args, argidx, hash_str);
+        printf("hash_str = %s\n", hash_str);
 
         args[argidx++] = "-w";
         args[argidx++] = (char *)json_report_path;
