@@ -101,6 +101,11 @@ typedef struct {
     char *args[PROC_MAX_ARGS];
 } Solver;
 
+typedef struct ProcessInfo {
+    char hash[65];
+    char json_output_path[OS_MAX_PATH + 32];
+} ProcessInfo;
+
 #define BAPCOD_SOLVER_NAME ("BaPCod")
 static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, {0}});
 
@@ -136,8 +141,23 @@ static void my_sighandler(int signum) {
     }
 }
 
-void compute_sha256_hash_str_from_string_array(const char *args[],
-                                               int32_t num_args,
+void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
+    if (!user_handle) {
+        return;
+    }
+
+    ProcessInfo *info = user_handle;
+    printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
+    if (exit_status == 0) {
+        // TODO: Parse the json output file and do something
+    } else {
+        // TODO: Pretend that generated huge cost and took the entire timelimit
+        // time
+    }
+    free(info);
+}
+
+void compute_sha256_hash_str_from_string_array(char *args[], int32_t num_args,
                                                char hash_str[65]) {
     SHA256_CTX shactx;
     sha256_init(&shactx);
@@ -193,25 +213,27 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
         for (int32_t i = 0; solver->args[i] != NULL; i++) {
             args[argidx++] = solver->args[i];
         }
-        char hash_str[65];
-        compute_sha256_hash_str_from_string_array(args, argidx, hash_str);
-        printf("hash_str = %s\n", hash_str);
+
+        ProcessInfo *pinfo = malloc(sizeof(*pinfo));
+        compute_sha256_hash_str_from_string_array(args, argidx, pinfo->hash);
+        printf("hash_str = %s\n", pinfo->hash);
 
         Path fpath_basename;
         Path json_report_path_basename;
-        char json_report_path[OS_MAX_PATH + 32];
 
-        snprintf_safe(json_report_path, ARRAY_LEN(json_report_path),
-                      "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, hash_str,
+        snprintf_safe(pinfo->json_output_path,
+                      ARRAY_LEN(pinfo->json_output_path), "%s/%s/%s.json",
+                      PERFPROF_DUMP_ROOTDIR, pinfo->hash,
                       os_basename(fpath, &fpath_basename));
-        os_mkdir(os_dirname(json_report_path, &json_report_path_basename),
-                 true);
+        os_mkdir(
+            os_dirname(pinfo->json_output_path, &json_report_path_basename),
+            true);
 
         args[argidx++] = "-w";
-        args[argidx++] = (char *)json_report_path;
+        args[argidx++] = (char *)pinfo->json_output_path;
         args[argidx++] = NULL;
 
-        proc_pool_queue(&G_pool, args);
+        proc_pool_queue(&G_pool, pinfo, args);
         if (G_pool.max_num_procs == 1) {
             proc_pool_join(&G_pool);
         }
@@ -255,6 +277,8 @@ static void do_batch(BatchGroup *bgroup) {
     proc_pool_join(&G_pool);
     G_active_bgroup = bgroup;
     G_pool.max_num_procs = bgroup->max_num_procs;
+    G_pool.on_async_proc_exit = on_async_proc_exit;
+
     if (!G_should_terminate) {
         scan_dir_and_solve("./data/BaPCod generated - Test instances/A-n37-k5");
     }

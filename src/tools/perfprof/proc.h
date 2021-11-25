@@ -46,16 +46,18 @@ bool proc_terminated(pid_t pid, int *exit_status);
 typedef struct {
     bool valid;
     pid_t pid;
+    void *user_handle;
     char *args[PROC_MAX_ARGS];
 } Process;
 
 typedef struct ProcPool {
     bool aborted;
     int32_t max_num_procs;
+    void (*on_async_proc_exit)(Process *proc, int exit_status, void *user_handle);
     Process procs[PROC_POOL_SIZE];
 } ProcPool;
 
-void proc_pool_queue(ProcPool *pool, char *const args[]);
+void proc_pool_queue(ProcPool *pool, void *user_handle, char *const args[]);
 void proc_pool_sync(ProcPool *pool);
 void proc_pool_join(ProcPool *pool);
 

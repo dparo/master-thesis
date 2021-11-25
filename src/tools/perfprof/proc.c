@@ -53,7 +53,7 @@ static int wstatus_to_exit_status(pid_t pid, int wstatus) {
 }
 
 pid_t proc_spawn(char *const args[]) {
-    pid_t pid = 0;
+    pid_t pid = 0; 
     if ((pid = fork()) == 0) {
 
         if (!SHARE_STDIN)
@@ -123,7 +123,7 @@ static void proc_destroy(Process *proc) {
     memset(proc, 0, sizeof(*proc));
 }
 
-static void insert_proc_in_pool(ProcPool *pool, int32_t idx,
+static void insert_proc_in_pool(ProcPool *pool, int32_t idx, void *user_handle,
                                 char *const args[]) {
     if (pool->procs[idx].valid) {
         proc_destroy(&pool->procs[idx]);
@@ -132,6 +132,7 @@ static void insert_proc_in_pool(ProcPool *pool, int32_t idx,
     pid_t pid = proc_spawn(args);
 
     pool->procs[idx].valid = true;
+    pool->procs[idx].user_handle = user_handle;
     pool->procs[idx].pid = pid;
     int32_t i = 0;
     for (i = 0; i < PROC_MAX_ARGS - 1 && args[i] != NULL; i++) {
@@ -164,6 +165,9 @@ static int32_t pool_sync2(ProcPool *pool) {
                     printf(" %s", p->args[i]);
                 }
                 printf(")\n");
+                if (pool->on_async_proc_exit) {
+                    pool->on_async_proc_exit(p, exit_status, p->user_handle);
+                }
                 proc_destroy(p);
                 return idx;
             }
@@ -174,12 +178,12 @@ static int32_t pool_sync2(ProcPool *pool) {
     return INT32_MIN;
 }
 
-void proc_pool_queue(ProcPool *pool, char *const args[]) {
+void proc_pool_queue(ProcPool *pool, void *user_handle, char *const args[]) {
     for (int32_t idx = 0; idx < MIN(pool->max_num_procs, PROC_POOL_SIZE);
          idx++) {
         Process *p = &pool->procs[idx];
         if (!p->valid) {
-            insert_proc_in_pool(pool, idx, args);
+            insert_proc_in_pool(pool, idx, user_handle, args);
             return;
         }
     }
@@ -187,7 +191,7 @@ void proc_pool_queue(ProcPool *pool, char *const args[]) {
     int32_t idx = pool_sync2(pool);
     assert(idx >= 0);
     if (!pool->aborted) {
-        insert_proc_in_pool(pool, idx, args);
+        insert_proc_in_pool(pool, idx, user_handle, args);
     }
 }
 
