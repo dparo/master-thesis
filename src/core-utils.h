@@ -88,25 +88,37 @@ static inline int32_t *tcomp(Tour *tour, int32_t customer_idx) {
 }
 
 static inline double tour_eval(const Instance *instance, Tour *tour) {
-    double dist = 0.0;
-    double profit = 0.0;
-
-    if (*tcomp(tour, 0) >= 0) {
-        int32_t curr_vertex = 0;
-        int32_t next_vertex;
-
-        profit += instance->duals[0];
-
-        while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
-            assert(next_vertex != curr_vertex);
-            dist += cptp_dist(instance, curr_vertex, next_vertex);
-            profit += instance->duals[next_vertex];
-            curr_vertex = next_vertex;
-        }
-        dist += cptp_dist(instance, curr_vertex, 0);
+    if (tour->num_comps != 1) {
+        return INFINITY;
     }
 
-    return dist - profit;
+    for (int32_t i = 0; i < tour->num_customers + 1; i++) {
+        int32_t succ = *tsucc(tour, i);
+        if (succ >= 0) {
+            if (*tcomp(tour, i) != 0 || succ >= tour->num_customers + 1) {
+                return INFINITY;
+            }
+        }
+    }
+
+    double cost = 0.0;
+    double profit = 0.0;
+
+    int32_t curr_vertex = 0;
+    int32_t next_vertex;
+
+    profit += instance->duals[0];
+
+    while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
+        assert(next_vertex != curr_vertex);
+        cost += cptp_dist(instance, curr_vertex, next_vertex);
+        profit += instance->duals[next_vertex];
+        curr_vertex = next_vertex;
+    }
+
+    cost += cptp_dist(instance, curr_vertex, 0);
+
+    return cost - profit;
 }
 
 static inline double solution_relgap(Solution *solution) {
