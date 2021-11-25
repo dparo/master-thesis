@@ -388,6 +388,10 @@ int main(int argc, char **argv) {
                   .vis_path = vis_path->filename[0],
                   .json_report_path = json_report_path->filename[0]};
 
+    if (ctx.randomseed == 0) {
+        ctx.randomseed = time(NULL);
+    }
+
     exitcode = main2(&ctx);
 
 exit:
