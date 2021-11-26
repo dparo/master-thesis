@@ -46,30 +46,9 @@
 #include <sha256.h>
 #include <cJSON.h>
 
-#ifndef NDEBUG
-#define CPTP_EXE "./build/Debug/src/cptp"
-#else
-#define CPTP_EXE "./build/Release/src/cptp"
-#endif
-
-static char G_cptp_exe_hash[65];
-
-#define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
-
-// 100 Random integer numbers from [0, 32767] range generated from
-// https://www.random.org/integers/
-static const int32_t RANDOM_SEEDS[] = {
-    8111,  9333,  16884, 2228,  20278, 22042, 18309, 15176, 19175, 21292,
-    12903, 19891, 6359,  14333, 27486, 12791, 31021, 855,   2552,  8691,
-    12612, 11744, 15720, 20122, 401,   21650, 7144,  21018, 28549, 2660,
-    10504, 2060,  1374,  11723, 10932, 21808, 22998, 23168, 31770, 7616,
-    26891, 8217,  31272, 28626, 29539, 6930,  29356, 2885,  24150, 15753,
-    15869, 6260,  13922, 23839, 27864, 820,   2392,  15204, 10215, 16686,
-    26072, 18447, 6101,  5554,  6739,  23735, 31277, 12123, 363,   4562,
-    12773, 18146, 22084, 14991, 23488, 5131,  27575, 31055, 25576, 28122,
-    32632, 21942, 18007, 11716, 13917, 31899, 15279, 23520, 8192,  24349,
-    13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
-};
+typedef struct {
+    char cstr[65];
+} Hash;
 
 typedef struct {
     int32_t a, b;
@@ -81,8 +60,6 @@ typedef struct {
     int32_interval_t nvehicles;
 } Filter;
 
-static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
-
 typedef struct {
     char *name;
     char *args[PROC_MAX_ARGS];
@@ -90,12 +67,12 @@ typedef struct {
 
 typedef struct PerfProcessInfo {
     char solver_name[48];
-    char hash[65];
+    Hash hash;
     char json_output_path[OS_MAX_PATH + 32];
 } PerfProfProcessInfo;
 
 typedef struct {
-    char hash[65];
+    Hash hash;
     char solver_name[48];
     double secs;
     double obj_ub;
@@ -113,10 +90,6 @@ typedef struct PerfTbl {
     PerfTblEntry value;
 } PerfTbl;
 
-#define BAPCOD_SOLVER_NAME ("BaPCod")
-static const PerfProfSolver BAPCOD_SOLVER =
-    ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
-
 typedef struct {
     int32_t max_num_procs;
     char *name;
@@ -127,23 +100,52 @@ typedef struct {
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
 } PerfProfBatchGroup;
 
+#ifndef NDEBUG
+#define CPTP_EXE "./build/Debug/src/cptp"
+#else
+#define CPTP_EXE "./build/Release/src/cptp"
+#endif
+
+#define BAPCOD_SOLVER_NAME ("BaPCod")
+#define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
+
+static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
 static PerfProfBatchGroup *G_active_bgroup = NULL;
 static PerfTbl *G_perftbl = NULL;
 
-void insert_perf_to_table(char *solver_name, char hash[65], Perf *p) {
+static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
+static const PerfProfSolver BAPCOD_SOLVER =
+    ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
+
+// 100 Random integer numbers from [0, 32767] range generated from
+// https://www.random.org/integers/
+static const int32_t RANDOM_SEEDS[] = {
+    8111,  9333,  16884, 2228,  20278, 22042, 18309, 15176, 19175, 21292,
+    12903, 19891, 6359,  14333, 27486, 12791, 31021, 855,   2552,  8691,
+    12612, 11744, 15720, 20122, 401,   21650, 7144,  21018, 28549, 2660,
+    10504, 2060,  1374,  11723, 10932, 21808, 22998, 23168, 31770, 7616,
+    26891, 8217,  31272, 28626, 29539, 6930,  29356, 2885,  24150, 15753,
+    15869, 6260,  13922, 23839, 27864, 820,   2392,  15204, 10215, 16686,
+    26072, 18447, 6101,  5554,  6739,  23735, 31277, 12123, 363,   4562,
+    12773, 18146, 22084, 14991, 23488, 5131,  27575, 31055, 25576, 28122,
+    32632, 21942, 18007, 11716, 13917, 31899, 15279, 23520, 8192,  24349,
+    13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
+};
+
+void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
     if (!G_perftbl) {
         sh_new_strdup(G_perftbl);
     }
-    if (!shgetp_null(G_perftbl, hash)) {
+    if (!shgetp_null(G_perftbl, hash->cstr)) {
         PerfTblEntry empty_entry = {0};
-        shput(G_perftbl, hash, empty_entry);
+        shput(G_perftbl, hash->cstr, empty_entry);
     }
 
     PerfTblEntry *e = NULL;
     {
-        PerfTbl *t = shgetp(G_perftbl, hash);
+        PerfTbl *t = shgetp(G_perftbl, hash->cstr);
         assert(t);
         if (t) {
             e = &t->value;
@@ -201,12 +203,11 @@ static void my_sighandler(int signum) {
     }
 }
 
-Perf perf_from_cptp_generated_json(char hash[65], char *solver_name,
-                                   cJSON *root) {
+Perf perf_from_cptp_generated_json(Hash *hash, char *solver_name, cJSON *root) {
     Perf perf = {0};
     perf.secs = 2 * G_active_bgroup->timelimit;
     perf.obj_ub = INFINITY;
-    memcpy(perf.hash, hash, ARRAY_LEN(perf.hash));
+    memcpy(&perf.hash, hash, sizeof(*hash));
 
     if (solver_name) {
         snprintf_safe(perf.solver_name, ARRAY_LEN(perf.solver_name), "%s",
@@ -255,7 +256,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                         info->json_output_path, p->pid);
                 exit(1);
             } else {
-                perf = perf_from_cptp_generated_json(info->hash,
+                perf = perf_from_cptp_generated_json(&info->hash,
                                                      info->solver_name, root);
 
                 // TODO: Do something with the perf
@@ -267,27 +268,28 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             // timelimit time
         }
 
-        printf("Got perf ::: sha = %s, time = %.17g, obj_ub = %.17g\n",
-               perf.hash, perf.secs, perf.obj_ub);
-        insert_perf_to_table(info->solver_name, info->hash, &perf);
+        printf("Got perf ::: sha = %s, solver_name = %s, time = %.17g, obj_ub "
+               "= %.17g\n",
+               perf.hash.cstr, info->solver_name, perf.secs, perf.obj_ub);
+        insert_perf_to_table(info->solver_name, &info->hash, &perf);
     }
     free(info);
 }
 
-static void sha256_finalize_to_string(SHA256_CTX *shactx, char hash_str[65]) {
+static void sha256_finalize_to_string(SHA256_CTX *shactx, Hash *hash) {
 
-    BYTE hash[32];
+    BYTE bytes[32];
 
-    sha256_final(shactx, hash);
+    sha256_final(shactx, bytes);
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(hash); i++) {
-        snprintf_safe(hash_str + 2 * i, 65 - 2 * i, "%02x", hash[i]);
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(bytes); i++) {
+        snprintf_safe(hash->cstr + 2 * i, 65 - 2 * i, "%02x", bytes[i]);
     }
 
-    hash_str[64] = 0;
+    hash->cstr[ARRAY_LEN(hash->cstr) - 1] = 0;
 }
 
-static void sha256_hash_file_contents(const char *fpath, char hash_str[65]) {
+static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
 
     SHA256_CTX shactx;
     size_t len = 0;
@@ -298,33 +300,33 @@ static void sha256_hash_file_contents(const char *fpath, char hash_str[65]) {
         fprintf(stderr, "%s: Failed to hash (sha256) file contents\n", fpath);
         abort();
     }
-    sha256_finalize_to_string(&shactx, hash_str);
+    sha256_finalize_to_string(&shactx, hash);
     free(contents);
 }
 
-static void compute_whole_sha256(char hash_str[65], char exe_hash[65],
-                                 char instance_hash[65],
+static void compute_whole_sha256(Hash *hash, const Hash *exe_hash,
+                                 const Hash *instance_hash,
                                  char *args[PROC_MAX_ARGS], int32_t num_args) {
 
     SHA256_CTX shactx;
     sha256_init(&shactx);
     for (int32_t i = 0; i < num_args; i++) {
-        sha256_update(&shactx, (const BYTE *)args[i], strlen(args[i]));
+        sha256_update(&shactx, (const BYTE *)(&args[i][0]), strlen(args[i]));
     }
 
     if (exe_hash) {
-        sha256_update(&shactx, (BYTE *)exe_hash, 64);
+        sha256_update(&shactx, (const BYTE *)(&exe_hash->cstr[0]), 64);
     }
 
     if (instance_hash) {
-        sha256_update(&shactx, (BYTE *)instance_hash, 64);
+        sha256_update(&shactx, (const BYTE *)(&instance_hash->cstr[0]), 64);
     }
 
-    sha256_finalize_to_string(&shactx, hash_str);
+    sha256_finalize_to_string(&shactx, hash);
 }
 
 static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
-                       char instance_hash[65]) {
+                       Hash *instance_hash) {
     if (G_should_terminate) {
         return;
     }
@@ -365,7 +367,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     }
 
     PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
-    compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
+    compute_whole_sha256(&pinfo->hash, &G_cptp_exe_hash, instance_hash, args,
                          argidx);
     snprintf_safe(pinfo->solver_name, ARRAY_LEN(pinfo->solver_name), "%s",
                   solver->name);
@@ -374,7 +376,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     Path json_report_path_basename;
 
     snprintf_safe(pinfo->json_output_path, ARRAY_LEN(pinfo->json_output_path),
-                  "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, pinfo->hash,
+                  "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, pinfo->hash.cstr,
                   os_basename(fpath, &fpath_basename));
 
     args[argidx++] = "-w";
@@ -387,8 +389,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     proc_pool_queue(&G_pool, pinfo, args);
 }
 
-void handle_vrp_instance(const char *fpath, int32_t seed,
-                         char instance_hash[65]) {
+void handle_vrp_instance(const char *fpath, int32_t seed, Hash *instance_hash) {
     if (G_should_terminate) {
         return;
     }
@@ -421,21 +422,21 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
         // Is a regular file
         const char *ext = os_get_fext(fpath);
         if (ext && (0 == strcmp(ext, "vrp"))) {
-            printf("Found file: %s\n", fpath);
+            // printf("Found file: %s\n", fpath);
 
             Instance instance = parse(fpath);
             if (is_valid_instance(&instance)) {
                 Filter *filter = &G_active_bgroup->filter;
                 if (!is_filtered_instance(filter, &instance)) {
-                    char instance_hash[65];
-                    sha256_hash_file_contents(fpath, instance_hash);
+                    Hash instance_hash;
+                    sha256_hash_file_contents(fpath, &instance_hash);
                     for (int32_t seedidx = 0;
                          seedidx < MIN(G_active_bgroup->nseeds,
                                        (int32_t)ARRAY_LEN(RANDOM_SEEDS)) &&
                          !G_should_terminate;
                          seedidx++) {
                         handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx],
-                                            instance_hash);
+                                            &instance_hash);
                     }
                 } else {
                     printf("%s: Skipping since it does not match filter\n",
@@ -514,7 +515,7 @@ static void init(void) {
 
         sha256_init(&shactx);
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
-        sha256_finalize_to_string(&shactx, G_cptp_exe_hash);
+        sha256_finalize_to_string(&shactx, &G_cptp_exe_hash);
     }
 }
 
