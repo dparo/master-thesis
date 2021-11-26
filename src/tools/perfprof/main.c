@@ -282,8 +282,13 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
 
 void handle_vrp_instance(const char *fpath, int32_t seed,
                          char instance_hash[65]) {
+    if (G_should_terminate) {
+        return;
+    }
     for (int32_t solver_idx = 0;
-         G_active_bgroup->solvers[solver_idx].name != NULL; solver_idx++) {
+         !G_should_terminate &&
+         (G_active_bgroup->solvers[solver_idx].name != NULL);
+         solver_idx++) {
         PerfProfSolver *solver = &G_active_bgroup->solvers[solver_idx];
         run_solver(solver, fpath, seed, instance_hash);
         if (G_pool.max_num_procs == 1) {
