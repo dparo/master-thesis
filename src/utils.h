@@ -126,6 +126,12 @@ static char *fread_all_into_null_terminated_string(const char *filepath,
     return buffer;
 }
 
+static inline char *strncpy_safe(char *dst, const char *src, size_t n) {
+    char *result = strncpy(dst, src, n);
+    dst[n - 1] = 0;
+    return result;
+}
+
 ATTRIB_PRINTF(3, 4)
 static inline int snprintf_safe(char *str, size_t size, const char *fmt, ...) {
     va_list ap;

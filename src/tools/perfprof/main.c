@@ -158,8 +158,7 @@ void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
 
     int32_t i = 0;
     for (i = 0; i < e->num_perfs; i++) {
-        if (0 == strncmp(solver_name, e->perfs[i].solver_name,
-                         ARRAY_LEN(e->perfs[i].solver_name))) {
+        if (0 == strcmp(solver_name, e->perfs[i].solver_name)) {
             // Need to update previous perf
             // BUT... This is an invalid case to happen
             assert(0);
