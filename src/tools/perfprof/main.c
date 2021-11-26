@@ -56,7 +56,7 @@ static char G_cptp_exe_hash[65];
 
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
-// 100 Random integer numbers from [0, 32767] range genrated from
+// 100 Random integer numbers from [0, 32767] range generated from
 // https://www.random.org/integers/
 static const int32_t RANDOM_SEEDS[] = {
     8111,  9333,  16884, 2228,  20278, 22042, 18309, 15176, 19175, 21292,
@@ -94,9 +94,16 @@ typedef struct ProcessInfo {
 } PerfProfProcessInfo;
 
 typedef struct {
+    char hash[65];
+    char solver_name[48];
     double secs;
     double obj_ub;
 } Perf;
+
+typedef struct PerfTable {
+    int32_t num_perfs;
+    Perf *perfs;
+} PerfTable;
 
 #define BAPCOD_SOLVER_NAME ("BaPCod")
 static const PerfProfSolver BAPCOD_SOLVER =
@@ -114,9 +121,24 @@ typedef struct {
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
 } PerfProfBatchGroup;
 
-bool G_should_terminate;
-ProcPool G_pool = {0};
-PerfProfBatchGroup *G_active_bgroup = NULL;
+static bool G_should_terminate;
+static ProcPool G_pool = {0};
+static PerfProfBatchGroup *G_active_bgroup = NULL;
+static PerfTable G_perftbl = {0};
+
+void push_perf_to_table(PerfTable *tbl, Perf *p) {
+    tbl->perfs =
+        realloc(tbl->perfs, (tbl->num_perfs + 1) * sizeof(*tbl->perfs));
+    memcpy(tbl->perfs, p, MIN(sizeof(*tbl->perfs), sizeof(*p)));
+    tbl->num_perfs++;
+}
+
+void clear_perf_table(PerfTable *tbl) {
+    if (tbl->perfs) {
+        free(tbl->perfs);
+    }
+    memset(tbl, 0, sizeof(*tbl));
+}
 
 static void my_sighandler(int signum) {
     switch (signum) {
@@ -135,10 +157,17 @@ static void my_sighandler(int signum) {
     }
 }
 
-Perf perf_from_cptp_generated_json(cJSON *root) {
+Perf perf_from_cptp_generated_json(char hash[65], char *solver_name,
+                                   cJSON *root) {
     Perf perf = {0};
     perf.secs = 2 * G_active_bgroup->timelimit;
     perf.obj_ub = INFINITY;
+    memcpy(perf.hash, hash, ARRAY_LEN(perf.hash));
+
+    if (solver_name) {
+        snprintf_safe(perf.solver_name, ARRAY_LEN(perf.solver_name), "%s",
+                      solver_name);
+    }
 
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
     cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
@@ -163,7 +192,6 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
         Perf perf;
         perf.obj_ub = INFINITY;
         perf.secs = 2.0 * G_active_bgroup->timelimit;
-        printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
         if (exit_status == 0) {
             char *contents = fread_all_into_null_terminated_string(
                 info->json_output_path, NULL);
@@ -183,7 +211,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                     info->json_output_path, p->pid);
                 exit(1);
             } else {
-                perf = perf_from_cptp_generated_json(root);
+                perf = perf_from_cptp_generated_json(info->hash, NULL, root);
 
                 // TODO: Do something with the perf
             }
@@ -194,8 +222,8 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             // timelimit time
         }
 
-        printf("Got perf ::: time = %.17g, obj_ub = %.17g\n", perf.secs,
-               perf.obj_ub);
+        printf("Got perf ::: sha = %s, time = %.17g, obj_ub = %.17g\n",
+               perf.hash, perf.secs, perf.obj_ub);
     }
     free(info);
 }
@@ -293,7 +321,6 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
     compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
                          argidx);
-    printf("hash_str = %s\n", pinfo->hash);
 
     Path fpath_basename;
     Path json_report_path_basename;
@@ -404,7 +431,7 @@ static void do_batch(PerfProfBatchGroup *bgroup) {
         }
 
         if (filter->nvehicles.a >= 0 && filter->nvehicles.b == 0) {
-            filter->nvehicles.b = 9999;
+            filter->nvehicles.b = 99999;
         }
     }
 
@@ -436,7 +463,7 @@ static void main_loop(void) {
          3,
          "./data/ESPPRC - Test Instances/",
          (Filter){NULL, {0, 80}, {0, 0}},
-         {{"cptp",
+         {{"Integer separation",
            {
                "--solver",
                "mip",
@@ -461,7 +488,14 @@ static void main_loop(void) {
         printf("###########################################################\n");
         printf("###########################################################\n");
         printf("\n\n");
+
+        clear_perf_table(&G_perftbl);
         do_batch(&batches[i]);
+        proc_pool_join(&G_pool);
+
+        // Process the perf_table to generate the csv file
+
+        clear_perf_table(&G_perftbl);
     }
 
     proc_pool_join(&G_pool);
