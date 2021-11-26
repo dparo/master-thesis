@@ -133,6 +133,9 @@ static PerfProfBatchGroup *G_active_bgroup = NULL;
 static PerfTbl *G_perftbl = NULL;
 
 void insert_perf_to_table(char *solver_name, char hash[65], Perf *p) {
+    if (!G_perftbl) {
+        sh_new_strdup(G_perftbl);
+    }
     if (!shgetp_null(G_perftbl, hash)) {
         PerfTblEntry empty_entry = {0};
         shput(G_perftbl, hash, empty_entry);
@@ -142,8 +145,9 @@ void insert_perf_to_table(char *solver_name, char hash[65], Perf *p) {
     {
         PerfTbl *t = shgetp(G_perftbl, hash);
         assert(t);
-        // memcpy(t->key, hash, 65);
-        e = &t->value;
+        if (t) {
+            e = &t->value;
+        }
     }
 
     if (!e) {
@@ -154,7 +158,9 @@ void insert_perf_to_table(char *solver_name, char hash[65], Perf *p) {
     for (i = 0; i < e->num_perfs; i++) {
         if (0 == strncmp(solver_name, e->perfs[i].solver_name,
                          ARRAY_LEN(e->perfs[i].solver_name))) {
-            // Found: need to update previous perf
+            // Need to update previous perf
+            // BUT... This is an invalid case to happen
+            assert(0);
             break;
         }
     }
@@ -512,13 +518,15 @@ static void init(void) {
     }
 }
 
+static void output_csv_file(PerfProfBatchGroup *batch);
+
 static void main_loop(void) {
 
     PerfProfBatchGroup batches[] = {
         {1,
          "Integer separation vs Fractional separation",
          600.0,
-         1,
+         3,
          "./data/ESPPRC - Test Instances/vrps",
          (Filter){NULL, {0, 72}, {0, 0}},
          {{"A",
@@ -531,6 +539,22 @@ static void main_loop(void) {
                "--solver",
                "mip",
            }}}}};
+
+    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
+        for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {
+            if (i == j) {
+                continue;
+            }
+
+            if (0 == strcmp(batches[i].name, batches[j].name)) {
+                fprintf(stderr,
+                        "\n\nInternal perfprof error: detected duplicate batch "
+                        "names (`%s`)\n",
+                        batches[i].name);
+                abort();
+            }
+        }
+    }
 
     for (int32_t i = 0; i < !G_should_terminate && (int32_t)ARRAY_LEN(batches);
          i++) {
@@ -563,21 +587,7 @@ static void main_loop(void) {
         proc_pool_join(&G_pool);
 
         // Process the perf_table to generate the csv file
-
-        printf("\n\n\n");
-        ptrdiff_t tbl_len = shlen(G_perftbl);
-        for (int32_t i = 0; i < tbl_len; i++) {
-            char *key = G_perftbl[i].key;
-            PerfTblEntry *value = &G_perftbl[i].value;
-
-            for (int32_t perf_idx = 0; perf_idx < value->num_perfs;
-                 perf_idx++) {
-                Perf *perf = &value->perfs[perf_idx];
-                printf("i = %d, Got perf hash=%s, perf_idx = %d, time = %.17g, "
-                       "cost_ub = %.17g\n",
-                       i, key, perf_idx, perf->secs, perf->obj_ub);
-            }
-        }
+        output_csv_file(&batches[i]);
 
         clear_perf_table();
     }
@@ -595,4 +605,78 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, prev_sigint_handler);
     proc_pool_join(&G_pool);
     return 0;
+}
+
+static void output_csv_file(PerfProfBatchGroup *batch) {
+    printf("\n\n\n");
+    char dump_dir[OS_MAX_PATH];
+    char data_csv_file[OS_MAX_PATH];
+
+    os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
+    os_mkdir(PERFPROF_DUMP_ROOTDIR "/Plots", true);
+    snprintf_safe(dump_dir, ARRAY_LEN(dump_dir),
+                  PERFPROF_DUMP_ROOTDIR "/Plots/%s", batch->name);
+    os_mkdir(dump_dir, true);
+
+    for (int32_t data_dump_idx = 0; data_dump_idx < 2; data_dump_idx++) {
+        char *filename = data_dump_idx == 0 ? "time-data.csv" : "cost-data.csv";
+
+        snprintf_safe(data_csv_file, ARRAY_LEN(data_csv_file), "%s/%s",
+                      dump_dir, filename);
+
+        FILE *fh = fopen(data_csv_file, "w");
+        if (!fh) {
+            fprintf(stderr, "%s: failed to output csv data\n", data_csv_file);
+            return;
+        }
+
+        // Compute the number of solvers in the batch
+        int32_t num_solvers = 0;
+        for (int32_t i = 0; batch->solvers[i].name; i++) {
+            num_solvers++;
+        }
+
+        // Write out the header
+        fprintf(fh, "%d", num_solvers);
+        for (int32_t i = 0; i < num_solvers; i++) {
+            fprintf(fh, "\t%s", batch->solvers[i].name);
+        }
+        fprintf(fh, "\n");
+
+        size_t tbl_len = shlenu(G_perftbl);
+        for (size_t i = 0; i < tbl_len; i++) {
+            char *key = G_perftbl[i].key;
+            PerfTblEntry *value = &G_perftbl[i].value;
+
+            fprintf(fh, "%s", key);
+
+            // Due to the out of order generation of the performance table,
+            // the perf data may be out of order, compared to the order of
+            // the solvers considered when outputting the CSV file.
+            // Therefore fix a solver name, and find its perf in the list,
+            // to output the perf data in the expected order
+            for (int32_t curr_solver_idx = 0; curr_solver_idx < num_solvers;
+                 curr_solver_idx++) {
+                // Fix the solver name as in order
+                char *solver_name = batch->solvers[curr_solver_idx].name;
+
+                // Scan the list to find the matching solver perf data
+                for (int32_t perf_idx = 0; perf_idx < value->num_perfs;
+                     perf_idx++) {
+                    Perf *perf = &value->perfs[perf_idx];
+
+                    double data =
+                        data_dump_idx == 0 ? perf->secs : perf->obj_ub;
+
+                    if (0 == strcmp(perf->solver_name, solver_name)) {
+                        fprintf(fh, "\t%.17g", data);
+                    }
+                }
+            }
+
+            fprintf(fh, "\n");
+        }
+
+        fclose(fh);
+    }
 }
