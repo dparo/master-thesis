@@ -39,6 +39,7 @@
 #include "misc.h"
 #include "proc.h"
 #include "os.h"
+#include "parser.h"
 
 #include <ftw.h>
 
@@ -50,6 +51,8 @@
 #else
 #define CPTP_EXE "./build/Release/src/cptp"
 #endif
+
+static char G_cptp_exe_hash[65];
 
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
@@ -73,7 +76,7 @@ typedef struct {
 } int32_interval_t;
 
 typedef struct {
-    char *family;
+    char *family; /// TODO: Not supported yet
     int32_interval_t ncustomers;
     int32_interval_t nvehicles;
 } Filter;
@@ -95,19 +98,21 @@ static inline Filter make_filter(char *family, int32_interval_t ncustomers,
 }
 
 static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
+static const Filter TEST_FILTER = ((Filter){NULL, {0, 80}, {0, 99999}});
 
 typedef struct {
     char *name;
     char *args[PROC_MAX_ARGS];
-} Solver;
+} PerfProfSolver;
 
 typedef struct ProcessInfo {
     char hash[65];
     char json_output_path[OS_MAX_PATH + 32];
-} ProcessInfo;
+} PerfProfProcessInfo;
 
 #define BAPCOD_SOLVER_NAME ("BaPCod")
-static const Solver BAPCOD_SOLVER = ((Solver){BAPCOD_SOLVER_NAME, {0}});
+static const PerfProfSolver BAPCOD_SOLVER =
+    ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
 
 #define MAX_NUM_SOLVERS_PER_GROUP 16
 
@@ -117,12 +122,12 @@ typedef struct {
     Filter filter;
     double timelimit;
     int32_t nseeds;
-    Solver solvers[MAX_NUM_SOLVERS_PER_GROUP];
-} BatchGroup;
+    PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
+} PerfProfBatchGroup;
 
 bool G_should_terminate;
 ProcPool G_pool = {0};
-BatchGroup *G_active_bgroup = NULL;
+PerfProfBatchGroup *G_active_bgroup = NULL;
 
 static void my_sighandler(int signum) {
     switch (signum) {
@@ -146,7 +151,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
         return;
     }
 
-    ProcessInfo *info = user_handle;
+    PerfProfProcessInfo *info = user_handle;
     printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
     if (exit_status == 0) {
         char *contents =
@@ -177,16 +182,11 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     free(info);
 }
 
-void compute_sha256_hash_str_from_string_array(char *args[], int32_t num_args,
-                                               char hash_str[65]) {
-    SHA256_CTX shactx;
-    sha256_init(&shactx);
-    for (int32_t i = 0; i < num_args; i++) {
-        sha256_update(&shactx, (const BYTE *)args[i], strlen(args[i]));
-    }
+static void sha256_finalize_to_string(SHA256_CTX *shactx, char hash_str[65]) {
 
     BYTE hash[32];
-    sha256_final(&shactx, hash);
+
+    sha256_final(shactx, hash);
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(hash); i++) {
         snprintf_safe(hash_str + 2 * i, 65 - 2 * i, "%02x", hash[i]);
@@ -195,10 +195,47 @@ void compute_sha256_hash_str_from_string_array(char *args[], int32_t num_args,
     hash_str[64] = 0;
 }
 
-void handle_vrp_instance(const char *fpath, int32_t seed) {
+static void sha256_hash_file_contents(const char *fpath, char hash_str[65]) {
+
+    SHA256_CTX shactx;
+    size_t len = 0;
+    char *contents = fread_all_into_null_terminated_string(fpath, &len);
+    if (contents) {
+        sha256_update(&shactx, (BYTE *)contents, len);
+    } else {
+        fprintf(stderr, "%s: Failed to hash (sha256) file contents\n", fpath);
+        abort();
+    }
+    sha256_finalize_to_string(&shactx, hash_str);
+    free(contents);
+}
+
+static void compute_whole_sha256(char hash_str[65], char exe_hash[65],
+                                 char instance_hash[65],
+                                 char *args[PROC_MAX_ARGS], int32_t num_args) {
+
+    SHA256_CTX shactx;
+    sha256_init(&shactx);
+    for (int32_t i = 0; i < num_args; i++) {
+        sha256_update(&shactx, (const BYTE *)args[i], strlen(args[i]));
+    }
+
+    if (exe_hash) {
+        sha256_update(&shactx, (BYTE *)exe_hash, 64);
+    }
+
+    if (instance_hash) {
+        sha256_update(&shactx, (BYTE *)instance_hash, 64);
+    }
+
+    sha256_finalize_to_string(&shactx, hash_str);
+}
+
+void handle_vrp_instance(const char *fpath, int32_t seed,
+                         char instance_hash[65]) {
     for (int32_t solver_idx = 0;
          G_active_bgroup->solvers[solver_idx].name != NULL; solver_idx++) {
-        Solver *solver = &G_active_bgroup->solvers[solver_idx];
+        PerfProfSolver *solver = &G_active_bgroup->solvers[solver_idx];
         char *args[PROC_MAX_ARGS];
         int32_t argidx = 0;
 
@@ -234,8 +271,9 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
             args[argidx++] = solver->args[i];
         }
 
-        ProcessInfo *pinfo = malloc(sizeof(*pinfo));
-        compute_sha256_hash_str_from_string_array(args, argidx, pinfo->hash);
+        PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
+        compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
+                             argidx);
         printf("hash_str = %s\n", pinfo->hash);
 
         Path fpath_basename;
@@ -260,6 +298,17 @@ void handle_vrp_instance(const char *fpath, int32_t seed) {
     }
 }
 
+bool is_filtered_instance(Filter *f, const Instance *instance) {
+    if (instance->num_customers < f->ncustomers.a ||
+        instance->num_customers > f->ncustomers.b) {
+        return true;
+    } else if (instance->num_vehicles < f->nvehicles.a ||
+               instance->num_vehicles > f->nvehicles.b) {
+        return true;
+    }
+    return false;
+}
+
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                  struct FTW *ftwbuf) {
     if (typeflag == FTW_F || typeflag == FTW_SL) {
@@ -268,11 +317,27 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
         if (ext && (0 == strcmp(ext, "vrp"))) {
             printf("Found file: %s\n", fpath);
 
-            for (int32_t seedidx = 0;
-                 seedidx <
-                 MIN(G_active_bgroup->nseeds, (int32_t)ARRAY_LEN(RANDOM_SEEDS));
-                 seedidx++) {
-                handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx]);
+            Instance instance = parse(fpath);
+            if (is_valid_instance(&instance)) {
+                Filter *filter = &G_active_bgroup->filter;
+                if (!is_filtered_instance(filter, &instance)) {
+                    char instance_hash[65];
+                    sha256_hash_file_contents(fpath, instance_hash);
+                    for (int32_t seedidx = 0;
+                         seedidx < MIN(G_active_bgroup->nseeds,
+                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS));
+                         seedidx++) {
+                        handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx],
+                                            instance_hash);
+                    }
+                } else {
+                    printf("%s: Skipping since it does not match filter\n",
+                           fpath);
+                }
+                instance_destroy(&instance);
+            } else {
+                fprintf(stderr, "%s: Failed to parse input file\n", fpath);
+                exit(EXIT_FAILURE);
             }
         }
     } else if (typeflag == FTW_D) {
@@ -293,33 +358,42 @@ void scan_dir_and_solve(char *dirpath) {
     }
 }
 
-static void do_batch(BatchGroup *bgroup) {
+static void do_batch(PerfProfBatchGroup *bgroup) {
     proc_pool_join(&G_pool);
     G_active_bgroup = bgroup;
     G_pool.max_num_procs = bgroup->max_num_procs;
     G_pool.on_async_proc_exit = on_async_proc_exit;
 
     if (!G_should_terminate) {
-        scan_dir_and_solve("./data/BaPCod generated - Test instances/A-n37-k5");
+        scan_dir_and_solve("./data/ESPPRC - Test Instances/");
     }
 }
 
 int main(int argc, char *argv[]) {
     os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
 
+    // Compute the cptp exe hash
+    {
+        SHA256_CTX shactx;
+
+        sha256_init(&shactx);
+        sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
+        sha256_finalize_to_string(&shactx, G_cptp_exe_hash);
+    }
     sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
     sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
 
-    BatchGroup batches[] = {{1,
-                             "Integer separation vs Fractional separation",
-                             DEFAULT_FILTER,
-                             600.0,
-                             3,
-                             {{"cptp",
-                               {
-                                   "--solver",
-                                   "mip",
-                               }}}}};
+    PerfProfBatchGroup batches[] = {
+        {1,
+         "Integer separation vs Fractional separation",
+         TEST_FILTER,
+         600.0,
+         3,
+         {{"cptp",
+           {
+               "--solver",
+               "mip",
+           }}}}};
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         do_batch(&batches[i]);
