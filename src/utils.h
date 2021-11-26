@@ -1,4 +1,3 @@
-
 /*
  * Copyright (c) 2021 Davide Paro
  *
@@ -98,6 +97,33 @@ static inline size_t get_file_size(FILE *f) {
     size_t result = ftell(f);
     fseek(f, 0L, SEEK_SET);
     return result;
+}
+
+static char *fread_all_into_null_terminated_string(char *filepath,
+                                                   size_t *len) {
+    FILE *fh = fopen(filepath, "r");
+    if (!fh) {
+        return NULL;
+    }
+    size_t size = get_file_size(fh);
+    char *buffer = malloc(size + 1);
+    if (buffer) {
+        size_t readamt = fread(buffer, 1, size, fh);
+        if (readamt != size) {
+            free(buffer);
+            buffer = NULL;
+            if (len) {
+                *len = 0;
+            }
+        } else {
+            buffer[size] = 0;
+            if (len) {
+                *len = size;
+            }
+        }
+    }
+    fclose(fh);
+    return buffer;
 }
 
 ATTRIB_PRINTF(3, 4)

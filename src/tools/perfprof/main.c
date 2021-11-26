@@ -149,7 +149,27 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     ProcessInfo *info = user_handle;
     printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
     if (exit_status == 0) {
-        // TODO: Parse the json output file and do something
+        char *contents =
+            fread_all_into_null_terminated_string(info->json_output_path, NULL);
+        if (!contents) {
+            fprintf(
+                stderr,
+                "Failed to load JSON contents from `%s` produced from PID %d\n",
+                info->json_output_path, p->pid);
+            exit(1);
+        }
+        cJSON *root = cJSON_Parse(contents);
+        if (!root) {
+            fprintf(stderr,
+                    "Failed to parse JSON contents from `%s` produced from PID "
+                    "%d\n",
+                    info->json_output_path, p->pid);
+            exit(1);
+        } else {
+            // TODO: Parse the json structure and do something
+        }
+        cJSON_Delete(root);
+        free(contents);
     } else {
         // TODO: Pretend that generated huge cost and took the entire timelimit
         // time
