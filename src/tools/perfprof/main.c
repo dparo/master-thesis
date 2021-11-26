@@ -93,6 +93,11 @@ typedef struct ProcessInfo {
     char json_output_path[OS_MAX_PATH + 32];
 } PerfProfProcessInfo;
 
+typedef struct {
+    double secs;
+    double obj_ub;
+} Perf;
+
 #define BAPCOD_SOLVER_NAME ("BaPCod")
 static const PerfProfSolver BAPCOD_SOLVER =
     ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
@@ -130,6 +135,24 @@ static void my_sighandler(int signum) {
     }
 }
 
+Perf perf_from_cptp_generated_json(cJSON *root) {
+    Perf perf = {0};
+    perf.secs = 2 * G_active_bgroup->timelimit;
+    perf.obj_ub = INFINITY;
+
+    cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
+    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
+
+    if (itm_took && cJSON_IsNumber(itm_took)) {
+        perf.secs = cJSON_GetNumberValue(itm_took);
+    }
+    if (itm_cost && cJSON_IsNumber(itm_cost)) {
+        perf.obj_ub = cJSON_GetNumberValue(itm_cost);
+    }
+
+    return perf;
+}
+
 void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     if (!user_handle) {
         return;
@@ -137,6 +160,9 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
 
     PerfProfProcessInfo *info = user_handle;
     if (p) {
+        Perf perf;
+        perf.obj_ub = INFINITY;
+        perf.secs = 2.0 * G_active_bgroup->timelimit;
         printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
         if (exit_status == 0) {
             char *contents = fread_all_into_null_terminated_string(
@@ -157,7 +183,9 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                     info->json_output_path, p->pid);
                 exit(1);
             } else {
-                // TODO: Parse the json structure and do something
+                perf = perf_from_cptp_generated_json(root);
+
+                // TODO: Do something with the perf
             }
             cJSON_Delete(root);
             free(contents);
@@ -165,6 +193,9 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             // TODO: Pretend that generated huge cost and took the entire
             // timelimit time
         }
+
+        printf("Got perf ::: time = %.17g, obj_ub = %.17g\n", perf.secs,
+               perf.obj_ub);
     }
     free(info);
 }
@@ -223,6 +254,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     if (G_should_terminate) {
         return;
     }
+
     char *args[PROC_MAX_ARGS];
     int32_t argidx = 0;
 
@@ -403,14 +435,32 @@ static void main_loop(void) {
          600.0,
          3,
          "./data/ESPPRC - Test Instances/",
-         (Filter){NULL, {120, 99999}, {0, 0}},
+         (Filter){NULL, {0, 80}, {0, 0}},
          {{"cptp",
            {
                "--solver",
                "mip",
            }}}}};
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
+    for (int32_t i = 0; i < !G_should_terminate && (int32_t)ARRAY_LEN(batches);
+         i++) {
+
+        printf("\n\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("     DOING BATCH:\n");
+        printf("            Batch max num concurrent procs: %d\n",
+               batches[i].max_num_procs);
+        printf("            Batch name: %s\n", batches[i].name);
+        printf("            Batch timelimit: %g\n", batches[i].timelimit);
+        printf("            Batch num seeds: %d\n", batches[i].nseeds);
+        printf("            Batch scan_root_dir: %s\n",
+               batches[i].scan_root_dir);
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("\n\n");
         do_batch(&batches[i]);
     }
 
