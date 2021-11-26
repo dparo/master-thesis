@@ -423,17 +423,19 @@ static THREAD_LOCAL Solver *sighandler_ctx_solver_ptr;
 /// \brief Consumes the signal and does not propage it further
 static void cptp_sighandler(int signum) {
     switch (signum) {
-    case SIGTERM:
+    case SIGINT:
         log_warn("Received SIGINT");
         break;
-    case SIGINT:
+    case SIGTERM:
         log_warn("Received SIGTERM");
         break;
     default:
         break;
     }
     if (signum == SIGTERM || signum == SIGINT) {
-        sighandler_ctx_solver_ptr->should_terminate = true;
+        if (sighandler_ctx_solver_ptr) {
+            sighandler_ctx_solver_ptr->should_terminate = true;
+        }
     }
 }
 

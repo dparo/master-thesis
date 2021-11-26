@@ -80,25 +80,8 @@ typedef struct {
     int32_interval_t ncustomers;
     int32_interval_t nvehicles;
 } Filter;
-static inline Filter make_filter(char *family, int32_interval_t ncustomers,
-                                 int32_interval_t nvehicles) {
-    Filter result = {0};
-    if (ncustomers.a == 0 && ncustomers.b == 0) {
-        ncustomers.b = 99999;
-    }
-
-    if (nvehicles.a == 0 && nvehicles.b == 0) {
-        nvehicles.b = 9999;
-    }
-
-    result.family = family;
-    result.ncustomers = ncustomers;
-    result.nvehicles = nvehicles;
-    return result;
-}
 
 static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
-static const Filter TEST_FILTER = ((Filter){NULL, {0, 80}, {0, 99999}});
 
 typedef struct {
     char *name;
@@ -119,9 +102,10 @@ static const PerfProfSolver BAPCOD_SOLVER =
 typedef struct {
     int32_t max_num_procs;
     char *name;
-    Filter filter;
     double timelimit;
     int32_t nseeds;
+    const char *scan_root_dir;
+    Filter filter;
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
 } PerfProfBatchGroup;
 
@@ -131,10 +115,10 @@ PerfProfBatchGroup *G_active_bgroup = NULL;
 
 static void my_sighandler(int signum) {
     switch (signum) {
-    case SIGTERM:
+    case SIGINT:
         log_warn("Received SIGINT");
         break;
-    case SIGINT:
+    case SIGTERM:
         log_warn("Received SIGTERM");
         break;
     default:
@@ -152,32 +136,35 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     }
 
     PerfProfProcessInfo *info = user_handle;
-    printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
-    if (exit_status == 0) {
-        char *contents =
-            fread_all_into_null_terminated_string(info->json_output_path, NULL);
-        if (!contents) {
-            fprintf(
-                stderr,
-                "Failed to load JSON contents from `%s` produced from PID %d\n",
-                info->json_output_path, p->pid);
-            exit(1);
-        }
-        cJSON *root = cJSON_Parse(contents);
-        if (!root) {
-            fprintf(stderr,
+    if (p) {
+        printf("\n\non_async_proc_exit() :: hash = %s\n\n", info->hash);
+        if (exit_status == 0) {
+            char *contents = fread_all_into_null_terminated_string(
+                info->json_output_path, NULL);
+            if (!contents) {
+                fprintf(stderr,
+                        "Failed to load JSON contents from `%s` produced from "
+                        "PID %d\n",
+                        info->json_output_path, p->pid);
+                exit(1);
+            }
+            cJSON *root = cJSON_Parse(contents);
+            if (!root) {
+                fprintf(
+                    stderr,
                     "Failed to parse JSON contents from `%s` produced from PID "
                     "%d\n",
                     info->json_output_path, p->pid);
-            exit(1);
+                exit(1);
+            } else {
+                // TODO: Parse the json structure and do something
+            }
+            cJSON_Delete(root);
+            free(contents);
         } else {
-            // TODO: Parse the json structure and do something
+            // TODO: Pretend that generated huge cost and took the entire
+            // timelimit time
         }
-        cJSON_Delete(root);
-        free(contents);
-    } else {
-        // TODO: Pretend that generated huge cost and took the entire timelimit
-        // time
     }
     free(info);
 }
@@ -231,74 +218,81 @@ static void compute_whole_sha256(char hash_str[65], char exe_hash[65],
     sha256_finalize_to_string(&shactx, hash_str);
 }
 
+static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
+                       char instance_hash[65]) {
+    if (G_should_terminate) {
+        return;
+    }
+    char *args[PROC_MAX_ARGS];
+    int32_t argidx = 0;
+
+    char timelimit[128];
+    snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
+                  G_active_bgroup->timelimit);
+
+    char timelimit_extended[128];
+    snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
+                  G_active_bgroup->timelimit * 1.05 + 2);
+
+    char killafter[128];
+    snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
+                  G_active_bgroup->timelimit * 1.05 + 2 -
+                      G_active_bgroup->timelimit);
+
+    char seed_str[128];
+    snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
+
+    args[argidx++] = "timeout";
+    args[argidx++] = "-k";
+    args[argidx++] = killafter;
+    args[argidx++] = timelimit_extended;
+    args[argidx++] = CPTP_EXE;
+    args[argidx++] = "-t";
+    args[argidx++] = timelimit;
+    args[argidx++] = "--seed";
+    args[argidx++] = seed_str;
+    args[argidx++] = "-i";
+    args[argidx++] = (char *)fpath;
+
+    for (int32_t i = 0; solver->args[i] != NULL; i++) {
+        args[argidx++] = solver->args[i];
+    }
+
+    PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
+    compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
+                         argidx);
+    printf("hash_str = %s\n", pinfo->hash);
+
+    Path fpath_basename;
+    Path json_report_path_basename;
+
+    snprintf_safe(pinfo->json_output_path, ARRAY_LEN(pinfo->json_output_path),
+                  "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, pinfo->hash,
+                  os_basename(fpath, &fpath_basename));
+
+    args[argidx++] = "-w";
+    args[argidx++] = (char *)pinfo->json_output_path;
+    args[argidx++] = NULL;
+
+    os_mkdir(os_dirname(pinfo->json_output_path, &json_report_path_basename),
+             true);
+
+    proc_pool_queue(&G_pool, pinfo, args);
+}
+
 void handle_vrp_instance(const char *fpath, int32_t seed,
                          char instance_hash[65]) {
     for (int32_t solver_idx = 0;
          G_active_bgroup->solvers[solver_idx].name != NULL; solver_idx++) {
         PerfProfSolver *solver = &G_active_bgroup->solvers[solver_idx];
-        char *args[PROC_MAX_ARGS];
-        int32_t argidx = 0;
-
-        char timelimit[128];
-        snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
-                      G_active_bgroup->timelimit);
-
-        char timelimit_extended[128];
-        snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
-                      G_active_bgroup->timelimit * 1.05 + 2);
-
-        char killafter[128];
-        snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
-                      G_active_bgroup->timelimit * 1.05 + 2 -
-                          G_active_bgroup->timelimit);
-
-        char seed_str[128];
-        snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", seed);
-
-        args[argidx++] = "timeout";
-        args[argidx++] = "-k";
-        args[argidx++] = killafter;
-        args[argidx++] = timelimit_extended;
-        args[argidx++] = CPTP_EXE;
-        args[argidx++] = "-t";
-        args[argidx++] = timelimit;
-        args[argidx++] = "--seed";
-        args[argidx++] = seed_str;
-        args[argidx++] = "-i";
-        args[argidx++] = (char *)fpath;
-
-        for (int32_t i = 0; solver->args[i] != NULL; i++) {
-            args[argidx++] = solver->args[i];
-        }
-
-        PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
-        compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
-                             argidx);
-        printf("hash_str = %s\n", pinfo->hash);
-
-        Path fpath_basename;
-        Path json_report_path_basename;
-
-        snprintf_safe(pinfo->json_output_path,
-                      ARRAY_LEN(pinfo->json_output_path), "%s/%s/%s.json",
-                      PERFPROF_DUMP_ROOTDIR, pinfo->hash,
-                      os_basename(fpath, &fpath_basename));
-        os_mkdir(
-            os_dirname(pinfo->json_output_path, &json_report_path_basename),
-            true);
-
-        args[argidx++] = "-w";
-        args[argidx++] = (char *)pinfo->json_output_path;
-        args[argidx++] = NULL;
-
-        proc_pool_queue(&G_pool, pinfo, args);
+        run_solver(solver, fpath, seed, instance_hash);
         if (G_pool.max_num_procs == 1) {
             proc_pool_join(&G_pool);
         }
     }
 }
 
-bool is_filtered_instance(Filter *f, const Instance *instance) {
+static bool is_filtered_instance(Filter *f, const Instance *instance) {
     if (instance->num_customers < f->ncustomers.a ||
         instance->num_customers > f->ncustomers.b) {
         return true;
@@ -325,7 +319,8 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                     sha256_hash_file_contents(fpath, instance_hash);
                     for (int32_t seedidx = 0;
                          seedidx < MIN(G_active_bgroup->nseeds,
-                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS));
+                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS)) &&
+                         !G_should_terminate;
                          seedidx++) {
                         handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx],
                                             instance_hash);
@@ -347,7 +342,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
     return G_should_terminate ? FTW_STOP : FTW_CONTINUE;
 }
 
-void scan_dir_and_solve(char *dirpath) {
+void scan_dir_and_solve(const char *dirpath) {
     int result = nftw(dirpath, file_walk_cb, 8, 0);
     if (result == FTW_STOP) {
         proc_pool_join(&G_pool);
@@ -364,12 +359,25 @@ static void do_batch(PerfProfBatchGroup *bgroup) {
     G_pool.max_num_procs = bgroup->max_num_procs;
     G_pool.on_async_proc_exit = on_async_proc_exit;
 
+    // Adjust zero-initialized filters
+    {
+        Filter *filter = &bgroup->filter;
+        if (filter->ncustomers.a >= 0 && filter->ncustomers.b == 0) {
+            filter->ncustomers.b = 99999;
+        }
+
+        if (filter->nvehicles.a >= 0 && filter->nvehicles.b == 0) {
+            filter->nvehicles.b = 9999;
+        }
+    }
+
     if (!G_should_terminate) {
-        scan_dir_and_solve("./data/ESPPRC - Test Instances/");
+        scan_dir_and_solve(bgroup->scan_root_dir);
     }
 }
 
-int main(int argc, char *argv[]) {
+static void init(void) {
+
     os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
 
     // Compute the cptp exe hash
@@ -380,15 +388,17 @@ int main(int argc, char *argv[]) {
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
         sha256_finalize_to_string(&shactx, G_cptp_exe_hash);
     }
-    sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
-    sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
+}
+
+static void main_loop(void) {
 
     PerfProfBatchGroup batches[] = {
         {1,
          "Integer separation vs Fractional separation",
-         TEST_FILTER,
          600.0,
          3,
+         "./data/ESPPRC - Test Instances/",
+         (Filter){NULL, {120, 99999}, {0, 0}},
          {{"cptp",
            {
                "--solver",
@@ -399,22 +409,16 @@ int main(int argc, char *argv[]) {
         do_batch(&batches[i]);
     }
 
+    proc_pool_join(&G_pool);
+}
+
+int main(int argc, char *argv[]) {
+    init();
+    sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
+    sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
+    { main_loop(); }
     signal(SIGTERM, prev_sigterm_handler);
     signal(SIGINT, prev_sigint_handler);
-
-#if 0
-    for (int32_t i = 0; i < 20; i++) {
-        char amt[2] = "5";
-        amt[0] = rand() % 10 + '0';
-        amt[1] = '\0';
-        char *args[] = {"sleep", amt, NULL};
-
-        proc_pool_queue(&G_pool, args);
-    }
-
-#endif
-
     proc_pool_join(&G_pool);
-
     return 0;
 }

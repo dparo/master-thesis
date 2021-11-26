@@ -53,7 +53,7 @@ static int wstatus_to_exit_status(pid_t pid, int wstatus) {
 }
 
 pid_t proc_spawn(char *const args[]) {
-    pid_t pid = 0; 
+    pid_t pid = 0;
     if ((pid = fork()) == 0) {
 
         if (!SHARE_STDIN)
@@ -129,16 +129,23 @@ static void insert_proc_in_pool(ProcPool *pool, int32_t idx, void *user_handle,
         proc_destroy(&pool->procs[idx]);
     }
 
-    pid_t pid = proc_spawn(args);
+    if (pool->aborted) {
+        if (pool->on_async_proc_exit) {
+            pool->on_async_proc_exit(NULL, -1, user_handle);
+        }
+    } else {
 
-    pool->procs[idx].valid = true;
-    pool->procs[idx].user_handle = user_handle;
-    pool->procs[idx].pid = pid;
-    int32_t i = 0;
-    for (i = 0; i < PROC_MAX_ARGS - 1 && args[i] != NULL; i++) {
-        pool->procs[idx].args[i] = strdup(args[i]);
+        pid_t pid = proc_spawn(args);
+
+        pool->procs[idx].valid = true;
+        pool->procs[idx].user_handle = user_handle;
+        pool->procs[idx].pid = pid;
+        int32_t i = 0;
+        for (i = 0; i < PROC_MAX_ARGS - 1 && args[i] != NULL; i++) {
+            pool->procs[idx].args[i] = strdup(args[i]);
+        }
+        pool->procs[idx].args[i] = NULL;
     }
-    pool->procs[idx].args[i] = NULL;
 }
 
 static int32_t pool_sync2(ProcPool *pool) {
@@ -151,6 +158,11 @@ static int32_t pool_sync2(ProcPool *pool) {
                 continue;
             } else {
                 any_valid = true;
+            }
+
+            if (pool->aborted) {
+                assert(p->valid);
+                kill(p->pid, SIGTERM);
             }
 
             int exit_status;
@@ -190,9 +202,7 @@ void proc_pool_queue(ProcPool *pool, void *user_handle, char *const args[]) {
 
     int32_t idx = pool_sync2(pool);
     assert(idx >= 0);
-    if (!pool->aborted) {
-        insert_proc_in_pool(pool, idx, user_handle, args);
-    }
+    insert_proc_in_pool(pool, idx, user_handle, args);
 }
 
 void proc_pool_sync(ProcPool *pool) { (void)pool_sync2(pool); }
