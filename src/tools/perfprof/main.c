@@ -88,7 +88,8 @@ typedef struct {
     char *args[PROC_MAX_ARGS];
 } PerfProfSolver;
 
-typedef struct ProcessInfo {
+typedef struct PerfProcessInfo {
+    char solver_name[48];
     char hash[65];
     char json_output_path[OS_MAX_PATH + 32];
 } PerfProfProcessInfo;
@@ -100,16 +101,21 @@ typedef struct {
     double obj_ub;
 } Perf;
 
-typedef struct PerfTable {
+#define MAX_NUM_SOLVERS_PER_GROUP 16
+
+typedef struct PerfTblEntry {
     int32_t num_perfs;
-    Perf *perfs;
-} PerfTable;
+    Perf perfs[MAX_NUM_SOLVERS_PER_GROUP];
+} PerfTblEntry;
+
+typedef struct PerfTbl {
+    char *key;
+    PerfTblEntry value;
+} PerfTbl;
 
 #define BAPCOD_SOLVER_NAME ("BaPCod")
 static const PerfProfSolver BAPCOD_SOLVER =
     ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
-
-#define MAX_NUM_SOLVERS_PER_GROUP 16
 
 typedef struct {
     int32_t max_num_procs;
@@ -124,20 +130,52 @@ typedef struct {
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
 static PerfProfBatchGroup *G_active_bgroup = NULL;
-static PerfTable G_perftbl = {0};
+static PerfTbl *G_perftbl = NULL;
 
-void push_perf_to_table(PerfTable *tbl, Perf *p) {
-    tbl->perfs =
-        realloc(tbl->perfs, (tbl->num_perfs + 1) * sizeof(*tbl->perfs));
-    memcpy(tbl->perfs, p, MIN(sizeof(*tbl->perfs), sizeof(*p)));
-    tbl->num_perfs++;
+void insert_perf_to_table(char *solver_name, char hash[65], Perf *p) {
+    if (!shgetp_null(G_perftbl, hash)) {
+        PerfTblEntry empty_entry = {0};
+        shput(G_perftbl, hash, empty_entry);
+    }
+
+    PerfTblEntry *e = NULL;
+    {
+        PerfTbl *t = shgetp(G_perftbl, hash);
+        assert(t);
+        // memcpy(t->key, hash, 65);
+        e = &t->value;
+    }
+
+    if (!e) {
+        return;
+    }
+
+    int32_t i = 0;
+    for (i = 0; i < e->num_perfs; i++) {
+        if (0 == strncmp(solver_name, e->perfs[i].solver_name,
+                         ARRAY_LEN(e->perfs[i].solver_name))) {
+            // Found: need to update previous perf
+            break;
+        }
+    }
+
+    if (i == e->num_perfs && (e->num_perfs < (int32_t)ARRAY_LEN(e->perfs))) {
+        e->num_perfs++;
+    } else {
+        assert(0);
+    }
+
+    if (i < e->num_perfs) {
+        memcpy(&e->perfs[i], p, MIN(sizeof(e->perfs[i]), sizeof(*p)));
+    } else {
+        assert(0);
+    }
 }
 
-void clear_perf_table(PerfTable *tbl) {
-    if (tbl->perfs) {
-        free(tbl->perfs);
+void clear_perf_table(void) {
+    if (G_perftbl) {
+        shfree(G_perftbl);
     }
-    memset(tbl, 0, sizeof(*tbl));
 }
 
 static void my_sighandler(int signum) {
@@ -204,14 +242,15 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             }
             cJSON *root = cJSON_Parse(contents);
             if (!root) {
-                fprintf(
-                    stderr,
-                    "Failed to parse JSON contents from `%s` produced from PID "
-                    "%d\n",
-                    info->json_output_path, p->pid);
+                fprintf(stderr,
+                        "Failed to parse JSON contents from `%s` produced "
+                        "from PID "
+                        "%d\n",
+                        info->json_output_path, p->pid);
                 exit(1);
             } else {
-                perf = perf_from_cptp_generated_json(info->hash, NULL, root);
+                perf = perf_from_cptp_generated_json(info->hash,
+                                                     info->solver_name, root);
 
                 // TODO: Do something with the perf
             }
@@ -224,6 +263,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
 
         printf("Got perf ::: sha = %s, time = %.17g, obj_ub = %.17g\n",
                perf.hash, perf.secs, perf.obj_ub);
+        insert_perf_to_table(info->solver_name, info->hash, &perf);
     }
     free(info);
 }
@@ -321,6 +361,8 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     PerfProfProcessInfo *pinfo = malloc(sizeof(*pinfo));
     compute_whole_sha256(pinfo->hash, G_cptp_exe_hash, instance_hash, args,
                          argidx);
+    snprintf_safe(pinfo->solver_name, ARRAY_LEN(pinfo->solver_name), "%s",
+                  solver->name);
 
     Path fpath_basename;
     Path json_report_path_basename;
@@ -435,6 +477,22 @@ static void do_batch(PerfProfBatchGroup *bgroup) {
         }
     }
 
+    // Detect duplicate names in solver names
+    for (int32_t i = 0; bgroup->solvers[i].name; i++) {
+        for (int32_t j = 0; bgroup->solvers[j].name; j++) {
+            if (i != j) {
+                if (0 ==
+                    strcmp(bgroup->solvers[i].name, bgroup->solvers[j].name)) {
+                    fprintf(stderr,
+                            "\n\nInternal perfprof error: detected duplicate "
+                            "name `%s` in group %s\n",
+                            bgroup->solvers[i].name, bgroup->name);
+                    abort();
+                }
+            }
+        }
+    }
+
     if (!G_should_terminate) {
         scan_dir_and_solve(bgroup->scan_root_dir);
     }
@@ -460,10 +518,15 @@ static void main_loop(void) {
         {1,
          "Integer separation vs Fractional separation",
          600.0,
-         3,
-         "./data/ESPPRC - Test Instances/",
-         (Filter){NULL, {0, 80}, {0, 0}},
-         {{"Integer separation",
+         1,
+         "./data/ESPPRC - Test Instances/vrps",
+         (Filter){NULL, {0, 72}, {0, 0}},
+         {{"A",
+           {
+               "--solver",
+               "mip",
+           }},
+          {"B",
            {
                "--solver",
                "mip",
@@ -473,9 +536,12 @@ static void main_loop(void) {
          i++) {
 
         printf("\n\n");
-        printf("###########################################################\n");
-        printf("###########################################################\n");
-        printf("###########################################################\n");
+        printf("###########################################################"
+               "\n");
+        printf("###########################################################"
+               "\n");
+        printf("###########################################################"
+               "\n");
         printf("     DOING BATCH:\n");
         printf("            Batch max num concurrent procs: %d\n",
                batches[i].max_num_procs);
@@ -484,21 +550,40 @@ static void main_loop(void) {
         printf("            Batch num seeds: %d\n", batches[i].nseeds);
         printf("            Batch scan_root_dir: %s\n",
                batches[i].scan_root_dir);
-        printf("###########################################################\n");
-        printf("###########################################################\n");
-        printf("###########################################################\n");
+        printf("###########################################################"
+               "\n");
+        printf("###########################################################"
+               "\n");
+        printf("###########################################################"
+               "\n");
         printf("\n\n");
 
-        clear_perf_table(&G_perftbl);
+        clear_perf_table();
         do_batch(&batches[i]);
         proc_pool_join(&G_pool);
 
         // Process the perf_table to generate the csv file
 
-        clear_perf_table(&G_perftbl);
+        printf("\n\n\n");
+        ptrdiff_t tbl_len = shlen(G_perftbl);
+        for (int32_t i = 0; i < tbl_len; i++) {
+            char *key = G_perftbl[i].key;
+            PerfTblEntry *value = &G_perftbl[i].value;
+
+            for (int32_t perf_idx = 0; perf_idx < value->num_perfs;
+                 perf_idx++) {
+                Perf *perf = &value->perfs[perf_idx];
+                printf("i = %d, Got perf hash=%s, perf_idx = %d, time = %.17g, "
+                       "cost_ub = %.17g\n",
+                       i, key, perf_idx, perf->secs, perf->obj_ub);
+            }
+        }
+
+        clear_perf_table();
     }
 
     proc_pool_join(&G_pool);
+    clear_perf_table();
 }
 
 int main(int argc, char *argv[]) {
