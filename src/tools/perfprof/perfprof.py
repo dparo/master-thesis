@@ -1,41 +1,103 @@
+##
+## Performance Profile by D. Salvagnin (2016)
+## Internal use only, not to be distributed
+##
+
 #!/usr/bin/env python3
 
 from __future__ import print_function
+
 from optparse import OptionParser
+
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib
-matplotlib.use('PDF')
 
-matplotlib.rcParams['figure.dpi'] = 300
+matplotlib.use("PDF")
+
+matplotlib.rcParams["figure.dpi"] = 300
 
 
 # parameters
 defLW = 1.2  # default line width
 defMS = 7  # default marker size
-dashes = ['solid',
-          'dotted',
-          'dashed',
-          'dashdot']
+dashes = ["solid", "dotted", "dashed", "dashdot"]
 
-markers = ['+', 'x', 's', '^', 'o', 'd', 'v', '<', '>', '*', '2']
-colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'magenta']
+markers = ["+", "x", "s", "^", "o", "d", "v", "<", ">", "*", "2"]
+colors = [
+    "tab:blue",
+    "tab:orange",
+    "tab:green",
+    "tab:red",
+    "tab:purple",
+    "tab:brown",
+    "tab:pink",
+    "tab:gray",
+    "tab:olive",
+    "magenta",
+]
 
 
 class CmdLineParser(object):
     def __init__(self):
-        self.parser = OptionParser(usage='usage: python2 perfprof.py [options] cvsfile.csv outputfile.pdf')
+        self.parser = OptionParser(
+            usage="usage: python2 perfprof.py [options] cvsfile.csv outputfile.pdf"
+        )
         # default options
-        self.parser.add_option("-D", "--delimiter", dest="delimiter", default=None, help="delimiter for input files")
-        self.parser.add_option("-M", "--maxratio", dest="maxratio", default=4, type=float, help="maxratio for perf. profile")
-        self.parser.add_option("-S", "--shift", dest="shift", default=1, type=float, help="shift for data")
-        self.parser.add_option("-L", "--logplot", dest="logplot", action="store_true", default=False, help="log scale for x")
-        self.parser.add_option("-T", "--timelimit", dest="timelimit", default=1e99, type=float, help="time limit for runs")
-        self.parser.add_option("-P", "--plot-title", dest="plottitle", default=None, help="plot title")
-        self.parser.add_option("-l", "--legend", dest="plotlegend", default=True, help="plot the legend")
-        self.parser.add_option("-X", "--x-label", dest="xlabel", default='Time Ratio', help="x axis label")
-        self.parser.add_option("-B", "--bw", dest="bw", action="store_true", default=False, help="plot B/W")
-        self.parser.add_option("-0", "--startidx", dest="startidx", default=0, type=int, help="Start index to associate with the colors")
+        self.parser.add_option(
+            "-D",
+            "--delimiter",
+            dest="delimiter",
+            default=None,
+            help="delimiter for input files",
+        )
+        self.parser.add_option(
+            "-M",
+            "--maxratio",
+            dest="maxratio",
+            default=4,
+            type=float,
+            help="maxratio for perf. profile",
+        )
+        self.parser.add_option(
+            "-S", "--shift", dest="shift", default=1, type=float, help="shift for data"
+        )
+        self.parser.add_option(
+            "-L",
+            "--logplot",
+            dest="logplot",
+            action="store_true",
+            default=False,
+            help="log scale for x",
+        )
+        self.parser.add_option(
+            "-T",
+            "--timelimit",
+            dest="timelimit",
+            default=1e99,
+            type=float,
+            help="time limit for runs",
+        )
+        self.parser.add_option(
+            "-P", "--plot-title", dest="plottitle", default=None, help="plot title"
+        )
+        self.parser.add_option(
+            "-l", "--legend", dest="plotlegend", default=True, help="plot the legend"
+        )
+        self.parser.add_option(
+            "-X", "--x-label", dest="xlabel", default="Time Ratio", help="x axis label"
+        )
+        self.parser.add_option(
+            "-B", "--bw", dest="bw", action="store_true", default=False, help="plot B/W"
+        )
+        self.parser.add_option(
+            "-0",
+            "--startidx",
+            dest="startidx",
+            default=0,
+            type=int,
+            help="Start index to associate with the colors",
+        )
 
     def addOption(self, *args, **kwargs):
         self.parser.add_option(*args, **kwargs)
@@ -75,12 +137,12 @@ def main():
     parser = CmdLineParser()
     opt = parser.parseArgs()
     # read data
-    rnames, cnames, data = readTable(open(opt.input, 'r'), opt.delimiter)
+    rnames, cnames, data = readTable(open(opt.input, "r"), opt.delimiter)
 
     max_len = 64
     for i in range(0, len(cnames)):
         if len(cnames[i]) >= max_len:
-            cnames[i] = (cnames[i])[0:max_len - 4] + " ..."
+            cnames[i] = (cnames[i])[0 : max_len - 4] + " ..."
 
     if data.shape == (0,):
         return
@@ -110,28 +172,34 @@ def main():
     # plot first
     y = np.arange(nrows, dtype=np.float64) / nrows
     for j in range(ncols):
-        options = dict(label=cnames[j],
-                       drawstyle='steps-post',
-                       linewidth=defLW, linestyle=dashes[(opt.startidx + j) % len(dashes)],
-                       marker=markers[(opt.startidx + j) % len(markers)], markeredgewidth=defLW, markersize=defMS, alpha=0.75)
+        options = dict(
+            label=cnames[j],
+            drawstyle="steps-post",
+            linewidth=defLW,
+            linestyle=dashes[(opt.startidx + j) % len(dashes)],
+            marker=markers[(opt.startidx + j) % len(markers)],
+            markeredgewidth=defLW,
+            markersize=defMS,
+            alpha=0.75,
+        )
         if opt.bw:
-            options['markerfacecolor'] = 'w'
-            options['markeredgecolor'] = 'k'
-            options['color'] = 'k'
+            options["markerfacecolor"] = "w"
+            options["markeredgecolor"] = "k"
+            options["color"] = "k"
         else:
-            options['color'] = colors[(opt.startidx + j) % len(colors)]
+            options["color"] = colors[(opt.startidx + j) % len(colors)]
         if opt.logplot:
             plt.semilogx(ratio[:, j], y, **options)
         else:
             plt.plot(ratio[:, j], y, **options)
     plt.axis([1, opt.maxratio, 0, 1])
     if opt.plotlegend is not None and opt.plotlegend is True:
-        plt.legend(loc='best', fontsize=6, prop={'size': 6})
+        plt.legend(loc="best", fontsize=6, prop={"size": 6})
     if opt.plottitle is not None:
         plt.title(opt.plottitle)
     plt.xlabel(opt.xlabel)
     plt.savefig(opt.output)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
