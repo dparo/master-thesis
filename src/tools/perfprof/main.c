@@ -292,6 +292,7 @@ static void sha256_finalize_to_string(SHA256_CTX *shactx, Hash *hash) {
 static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
 
     SHA256_CTX shactx;
+    sha256_init(&shactx);
     size_t len = 0;
     char *contents = fread_all_into_null_terminated_string(fpath, &len);
     if (contents) {
