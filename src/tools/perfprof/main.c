@@ -74,26 +74,26 @@ typedef struct {
     Hash hash;
     char filepath[OS_MAX_PATH];
     int32_t seed;
-} PerfProfInputInstance;
+} PerfProfRunInput;
+
+typedef struct {
+    char solver_name[48];
+    Hash run_hash;
+    PerfProfRunInput input;
+    char json_output_path[OS_MAX_PATH + 32];
+} PerfProcRunHandle;
 
 typedef struct {
     Hash hash;
     char solver_name[48];
     Perf perf;
-} PerfProfSolverRun;
-
-typedef struct {
-    char solver_name[48];
-    Hash run_hash;
-    PerfProfInputInstance input;
-    char json_output_path[OS_MAX_PATH + 32];
-} PerfProcUserHandle;
+} PerfProfRun;
 
 #define MAX_NUM_SOLVERS_PER_GROUP 16
 
 typedef struct PerfTblEntry {
     int32_t num_perfs;
-    PerfProfSolverRun runs[MAX_NUM_SOLVERS_PER_GROUP];
+    PerfProfRun runs[MAX_NUM_SOLVERS_PER_GROUP];
 } PerfTblEntry;
 
 typedef struct PerfTbl {
@@ -146,9 +146,9 @@ static const int32_t RANDOM_SEEDS[] = {
     13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
 };
 
-PerfProfSolverRun make_solver_run(PerfProfBatch *batch, char *solver_name,
-                                  Hash *run_hash) {
-    PerfProfSolverRun run = {0};
+PerfProfRun make_solver_run(PerfProfBatch *batch, char *solver_name,
+                            Hash *run_hash) {
+    PerfProfRun run = {0};
     strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
     memcpy(run.hash.cstr, run_hash->cstr, ARRAY_LEN(run.hash.cstr));
     run.perf.cost = INFINITY;
@@ -156,8 +156,7 @@ PerfProfSolverRun make_solver_run(PerfProfBatch *batch, char *solver_name,
     return run;
 }
 
-void insert_run_into_table(PerfProfInputInstance *input_instance,
-                           PerfProfSolverRun *run) {
+void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
     printf("Inserting run into table. Instance hash: %s. Run ::: sha = %s, "
            "solver_name = %s, "
            "time = %.17g, obj_ub "
@@ -235,8 +234,7 @@ static void my_sighandler(int signum) {
     }
 }
 
-void extract_perf_data_from_cptp_json_file(PerfProfSolverRun *run,
-                                           cJSON *root) {
+void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
     cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
 
@@ -248,9 +246,9 @@ void extract_perf_data_from_cptp_json_file(PerfProfSolverRun *run,
     }
 }
 
-void update_perf_tbl_with_cptp_json_perf_data(PerfProcUserHandle *handle) {
-    PerfProfSolverRun run = make_solver_run(
-        G_active_bgroup, handle->solver_name, &handle->run_hash);
+void update_perf_tbl_with_cptp_json_perf_data(PerfProcRunHandle *handle) {
+    PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
+                                      &handle->run_hash);
 
     char *contents =
         fread_all_into_null_terminated_string(handle->json_output_path, NULL);
@@ -280,7 +278,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
         return;
     }
 
-    PerfProcUserHandle *handle = user_handle;
+    PerfProcRunHandle *handle = user_handle;
     if (p) {
         if (exit_status == 0) {
             update_perf_tbl_with_cptp_json_perf_data(handle);
@@ -288,7 +286,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             log_warn("\n\n\nSolver `%s` returned with non 0 exit status. Got "
                      "%d\n\n\n",
                      handle->solver_name, exit_status);
-            PerfProfSolverRun run = make_solver_run(
+            PerfProfRun run = make_solver_run(
                 G_active_bgroup, handle->solver_name, &handle->run_hash);
             insert_run_into_table(&handle->input, &run);
         }
@@ -326,7 +324,7 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
     free(contents);
 }
 
-Hash compute_run_hash(const Hash *exe_hash, const PerfProfInputInstance *input,
+Hash compute_run_hash(const Hash *exe_hash, const PerfProfRunInput *input,
                       char *args[PROC_MAX_ARGS], int32_t num_args) {
     SHA256_CTX shactx;
     sha256_init(&shactx);
@@ -347,8 +345,7 @@ Hash compute_run_hash(const Hash *exe_hash, const PerfProfInputInstance *input,
     return result;
 }
 
-void extract_perf_data_from_bapcod_json_file(PerfProfSolverRun *run,
-                                             cJSON *root) {
+void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
 
@@ -381,10 +378,10 @@ void extract_perf_data_from_bapcod_json_file(PerfProfSolverRun *run,
 }
 
 static void
-update_perf_tbl_with_bapcod_json_perf_data(PerfProcUserHandle *handle,
+update_perf_tbl_with_bapcod_json_perf_data(PerfProcRunHandle *handle,
                                            char *json_filepath) {
-    PerfProfSolverRun run = make_solver_run(
-        G_active_bgroup, handle->solver_name, &handle->run_hash);
+    PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
+                                      &handle->run_hash);
 
     if (json_filepath) {
         char *contents =
@@ -402,7 +399,7 @@ update_perf_tbl_with_bapcod_json_perf_data(PerfProcUserHandle *handle,
     insert_run_into_table(&handle->input, &run);
 }
 
-static void handle_bapcod_solver(PerfProcUserHandle *handle) {
+static void handle_bapcod_solver(PerfProcRunHandle *handle) {
     Path instance_filepath_dirname;
     Path instance_filepath_basename;
     char *dirname =
@@ -425,8 +422,7 @@ static void handle_bapcod_solver(PerfProcUserHandle *handle) {
     }
 }
 
-static void run_solver(PerfProfSolver *solver,
-                       PerfProfInputInstance *instance) {
+static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
     if (G_should_terminate) {
         return;
     }
@@ -466,7 +462,7 @@ static void run_solver(PerfProfSolver *solver,
         args[argidx++] = solver->args[i];
     }
 
-    PerfProcUserHandle *handle = malloc(sizeof(*handle));
+    PerfProcRunHandle *handle = malloc(sizeof(*handle));
     handle->run_hash =
         compute_run_hash(&G_cptp_exe_hash, instance, args, argidx);
 
