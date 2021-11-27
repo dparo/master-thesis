@@ -89,7 +89,7 @@ typedef struct {
     Perf perf;
 } PerfProfRun;
 
-#define MAX_NUM_SOLVERS_PER_GROUP 16
+#define MAX_NUM_SOLVERS_PER_GROUP 8
 
 typedef struct PerfTblEntry {
     int32_t num_perfs;
