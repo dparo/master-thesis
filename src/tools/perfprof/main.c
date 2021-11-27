@@ -391,7 +391,16 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     os_mkdir(os_dirname(pinfo->json_output_path, &json_report_path_basename),
              true);
 
-    proc_pool_queue(&G_pool, pinfo, args);
+    if (!os_fexists(pinfo->json_output_path)) {
+        proc_pool_queue(&G_pool, pinfo, args);
+    } else {
+        printf("Found cache for hash %s. CMD:", pinfo->hash.cstr);
+        for (int32_t i = 0; args[i] && i < argidx; i++) {
+            printf(" %s", args[i]);
+        }
+        printf("\n");
+        free(pinfo);
+    }
 }
 
 void handle_vrp_instance(const char *fpath, int32_t seed, Hash *instance_hash) {
@@ -532,7 +541,7 @@ static void main_loop(void) {
         {1,
          "Integer separation vs Fractional separation",
          600.0,
-         3,
+         4,
          "./data/ESPPRC - Test Instances/vrps",
          (Filter){NULL, {0, 72}, {0, 0}},
          {{"A",
