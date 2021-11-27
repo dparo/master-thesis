@@ -295,7 +295,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     free(handle);
 }
 
-static void hash_finalize(SHA256_CTX *shactx, Hash *hash) {
+static void sha256_hash_finalize(SHA256_CTX *shactx, Hash *hash) {
 
     BYTE bytes[32];
 
@@ -320,7 +320,7 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
         log_fatal("%s: Failed to hash (sha256) file contents\n", fpath);
         abort();
     }
-    hash_finalize(&shactx, hash);
+    sha256_hash_finalize(&shactx, hash);
     free(contents);
 }
 
@@ -341,7 +341,7 @@ Hash compute_run_hash(const Hash *exe_hash, const PerfProfRunInput *input,
     }
 
     Hash result = {0};
-    hash_finalize(&shactx, &result);
+    sha256_hash_finalize(&shactx, &result);
     return result;
 }
 
@@ -492,6 +492,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
     if (0 == strcmp(solver->name, BAPCOD_SOLVER_NAME) &&
         solver->args[0] == NULL) {
         handle_bapcod_solver(handle);
+        free(handle);
     } else {
         if (!os_fexists(handle->json_output_path)) {
             proc_pool_queue(&G_pool, handle, args);
@@ -553,6 +554,8 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                                  ARRAY_LEN(input.filepath));
 
                     sha256_hash_file_contents(fpath, &input.hash);
+                    printf("--- hash_file_contents :: computed_hash = %s\n",
+                           input.hash.cstr);
 
                     for (int32_t seedidx = 0;
                          seedidx < MIN(G_active_bgroup->nseeds,
@@ -560,6 +563,15 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                          !G_should_terminate;
                          seedidx++) {
                         input.seed = RANDOM_SEEDS[seedidx];
+
+                        // Re-hash the seed
+                        SHA256_CTX ctx = {0};
+                        sha256_init(&ctx);
+                        sha256_update(&ctx, (const BYTE *)input.hash.cstr, 64);
+                        sha256_update(&ctx, (const BYTE *)&input.seed,
+                                      sizeof(input.seed));
+                        sha256_hash_finalize(&ctx, &input.hash);
+
                         handle_vrp_instance(&input);
                     }
                 } else {
@@ -638,11 +650,11 @@ static void init(void) {
 
         sha256_init(&shactx);
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
-        hash_finalize(&shactx, &G_cptp_exe_hash);
+        sha256_hash_finalize(&shactx, &G_cptp_exe_hash);
     }
 }
 
-static void output_csv_file(PerfProfBatch *batch);
+static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
 
@@ -709,8 +721,10 @@ static void main_loop(void) {
         do_batch(&batches[i]);
         proc_pool_join(&G_pool);
 
-        // Process the perf_table to generate the csv file
-        output_csv_file(&batches[i]);
+        if (!G_should_terminate) {
+            // Process the perf_table to generate the csv file
+            generate_perfs_imgs(&batches[i]);
+        }
 
         clear_perf_table();
     }
@@ -786,7 +800,7 @@ static void generate_performance_profile_using_python_script(
     proc_spawn_sync(args);
 }
 
-static void output_csv_file(PerfProfBatch *batch) {
+static void generate_perfs_imgs(PerfProfBatch *batch) {
     printf("\n\n\n");
     char dump_dir[OS_MAX_PATH];
     char data_csv_file[OS_MAX_PATH];
