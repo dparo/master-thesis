@@ -339,27 +339,28 @@ static void compute_whole_sha256(Hash *hash, const Hash *exe_hash,
     sha256_finalize_to_string(&shactx, hash);
 }
 
-static void update_perf_tbl_with_bapcod_json_perf_data(void) {}
+static void update_perf_tbl_with_bapcod_json_perf_data(void) { debug_break(); }
 
 static void handle_bapcod_solver(const char *instance_filepath) {
     Path instance_filepath_dirname;
     Path instance_filepath_basename;
     char *dirname = os_dirname(instance_filepath, &instance_filepath_dirname);
-    char *basename = os_basename(instance_filepath, &instance_filepath_dirname);
+    char *basename =
+        os_basename(instance_filepath, &instance_filepath_basename);
 
     char json_output_file[OS_MAX_PATH];
 
     snprintf_safe(json_output_file, ARRAY_LEN(json_output_file),
-                  "%s/%s.info.json", dirname, basename);
+                  "%s/%.*s.info.json", dirname,
+                  os_get_fext(basename) - basename - 1, basename);
 
     if (os_fexists(json_output_file)) {
         update_perf_tbl_with_bapcod_json_perf_data();
     } else {
         log_warn("%s: BapCod JSON output file does not exist!!!\n",
                  json_output_file);
+        debug_break();
     }
-
-    debug_break();
 }
 
 static void run_solver(PerfProfSolver *solver, const char *instance_filepath,
