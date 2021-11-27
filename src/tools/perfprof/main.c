@@ -72,17 +72,26 @@ typedef struct PerfProcessInfo {
 } PerfProfProcessInfo;
 
 typedef struct {
+    double secs;
+    double cost;
+} Perf;
+
+typedef struct {
+    Hash hash;
+    char filepath[OS_MAX_PATH];
+} PerfProfInputInstance;
+
+typedef struct {
     Hash hash;
     char solver_name[48];
-    double secs;
-    double obj_ub;
-} Perf;
+    Perf perf;
+} PerfProfSolverRun;
 
 #define MAX_NUM_SOLVERS_PER_GROUP 16
 
 typedef struct PerfTblEntry {
     int32_t num_perfs;
-    Perf perfs[MAX_NUM_SOLVERS_PER_GROUP];
+    PerfProfSolverRun runs[MAX_NUM_SOLVERS_PER_GROUP];
 } PerfTblEntry;
 
 typedef struct PerfTbl {
@@ -98,7 +107,7 @@ typedef struct {
     const char *scan_root_dir;
     Filter filter;
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
-} PerfProfBatchGroup;
+} PerfProfBatch;
 
 #ifndef NDEBUG
 #define CPTP_EXE "./build/Debug/src/cptp"
@@ -113,7 +122,7 @@ typedef struct {
 static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
-static PerfProfBatchGroup *G_active_bgroup = NULL;
+static PerfProfBatch *G_active_bgroup = NULL;
 static PerfTbl *G_perftbl = NULL;
 
 static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
@@ -135,33 +144,34 @@ static const int32_t RANDOM_SEEDS[] = {
     13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
 };
 
-Perf make_invalidated_perf(char *solver_name, Hash *hash,
-                           PerfProfBatchGroup *bgroup) {
-    Perf perf = {0};
-    perf.obj_ub = INFINITY;
-    perf.secs = 2.0 * bgroup->timelimit;
-    strncpy_safe(perf.solver_name, solver_name, ARRAY_LEN(perf.solver_name));
-    memcpy(perf.hash.cstr, hash->cstr, ARRAY_LEN(perf.hash.cstr));
-    return perf;
+PerfProfSolverRun make_solver_run(PerfProfBatch *batch, char *solver_name,
+                                  Hash *run_hash) {
+    PerfProfSolverRun run = {0};
+    strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
+    memcpy(run.hash.cstr, run_hash->cstr, ARRAY_LEN(run.hash.cstr));
+    return run;
 }
 
-void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
-
-    printf("Got perf ::: sha = %s, solver_name = %s, time = %.17g, obj_ub "
+void insert_run_into_table(PerfProfInputInstance *input_instance,
+                           PerfProfSolverRun *run) {
+    printf("Inserting run into table. Instance hash: %s. Run ::: sha = %s, "
+           "solver_name = %s, "
+           "time = %.17g, obj_ub "
            "= %.17g\n",
-           p->hash.cstr, solver_name, p->secs, p->obj_ub);
+           input_instance->hash.cstr, run->hash.cstr, run->solver_name,
+           run->perf.secs, run->perf.cost);
 
     if (!G_perftbl) {
         sh_new_strdup(G_perftbl);
     }
-    if (!shgetp_null(G_perftbl, hash->cstr)) {
+    if (!shgetp_null(G_perftbl, input_instance->hash.cstr)) {
         PerfTblEntry empty_entry = {0};
-        shput(G_perftbl, hash->cstr, empty_entry);
+        shput(G_perftbl, input_instance->hash.cstr, empty_entry);
     }
 
     PerfTblEntry *e = NULL;
     {
-        PerfTbl *t = shgetp(G_perftbl, hash->cstr);
+        PerfTbl *t = shgetp(G_perftbl, input_instance->hash.cstr);
         assert(t);
         if (t) {
             e = &t->value;
@@ -174,7 +184,7 @@ void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
 
     int32_t i = 0;
     for (i = 0; i < e->num_perfs; i++) {
-        if (0 == strcmp(solver_name, e->perfs[i].solver_name)) {
+        if (0 == strcmp(run->solver_name, e->runs[i].solver_name)) {
             // Need to update previous perf
             // BUT... This is an invalid case to happen
             assert(0);
@@ -182,16 +192,19 @@ void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
         }
     }
 
-    if (i == e->num_perfs && (e->num_perfs < (int32_t)ARRAY_LEN(e->perfs))) {
+    if (i == e->num_perfs && (e->num_perfs < (int32_t)ARRAY_LEN(e->runs))) {
         e->num_perfs++;
     } else {
         assert(0);
     }
 
     if (i < e->num_perfs) {
-        memcpy(&e->perfs[i], p, MIN(sizeof(e->perfs[i]), sizeof(*p)));
+        memcpy(&e->runs[i], run, MIN(sizeof(e->runs[i]), sizeof(*run)));
     } else {
+        log_fatal("Bad internal error. Too much solvers specified in the same "
+                  "batch, or internal bug!!");
         assert(0);
+        abort();
     }
 }
 
@@ -229,7 +242,7 @@ Perf extract_perf_data_from_cptp_json_file(Hash *hash, char *solver_name,
         perf.secs = cJSON_GetNumberValue(itm_took);
     }
     if (itm_cost && cJSON_IsNumber(itm_cost)) {
-        perf.obj_ub = cJSON_GetNumberValue(itm_cost);
+        perf.cost = cJSON_GetNumberValue(itm_cost);
     }
 
     return perf;
@@ -261,7 +274,7 @@ void update_perf_tbl_with_cptp_json_perf_data(PerfProfProcessInfo *info) {
         free(contents);
     }
 
-    insert_perf_to_table(info->solver_name, &info->hash, &perf);
+    insert_run_into_table(info->solver_name, &info->hash, &perf);
 }
 
 void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
@@ -282,7 +295,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             Perf perf = make_invalidated_perf(info->solver_name, &info->hash,
                                               G_active_bgroup);
 
-            insert_perf_to_table(info->solver_name, &info->hash, &perf);
+            insert_run_into_table(info->solver_name, &info->hash, &perf);
         }
     }
 
@@ -365,7 +378,7 @@ Perf extract_perf_data_from_bapcod_json_file(Hash *hash, cJSON *root) {
                 cJSON_ArrayForEach(elem, columns_cost) {
                     cJSON *itm_cost = elem;
                     if (itm_cost && cJSON_IsNumber(itm_cost)) {
-                        perf.obj_ub = cJSON_GetNumberValue(itm_cost);
+                        perf.cost = cJSON_GetNumberValue(itm_cost);
                     }
                     break;
                 }
@@ -392,7 +405,7 @@ static void update_perf_tbl_with_bapcod_json_perf_data(Hash *hash,
             free(contents);
         }
     }
-    insert_perf_to_table(BAPCOD_SOLVER_NAME, hash, &perf);
+    insert_run_into_table(BAPCOD_SOLVER_NAME, hash, &perf);
 }
 
 static void handle_bapcod_solver(Hash *hash, const char *instance_filepath) {
@@ -576,7 +589,7 @@ void scan_dir_and_solve(const char *dirpath) {
     }
 }
 
-static void do_batch(PerfProfBatchGroup *bgroup) {
+static void do_batch(PerfProfBatch *bgroup) {
     proc_pool_join(&G_pool);
     G_active_bgroup = bgroup;
     G_pool.max_num_procs = bgroup->max_num_procs;
@@ -628,11 +641,11 @@ static void init(void) {
     }
 }
 
-static void output_csv_file(PerfProfBatchGroup *batch);
+static void output_csv_file(PerfProfBatch *batch);
 
 static void main_loop(void) {
 
-    PerfProfBatchGroup batches[] = {
+    PerfProfBatch batches[] = {
         {1,
          "Integer separation vs Fractional separation",
          600.0,
@@ -717,7 +730,7 @@ int main(int argc, char *argv[]) {
 }
 
 static void generate_performance_profile_using_python_script(
-    PerfProfBatchGroup *batch, char *csv_input_file, bool is_time_profile) {
+    PerfProfBatch *batch, char *csv_input_file, bool is_time_profile) {
     char *args[PROC_MAX_ARGS];
     int32_t argidx = 0;
 
@@ -772,7 +785,7 @@ static void generate_performance_profile_using_python_script(
     proc_spawn_sync(args);
 }
 
-static void output_csv_file(PerfProfBatchGroup *batch) {
+static void output_csv_file(PerfProfBatch *batch) {
     printf("\n\n\n");
     char dump_dir[OS_MAX_PATH];
     char data_csv_file[OS_MAX_PATH];
@@ -831,7 +844,7 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
                      perf_idx++) {
                     Perf *perf = &value->perfs[perf_idx];
 
-                    double data = is_time_profile ? perf->secs : perf->obj_ub;
+                    double data = is_time_profile ? perf->secs : perf->cost;
 
                     if (0 == strcmp(perf->solver_name, solver_name)) {
                         fprintf(fh, ",%.17g", data);
