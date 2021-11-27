@@ -134,6 +134,13 @@ static const int32_t RANDOM_SEEDS[] = {
     13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
 };
 
+Perf make_invalidated_perf(PerfProfBatchGroup *bgroup) {
+    Perf perf = {0};
+    perf.obj_ub = INFINITY;
+    perf.secs = 2.0 * bgroup->timelimit;
+    return perf;
+}
+
 void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
     if (!G_perftbl) {
         sh_new_strdup(G_perftbl);
@@ -204,8 +211,7 @@ static void my_sighandler(int signum) {
 
 Perf perf_from_cptp_generated_json(Hash *hash, char *solver_name, cJSON *root) {
     Perf perf = {0};
-    perf.secs = 2 * G_active_bgroup->timelimit;
-    perf.obj_ub = INFINITY;
+    make_invalidated_perf(G_active_bgroup);
     memcpy(&perf.hash, hash, sizeof(*hash));
 
     if (solver_name) {
@@ -233,9 +239,8 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
 
     PerfProfProcessInfo *info = user_handle;
     if (p) {
-        Perf perf;
-        perf.obj_ub = INFINITY;
-        perf.secs = 2.0 * G_active_bgroup->timelimit;
+        Perf perf = make_invalidated_perf(G_active_bgroup);
+
         if (exit_status == 0) {
             char *contents = fread_all_into_null_terminated_string(
                 info->json_output_path, NULL);
@@ -257,14 +262,14 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             } else {
                 perf = perf_from_cptp_generated_json(&info->hash,
                                                      info->solver_name, root);
-
-                // TODO: Do something with the perf
             }
             cJSON_Delete(root);
             free(contents);
         } else {
-            // TODO: Pretend that generated huge cost and took the entire
-            // timelimit time
+            fprintf(stderr,
+                    "\n\n\nSolver `%s` returned with non 0 exit status. Got "
+                    "%d\n\n\n",
+                    info->solver_name, exit_status);
         }
 
         printf("Got perf ::: sha = %s, solver_name = %s, time = %.17g, obj_ub "
