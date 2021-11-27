@@ -135,14 +135,22 @@ static const int32_t RANDOM_SEEDS[] = {
     13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
 };
 
-Perf make_invalidated_perf(PerfProfBatchGroup *bgroup) {
+Perf make_invalidated_perf(char *solver_name, Hash *hash,
+                           PerfProfBatchGroup *bgroup) {
     Perf perf = {0};
     perf.obj_ub = INFINITY;
     perf.secs = 2.0 * bgroup->timelimit;
+    strncpy_safe(perf.solver_name, solver_name, ARRAY_LEN(perf.solver_name));
+    memcpy(perf.hash.cstr, hash->cstr, ARRAY_LEN(perf.hash.cstr));
     return perf;
 }
 
 void insert_perf_to_table(char *solver_name, Hash *hash, Perf *p) {
+
+    printf("Got perf ::: sha = %s, solver_name = %s, time = %.17g, obj_ub "
+           "= %.17g\n",
+           p->hash.cstr, solver_name, p->secs, p->obj_ub);
+
     if (!G_perftbl) {
         sh_new_strdup(G_perftbl);
     }
@@ -210,15 +218,9 @@ static void my_sighandler(int signum) {
     }
 }
 
-Perf perf_from_cptp_generated_json(Hash *hash, char *solver_name, cJSON *root) {
-    Perf perf = {0};
-    make_invalidated_perf(G_active_bgroup);
-    memcpy(&perf.hash, hash, sizeof(*hash));
-
-    if (solver_name) {
-        snprintf_safe(perf.solver_name, ARRAY_LEN(perf.solver_name), "%s",
-                      solver_name);
-    }
+Perf extract_perf_data_from_cptp_json_file(Hash *hash, char *solver_name,
+                                           cJSON *root) {
+    Perf perf = make_invalidated_perf(solver_name, hash, G_active_bgroup);
 
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
     cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
@@ -233,6 +235,35 @@ Perf perf_from_cptp_generated_json(Hash *hash, char *solver_name, cJSON *root) {
     return perf;
 }
 
+void update_perf_tbl_with_cptp_json_perf_data(PerfProfProcessInfo *info) {
+
+    Perf perf =
+        make_invalidated_perf(info->solver_name, &info->hash, G_active_bgroup);
+
+    char *contents =
+        fread_all_into_null_terminated_string(info->json_output_path, NULL);
+    if (!contents) {
+        fprintf(stderr, "Failed to load JSON contents from `%s`\n",
+                info->json_output_path);
+    } else if (contents && contents[0] != '0') {
+        cJSON *root = cJSON_Parse(contents);
+        if (!root) {
+            fprintf(stderr, "Failed to parse JSON contents from `%s`\n",
+                    info->json_output_path);
+        } else {
+            perf = extract_perf_data_from_cptp_json_file(
+                &info->hash, info->solver_name, root);
+            cJSON_Delete(root);
+        }
+    }
+
+    if (contents) {
+        free(contents);
+    }
+
+    insert_perf_to_table(info->solver_name, &info->hash, &perf);
+}
+
 void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     if (!user_handle) {
         return;
@@ -240,44 +271,22 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
 
     PerfProfProcessInfo *info = user_handle;
     if (p) {
-        Perf perf = make_invalidated_perf(G_active_bgroup);
 
         if (exit_status == 0) {
-            char *contents = fread_all_into_null_terminated_string(
-                info->json_output_path, NULL);
-            if (!contents) {
-                fprintf(stderr,
-                        "Failed to load JSON contents from `%s` produced from "
-                        "PID %d\n",
-                        info->json_output_path, p->pid);
-                exit(1);
-            }
-            cJSON *root = cJSON_Parse(contents);
-            if (!root) {
-                fprintf(stderr,
-                        "Failed to parse JSON contents from `%s` produced "
-                        "from PID "
-                        "%d\n",
-                        info->json_output_path, p->pid);
-                exit(1);
-            } else {
-                perf = perf_from_cptp_generated_json(&info->hash,
-                                                     info->solver_name, root);
-            }
-            cJSON_Delete(root);
-            free(contents);
+            update_perf_tbl_with_cptp_json_perf_data(info);
         } else {
             fprintf(stderr,
                     "\n\n\nSolver `%s` returned with non 0 exit status. Got "
                     "%d\n\n\n",
                     info->solver_name, exit_status);
-        }
 
-        printf("Got perf ::: sha = %s, solver_name = %s, time = %.17g, obj_ub "
-               "= %.17g\n",
-               perf.hash.cstr, info->solver_name, perf.secs, perf.obj_ub);
-        insert_perf_to_table(info->solver_name, &info->hash, &perf);
+            Perf perf = make_invalidated_perf(info->solver_name, &info->hash,
+                                              G_active_bgroup);
+
+            insert_perf_to_table(info->solver_name, &info->hash, &perf);
+        }
     }
+
     free(info);
 }
 
@@ -403,6 +412,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
             printf(" %s", args[i]);
         }
         printf("\n");
+        update_perf_tbl_with_cptp_json_perf_data(pinfo);
         free(pinfo);
     }
 }
@@ -643,7 +653,7 @@ static void generate_performance_profile_using_python_script(
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
     double shift = 1.0;
-    double max_ratio = 4.0;
+    double max_ratio = 1.01;
 
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
