@@ -343,8 +343,6 @@ Perf extract_perf_data_from_bapcod_json_file(Hash *hash, cJSON *root) {
     Perf perf =
         make_invalidated_perf(BAPCOD_SOLVER_NAME, hash, G_active_bgroup);
 
-    debug_break();
-
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
 
@@ -390,6 +388,8 @@ static void update_perf_tbl_with_bapcod_json_perf_data(Hash *hash,
                 perf = extract_perf_data_from_bapcod_json_file(hash, root);
                 cJSON_Delete(root);
             }
+
+            free(contents);
         }
     }
     insert_perf_to_table(BAPCOD_SOLVER_NAME, hash, &perf);
