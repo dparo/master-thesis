@@ -427,7 +427,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
         return;
     }
 
-    char *args[PROC_MAX_ARGS];
+    char *args[PROC_MAX_ARGS] = {0};
     int32_t argidx = 0;
 
     char timelimit[128];
@@ -796,6 +796,7 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = xlabel_str;
     args[argidx++] = csv_input_file;
     args[argidx++] = output_file;
+    args[argidx++] = NULL;
 
     proc_spawn_sync(args);
 }
