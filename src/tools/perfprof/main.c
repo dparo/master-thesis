@@ -295,7 +295,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     free(handle);
 }
 
-static void sha256_finalize_to_string(SHA256_CTX *shactx, Hash *hash) {
+static void hash_finalize(SHA256_CTX *shactx, Hash *hash) {
 
     BYTE bytes[32];
 
@@ -320,7 +320,7 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
         log_fatal("%s: Failed to hash (sha256) file contents\n", fpath);
         abort();
     }
-    sha256_finalize_to_string(&shactx, hash);
+    hash_finalize(&shactx, hash);
     free(contents);
 }
 
@@ -341,7 +341,7 @@ Hash compute_run_hash(const Hash *exe_hash, const PerfProfRunInput *input,
     }
 
     Hash result = {0};
-    sha256_finalize_to_string(&shactx, &result);
+    hash_finalize(&shactx, &result);
     return result;
 }
 
@@ -422,7 +422,7 @@ static void handle_bapcod_solver(PerfProcRunHandle *handle) {
     }
 }
 
-static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
+static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -444,7 +444,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
                       G_active_bgroup->timelimit);
 
     char seed_str[128];
-    snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", instance->seed);
+    snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", input->seed);
 
     args[argidx++] = "timeout";
     args[argidx++] = "-k";
@@ -456,21 +456,20 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
     args[argidx++] = "--seed";
     args[argidx++] = seed_str;
     args[argidx++] = "-i";
-    args[argidx++] = (char *)instance->filepath;
+    args[argidx++] = (char *)input->filepath;
 
     for (int32_t i = 0; solver->args[i] != NULL; i++) {
         args[argidx++] = solver->args[i];
     }
 
     PerfProcRunHandle *handle = malloc(sizeof(*handle));
-    handle->run_hash =
-        compute_run_hash(&G_cptp_exe_hash, instance, args, argidx);
-
+    handle->run_hash = compute_run_hash(&G_cptp_exe_hash, input, args, argidx);
+    handle->input.seed = input->seed;
     snprintf_safe(handle->solver_name, ARRAY_LEN(handle->solver_name), "%s",
                   solver->name);
     snprintf_safe(handle->input.filepath, ARRAY_LEN(handle->input.filepath),
-                  "%s", instance->filepath);
-    strncpy_safe(handle->input.hash.cstr, instance->hash.cstr,
+                  "%s", input->filepath);
+    strncpy_safe(handle->input.hash.cstr, input->hash.cstr,
                  ARRAY_LEN(handle->input.hash.cstr));
 
     Path fpath_basename;
@@ -478,7 +477,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
 
     snprintf_safe(handle->json_output_path, ARRAY_LEN(handle->json_output_path),
                   "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, handle->run_hash.cstr,
-                  os_basename(instance->filepath, &fpath_basename));
+                  os_basename(input->filepath, &fpath_basename));
 
     args[argidx++] = "-w";
     args[argidx++] = (char *)handle->json_output_path;
@@ -508,7 +507,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *instance) {
     }
 }
 
-void handle_vrp_instance(const char *fpath, int32_t seed, Hash *instance_hash) {
+void handle_vrp_instance(PerfProfRunInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -517,7 +516,8 @@ void handle_vrp_instance(const char *fpath, int32_t seed, Hash *instance_hash) {
          (G_active_bgroup->solvers[solver_idx].name != NULL);
          solver_idx++) {
         PerfProfSolver *solver = &G_active_bgroup->solvers[solver_idx];
-        run_solver(solver, fpath, seed, instance_hash);
+
+        run_solver(solver, input);
         if (G_pool.max_num_procs == 1) {
             proc_pool_join(&G_pool);
         }
@@ -547,15 +547,20 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
             if (is_valid_instance(&instance)) {
                 Filter *filter = &G_active_bgroup->filter;
                 if (!is_filtered_instance(filter, &instance)) {
-                    Hash instance_hash;
-                    sha256_hash_file_contents(fpath, &instance_hash);
+
+                    PerfProfRunInput input = {0};
+                    strncpy_safe(input.filepath, fpath,
+                                 ARRAY_LEN(input.filepath));
+
+                    sha256_hash_file_contents(fpath, &input.hash);
+
                     for (int32_t seedidx = 0;
                          seedidx < MIN(G_active_bgroup->nseeds,
                                        (int32_t)ARRAY_LEN(RANDOM_SEEDS)) &&
                          !G_should_terminate;
                          seedidx++) {
-                        handle_vrp_instance(fpath, RANDOM_SEEDS[seedidx],
-                                            &instance_hash);
+                        input.seed = RANDOM_SEEDS[seedidx];
+                        handle_vrp_instance(&input);
                     }
                 } else {
                     printf("%s: Skipping since it does not match filter\n",
@@ -633,7 +638,7 @@ static void init(void) {
 
         sha256_init(&shactx);
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
-        sha256_finalize_to_string(&shactx, &G_cptp_exe_hash);
+        hash_finalize(&shactx, &G_cptp_exe_hash);
     }
 }
 
@@ -836,13 +841,14 @@ static void output_csv_file(PerfProfBatch *batch) {
                 char *solver_name = batch->solvers[curr_solver_idx].name;
 
                 // Scan the list to find the matching solver perf data
-                for (int32_t perf_idx = 0; perf_idx < value->num_perfs;
-                     perf_idx++) {
-                    Perf *perf = &value->perfs[perf_idx];
+                for (int32_t run_idx = 0; run_idx < value->num_perfs;
+                     run_idx++) {
+                    PerfProfRun *run = &value->runs[run_idx];
 
-                    double data = is_time_profile ? perf->time : perf->cost;
+                    double data =
+                        is_time_profile ? run->perf.time : run->perf.cost;
 
-                    if (0 == strcmp(perf->solver_name, solver_name)) {
+                    if (0 == strcmp(run->solver_name, solver_name)) {
                         fprintf(fh, ",%.17g", data);
                     }
                 }
