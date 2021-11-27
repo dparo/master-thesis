@@ -340,8 +340,13 @@ static void compute_whole_sha256(Hash *hash, const Hash *exe_hash,
     sha256_finalize_to_string(&shactx, hash);
 }
 
-static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
-                       Hash *instance_hash) {
+static void handle_bapcod_solver(const char *instance_filepath) {
+    Path instance_filepath_dirname;
+    os_dirname(instance_filepath, &instance_filepath_dirname);
+}
+
+static void run_solver(PerfProfSolver *solver, const char *instance_filepath,
+                       int32_t seed, Hash *instance_hash) {
     if (G_should_terminate) {
         return;
     }
@@ -375,7 +380,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     args[argidx++] = "--seed";
     args[argidx++] = seed_str;
     args[argidx++] = "-i";
-    args[argidx++] = (char *)fpath;
+    args[argidx++] = (char *)instance_filepath;
 
     for (int32_t i = 0; solver->args[i] != NULL; i++) {
         args[argidx++] = solver->args[i];
@@ -392,7 +397,7 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
 
     snprintf_safe(pinfo->json_output_path, ARRAY_LEN(pinfo->json_output_path),
                   "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, pinfo->hash.cstr,
-                  os_basename(fpath, &fpath_basename));
+                  os_basename(instance_filepath, &fpath_basename));
 
     args[argidx++] = "-w";
     args[argidx++] = (char *)pinfo->json_output_path;
@@ -404,16 +409,21 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     //
     // Check if the JSON output is already cached on disk
     //
-    if (!os_fexists(pinfo->json_output_path)) {
-        proc_pool_queue(&G_pool, pinfo, args);
+    if (0 == strcmp(solver->name, BAPCOD_SOLVER_NAME) &&
+        solver->args[0] == NULL) {
+        handle_bapcod_solver(instance_filepath);
     } else {
-        printf("Found cache for hash %s. CMD:", pinfo->hash.cstr);
-        for (int32_t i = 0; args[i] && i < argidx; i++) {
-            printf(" %s", args[i]);
+        if (!os_fexists(pinfo->json_output_path)) {
+            proc_pool_queue(&G_pool, pinfo, args);
+        } else {
+            printf("Found cache for hash %s. CMD:", pinfo->hash.cstr);
+            for (int32_t i = 0; args[i] && i < argidx; i++) {
+                printf(" %s", args[i]);
+            }
+            printf("\n");
+            update_perf_tbl_with_cptp_json_perf_data(pinfo);
+            free(pinfo);
         }
-        printf("\n");
-        update_perf_tbl_with_cptp_json_perf_data(pinfo);
-        free(pinfo);
     }
 }
 
@@ -558,16 +568,14 @@ static void main_loop(void) {
          4,
          "./data/ESPPRC - Test Instances/vrps",
          (Filter){NULL, {0, 72}, {0, 0}},
-         {{"A",
-           {
-               "--solver",
-               "mip",
-           }},
-          {"B",
-           {
-               "--solver",
-               "mip",
-           }}}}};
+         {
+             {"A",
+              {
+                  "--solver",
+                  "mip",
+              }},
+             BAPCOD_SOLVER,
+         }}};
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {
@@ -653,7 +661,7 @@ static void generate_performance_profile_using_python_script(
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
     double shift = 1.0;
-    double max_ratio = 1.01;
+    double max_ratio = 4.0;
 
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
