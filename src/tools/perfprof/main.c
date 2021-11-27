@@ -243,13 +243,13 @@ void update_perf_tbl_with_cptp_json_perf_data(PerfProfProcessInfo *info) {
     char *contents =
         fread_all_into_null_terminated_string(info->json_output_path, NULL);
     if (!contents) {
-        fprintf(stderr, "Failed to load JSON contents from `%s`\n",
-                info->json_output_path);
+        log_warn("Failed to load JSON contents from `%s`\n",
+                 info->json_output_path);
     } else if (contents && contents[0] != '0') {
         cJSON *root = cJSON_Parse(contents);
         if (!root) {
-            fprintf(stderr, "Failed to parse JSON contents from `%s`\n",
-                    info->json_output_path);
+            log_warn("Failed to parse JSON contents from `%s`\n",
+                     info->json_output_path);
         } else {
             perf = extract_perf_data_from_cptp_json_file(
                 &info->hash, info->solver_name, root);
@@ -275,10 +275,9 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
         if (exit_status == 0) {
             update_perf_tbl_with_cptp_json_perf_data(info);
         } else {
-            fprintf(stderr,
-                    "\n\n\nSolver `%s` returned with non 0 exit status. Got "
-                    "%d\n\n\n",
-                    info->solver_name, exit_status);
+            log_warn("\n\n\nSolver `%s` returned with non 0 exit status. Got "
+                     "%d\n\n\n",
+                     info->solver_name, exit_status);
 
             Perf perf = make_invalidated_perf(info->solver_name, &info->hash,
                                               G_active_bgroup);
@@ -312,7 +311,7 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
     if (contents) {
         sha256_update(&shactx, (BYTE *)contents, len);
     } else {
-        fprintf(stderr, "%s: Failed to hash (sha256) file contents\n", fpath);
+        log_fatal("%s: Failed to hash (sha256) file contents\n", fpath);
         abort();
     }
     sha256_finalize_to_string(&shactx, hash);
@@ -340,9 +339,27 @@ static void compute_whole_sha256(Hash *hash, const Hash *exe_hash,
     sha256_finalize_to_string(&shactx, hash);
 }
 
+static void update_perf_tbl_with_bapcod_json_perf_data(void) {}
+
 static void handle_bapcod_solver(const char *instance_filepath) {
     Path instance_filepath_dirname;
-    os_dirname(instance_filepath, &instance_filepath_dirname);
+    Path instance_filepath_basename;
+    char *dirname = os_dirname(instance_filepath, &instance_filepath_dirname);
+    char *basename = os_basename(instance_filepath, &instance_filepath_dirname);
+
+    char json_output_file[OS_MAX_PATH];
+
+    snprintf_safe(json_output_file, ARRAY_LEN(json_output_file),
+                  "%s/%s.info.json", dirname, basename);
+
+    if (os_fexists(json_output_file)) {
+        update_perf_tbl_with_bapcod_json_perf_data();
+    } else {
+        log_warn("%s: BapCod JSON output file does not exist!!!\n",
+                 json_output_file);
+    }
+
+    debug_break();
 }
 
 static void run_solver(PerfProfSolver *solver, const char *instance_filepath,
@@ -482,7 +499,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                 }
                 instance_destroy(&instance);
             } else {
-                fprintf(stderr, "%s: Failed to parse input file\n", fpath);
+                log_fatal("%s: Failed to parse input file\n", fpath);
                 exit(EXIT_FAILURE);
             }
         }
@@ -528,10 +545,9 @@ static void do_batch(PerfProfBatchGroup *bgroup) {
             if (i != j) {
                 if (0 ==
                     strcmp(bgroup->solvers[i].name, bgroup->solvers[j].name)) {
-                    fprintf(stderr,
-                            "\n\nInternal perfprof error: detected duplicate "
-                            "name `%s` in group %s\n",
-                            bgroup->solvers[i].name, bgroup->name);
+                    log_fatal("\n\nInternal perfprof error: detected duplicate "
+                              "name `%s` in group %s\n",
+                              bgroup->solvers[i].name, bgroup->name);
                     abort();
                 }
             }
@@ -566,7 +582,8 @@ static void main_loop(void) {
          "Integer separation vs Fractional separation",
          600.0,
          4,
-         "./data/ESPPRC - Test Instances/vrps",
+         // "./data/ESPPRC - Test Instances/vrps",
+         "data/BaPCod generated - Test instances/A-n37-k5",
          (Filter){NULL, {0, 72}, {0, 0}},
          {
              {"A",
@@ -584,10 +601,10 @@ static void main_loop(void) {
             }
 
             if (0 == strcmp(batches[i].name, batches[j].name)) {
-                fprintf(stderr,
-                        "\n\nInternal perfprof error: detected duplicate batch "
-                        "names (`%s`)\n",
-                        batches[i].name);
+                log_fatal(
+                    "\n\nInternal perfprof error: detected duplicate batch "
+                    "names (`%s`)\n",
+                    batches[i].name);
                 abort();
             }
         }
@@ -720,7 +737,7 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
 
         FILE *fh = fopen(data_csv_file, "w");
         if (!fh) {
-            fprintf(stderr, "%s: failed to output csv data\n", data_csv_file);
+            log_warn("%s: failed to output csv data\n", data_csv_file);
             return;
         }
 

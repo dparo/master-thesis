@@ -109,6 +109,8 @@ extern "C" {
 #define todo(...) assert(!"!!!TODO!!!")
 #define todo_msg(msg) assert(!(msg))
 
+#include <debugbreak.h>
+
 #if __cplusplus
 }
 #endif

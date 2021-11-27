@@ -94,7 +94,12 @@ fetchgitsubmodule("${DEPS_DIR}/argtable3")
 fetchgitsubmodule("${DEPS_DIR}/stb")
 fetchgitsubmodule("${DEPS_DIR}/cJSON")
 fetchgitsubmodule("${DEPS_DIR}/crypto-algorithms")
+fetchgitsubmodule("${DEPS_DIR}/debugbreak")
 
+
+# Customize debubbreak
+add_library(debugbreak INTERFACE)
+target_include_directories(debugbreak INTERFACE "${DEPS_DIR}/debugbreak/")
 
 # Customize logc
 add_library(logc STATIC "${DEPS_DIR}/log.c/src/log.c")

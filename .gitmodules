@@ -19,3 +19,6 @@
 [submodule "deps/crypto-algorithms"]
 	path = deps/crypto-algorithms
 	url = https://github.com/B-Con/crypto-algorithms
+[submodule "deps/debugbreak"]
+	path = deps/debugbreak
+	url = https://github.com/scottt/debugbreak
