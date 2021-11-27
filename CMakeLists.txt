@@ -61,7 +61,13 @@ endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_ADRESS_SANITIZER)
   if(CMAKE_C_COMPILER_ID STREQUAL "GNU" OR CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    set(SANITIZE_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined,bounds")
+
+    if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+        set(SANITIZE_FLAGS "-fno-omit-frame-pointer -fsanitize=memory,address,undefined,bounds")
+    elseif(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        set(SANITIZE_FLAGS "-fno-omit-frame-pointer -fsanitize=address,undefined,bounds")
+    endif()
+
     string(APPEND CMAKE_C_FLAGS_DEBUG " ${SANITIZE_FLAGS}")
     string(APPEND CMAKE_C_FLAGS_RELWITHDEBINFO " ${SANITIZE_FLAGS}")
 
