@@ -339,9 +339,63 @@ static void compute_whole_sha256(Hash *hash, const Hash *exe_hash,
     sha256_finalize_to_string(&shactx, hash);
 }
 
-static void update_perf_tbl_with_bapcod_json_perf_data(void) { debug_break(); }
+Perf extract_perf_data_from_bapcod_json_file(Hash *hash, cJSON *root) {
+    Perf perf =
+        make_invalidated_perf(BAPCOD_SOLVER_NAME, hash, G_active_bgroup);
 
-static void handle_bapcod_solver(const char *instance_filepath) {
+    debug_break();
+
+    cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
+    if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
+
+        cJSON *columns_cost =
+            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "columns-cost");
+
+        cJSON *itm_took =
+            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
+
+        if (itm_took && cJSON_IsNumber(itm_took)) {
+            perf.secs = cJSON_GetNumberValue(itm_took);
+        }
+
+        if (columns_cost && cJSON_IsArray(columns_cost)) {
+            cJSON *elem = NULL;
+            int32_t num_elems = 0;
+            cJSON_ArrayForEach(elem, columns_cost) { num_elems += 1; }
+
+            if (num_elems == 1) {
+                cJSON_ArrayForEach(elem, columns_cost) {
+                    cJSON *itm_cost = elem;
+                    if (itm_cost && cJSON_IsNumber(itm_cost)) {
+                        perf.obj_ub = cJSON_GetNumberValue(itm_cost);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    return perf;
+}
+
+static void update_perf_tbl_with_bapcod_json_perf_data(Hash *hash,
+                                                       char *json_filepath) {
+    Perf perf =
+        make_invalidated_perf(BAPCOD_SOLVER_NAME, hash, G_active_bgroup);
+    if (json_filepath) {
+        char *contents =
+            fread_all_into_null_terminated_string(json_filepath, NULL);
+        if (contents) {
+            cJSON *root = cJSON_Parse(contents);
+            if (root) {
+                perf = extract_perf_data_from_bapcod_json_file(hash, root);
+                cJSON_Delete(root);
+            }
+        }
+    }
+    insert_perf_to_table(BAPCOD_SOLVER_NAME, hash, &perf);
+}
+
+static void handle_bapcod_solver(Hash *hash, const char *instance_filepath) {
     Path instance_filepath_dirname;
     Path instance_filepath_basename;
     char *dirname = os_dirname(instance_filepath, &instance_filepath_dirname);
@@ -352,14 +406,14 @@ static void handle_bapcod_solver(const char *instance_filepath) {
 
     snprintf_safe(json_output_file, ARRAY_LEN(json_output_file),
                   "%s/%.*s.info.json", dirname,
-                  os_get_fext(basename) - basename - 1, basename);
+                  (int)(os_get_fext(basename) - basename - 1), basename);
 
-    if (os_fexists(json_output_file)) {
-        update_perf_tbl_with_bapcod_json_perf_data();
-    } else {
+    if (!os_fexists(json_output_file)) {
         log_warn("%s: BapCod JSON output file does not exist!!!\n",
                  json_output_file);
-        debug_break();
+        update_perf_tbl_with_bapcod_json_perf_data(hash, NULL);
+    } else {
+        update_perf_tbl_with_bapcod_json_perf_data(hash, json_output_file);
     }
 }
 
@@ -429,7 +483,7 @@ static void run_solver(PerfProfSolver *solver, const char *instance_filepath,
     //
     if (0 == strcmp(solver->name, BAPCOD_SOLVER_NAME) &&
         solver->args[0] == NULL) {
-        handle_bapcod_solver(instance_filepath);
+        handle_bapcod_solver(&pinfo->hash, instance_filepath);
     } else {
         if (!os_fexists(pinfo->json_output_path)) {
             proc_pool_queue(&G_pool, pinfo, args);
