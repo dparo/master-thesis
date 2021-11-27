@@ -106,7 +106,8 @@ typedef struct {
 #define CPTP_EXE "./build/Release/src/cptp"
 #endif
 
-#define BAPCOD_SOLVER_NAME ("BaPCod")
+#define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/perfprof.py"
+#define BAPCOD_SOLVER_NAME "BaPCod"
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
 static Hash G_cptp_exe_hash;
@@ -391,6 +392,9 @@ static void run_solver(PerfProfSolver *solver, const char *fpath, int32_t seed,
     os_mkdir(os_dirname(pinfo->json_output_path, &json_report_path_basename),
              true);
 
+    //
+    // Check if the JSON output is already cached on disk
+    //
     if (!os_fexists(pinfo->json_output_path)) {
         proc_pool_queue(&G_pool, pinfo, args);
     } else {
@@ -622,6 +626,62 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+static void generate_performance_profile_using_python_script(
+    PerfProfBatchGroup *batch, char *csv_input_file, bool is_time_profile) {
+    char *args[PROC_MAX_ARGS];
+    int32_t argidx = 0;
+
+    char title[512];
+
+    char shift_str[128];
+    char max_ratio_str[128];
+
+    char timelimit_str[128];
+    char *xlabel_str = is_time_profile ? "Time Ratio" : "Cost ratio";
+
+    // double shift = batch->shift > 0 ? batch->shift : 1.0;
+    // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
+
+    double shift = 1.0;
+    double max_ratio = 4.0;
+
+    Path csv_input_file_basename;
+    char output_file[OS_MAX_PATH];
+
+    snprintf_safe(output_file, ARRAY_LEN(output_file), "%s/%s-plot.pdf",
+                  os_dirname(csv_input_file, &csv_input_file_basename),
+                  xlabel_str);
+
+    snprintf_safe(shift_str, ARRAY_LEN(shift_str), "%g", shift);
+    snprintf_safe(max_ratio_str, ARRAY_LEN(max_ratio_str), "%g", max_ratio);
+    snprintf_safe(timelimit_str, ARRAY_LEN(timelimit_str), "%g",
+                  is_time_profile ? batch->timelimit : 1e99);
+
+    snprintf_safe(title, ARRAY_LEN(title), "%s (S=%s, M=%s)", batch->name,
+                  shift_str, max_ratio_str);
+
+    args[argidx++] = "python3";
+    args[argidx++] = PYTHON3_PERF_SCRIPT;
+    args[argidx++] = "--delimiter";
+    args[argidx++] = ",";
+    args[argidx++] = "--shift";
+    args[argidx++] = shift_str;
+    args[argidx++] = "--maxratio";
+    args[argidx++] = max_ratio_str;
+    args[argidx++] = "--timelimit";
+    args[argidx++] = timelimit_str;
+    args[argidx++] = "--plot-title";
+    args[argidx++] = title;
+    args[argidx++] = "--startidx"; // Start index to associated with the colors
+    args[argidx++] = "0";
+    args[argidx++] = "--x-label"; // Start index to associated with the colors
+    args[argidx++] = xlabel_str;
+    args[argidx++] = csv_input_file;
+    args[argidx++] = output_file;
+
+    proc_spawn_sync(args);
+}
+
 static void output_csv_file(PerfProfBatchGroup *batch) {
     printf("\n\n\n");
     char dump_dir[OS_MAX_PATH];
@@ -634,7 +694,8 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
     os_mkdir(dump_dir, true);
 
     for (int32_t data_dump_idx = 0; data_dump_idx < 2; data_dump_idx++) {
-        char *filename = data_dump_idx == 0 ? "time-data.csv" : "cost-data.csv";
+        bool is_time_profile = data_dump_idx == 0;
+        char *filename = is_time_profile ? "time-data.csv" : "cost-data.csv";
 
         snprintf_safe(data_csv_file, ARRAY_LEN(data_csv_file), "%s/%s",
                       dump_dir, filename);
@@ -654,7 +715,7 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
         // Write out the header
         fprintf(fh, "%d", num_solvers);
         for (int32_t i = 0; i < num_solvers; i++) {
-            fprintf(fh, "\t%s", batch->solvers[i].name);
+            fprintf(fh, ",%s", batch->solvers[i].name);
         }
         fprintf(fh, "\n");
 
@@ -680,11 +741,10 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
                      perf_idx++) {
                     Perf *perf = &value->perfs[perf_idx];
 
-                    double data =
-                        data_dump_idx == 0 ? perf->secs : perf->obj_ub;
+                    double data = is_time_profile ? perf->secs : perf->obj_ub;
 
                     if (0 == strcmp(perf->solver_name, solver_name)) {
-                        fprintf(fh, "\t%.17g", data);
+                        fprintf(fh, ",%.17g", data);
                     }
                 }
             }
@@ -693,5 +753,9 @@ static void output_csv_file(PerfProfBatchGroup *batch) {
         }
 
         fclose(fh);
+
+        // Generate the performance profile from the CSV file
+        generate_performance_profile_using_python_script(batch, data_csv_file,
+                                                         is_time_profile);
     }
 }

@@ -41,7 +41,7 @@ colors = [
 class CmdLineParser(object):
     def __init__(self):
         self.parser = OptionParser(
-            usage="usage: python2 perfprof.py [options] cvsfile.csv outputfile.pdf"
+            usage="usage: python3 perfprof.py [options] cvsfile.csv outputfile.pdf"
         )
         # default options
         self.parser.add_option(
