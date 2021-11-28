@@ -168,26 +168,26 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
         sh_new_strdup(G_perftbl);
     }
     if (!shgetp_null(G_perftbl, input_instance->hash.cstr)) {
-        PerfTblValue empty_entry = {0};
-        shput(G_perftbl, input_instance->hash.cstr, empty_entry);
+        PerfTblValue zero_value = {0};
+        shput(G_perftbl, input_instance->hash.cstr, zero_value);
     }
 
-    PerfTblValue *e = NULL;
+    PerfTblValue *v = NULL;
     {
         PerfTblEntry *t = shgetp(G_perftbl, input_instance->hash.cstr);
         assert(t);
         if (t) {
-            e = &t->value;
+            v = &t->value;
         }
     }
 
-    if (!e) {
+    if (!v) {
         return;
     }
 
     int32_t i = 0;
-    for (i = 0; i < e->num_runs; i++) {
-        if (0 == strcmp(run->solver_name, e->runs[i].solver_name)) {
+    for (i = 0; i < v->num_runs; i++) {
+        if (0 == strcmp(run->solver_name, v->runs[i].solver_name)) {
             // Need to update previous perf
             // BUT... This is an invalid case to happen
             assert(0);
@@ -195,14 +195,14 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
         }
     }
 
-    if (i == e->num_runs && (e->num_runs < (int32_t)ARRAY_LEN(e->runs))) {
-        e->num_runs++;
+    if (i == v->num_runs && (v->num_runs < (int32_t)ARRAY_LEN(v->runs))) {
+        v->num_runs++;
     } else {
         assert(0);
     }
 
-    if (i < e->num_runs) {
-        memcpy(&e->runs[i], run, MIN(sizeof(e->runs[i]), sizeof(*run)));
+    if (i < v->num_runs) {
+        memcpy(&v->runs[i], run, MIN(sizeof(v->runs[i]), sizeof(*run)));
     } else {
         log_fatal("Bad internal error. Too much solvers specified in the same "
                   "batch, or internal bug!!");
