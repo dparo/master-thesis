@@ -40,6 +40,7 @@
 #include "proc.h"
 #include "os.h"
 #include "parser.h"
+#include "core-utils.h"
 
 #include <ftw.h>
 
@@ -120,6 +121,17 @@ typedef struct {
 #define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/perfprof.py"
 #define BAPCOD_SOLVER_NAME "BaPCod"
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
+
+#define SHA256_UPDATE_WITH_VAR(shactx, var)                                    \
+    do {                                                                       \
+        sha256_update((shactx), (const BYTE *)(&(var)), sizeof(var));          \
+    } while (0)
+
+#define SHA256_UPDATE_WITH_ARRAY(shactx, array, num_elems)                     \
+    do {                                                                       \
+        sha256_update((shactx), (const BYTE *)(array),                         \
+                      (num_elems) * sizeof(*(array)));                         \
+    } while (0)
 
 static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
@@ -308,6 +320,42 @@ static void sha256_hash_finalize(SHA256_CTX *shactx, Hash *hash) {
     hash->cstr[ARRAY_LEN(hash->cstr) - 1] = 0;
 }
 
+static Hash hash_instance(const Instance *instance) {
+    SHA256_CTX shactx;
+    sha256_init(&shactx);
+
+    SHA256_UPDATE_WITH_VAR(&shactx, instance->num_customers);
+    SHA256_UPDATE_WITH_VAR(&shactx, instance->num_vehicles);
+    SHA256_UPDATE_WITH_VAR(&shactx, instance->vehicle_cap);
+
+    int32_t n = instance->num_customers + 1;
+
+    if (instance->positions) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->positions, n);
+    }
+
+    if (instance->demands) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->demands, n);
+    }
+
+    if (instance->demands) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->demands, n);
+    }
+
+    if (instance->duals) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->duals, n);
+    }
+
+    if (instance->edge_weight) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->edge_weight,
+                                 hm_nentries(n));
+    }
+
+    Hash result = {0};
+    sha256_hash_finalize(&shactx, &result);
+    return result;
+}
+
 static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
 
     SHA256_CTX shactx;
@@ -315,7 +363,7 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
     size_t len = 0;
     char *contents = fread_all_into_null_terminated_string(fpath, &len);
     if (contents) {
-        sha256_update(&shactx, (BYTE *)contents, len);
+        sha256_update(&shactx, (const BYTE *)contents, len);
     } else {
         log_fatal("%s: Failed to hash (sha256) file contents\n", fpath);
         abort();
