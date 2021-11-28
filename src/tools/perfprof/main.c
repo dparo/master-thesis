@@ -601,8 +601,8 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                     strncpy_safe(input.filepath, fpath,
                                  ARRAY_LEN(input.filepath));
 
-                    sha256_hash_file_contents(fpath, &input.hash);
-                    printf("--- hash_file_contents :: computed_hash = %s\n",
+                    input.hash = hash_instance(&instance);
+                    printf("--- instance_hash :: computed_hash = %s\n",
                            input.hash.cstr);
 
                     for (int32_t seedidx = 0;
