@@ -89,17 +89,17 @@ typedef struct {
     Perf perf;
 } PerfProfRun;
 
-#define MAX_NUM_SOLVERS_PER_GROUP 8
+#define MAX_NUM_SOLVERS_PER_BATCH 8
 
-typedef struct PerfTblEntry {
-    int32_t num_perfs;
-    PerfProfRun runs[MAX_NUM_SOLVERS_PER_GROUP];
-} PerfTblEntry;
+typedef struct {
+    int32_t num_runs;
+    PerfProfRun runs[MAX_NUM_SOLVERS_PER_BATCH];
+} PerfTblValue;
 
-typedef struct PerfTbl {
+typedef struct {
     char *key;
-    PerfTblEntry value;
-} PerfTbl;
+    PerfTblValue value;
+} PerfTblEntry;
 
 typedef struct {
     int32_t max_num_procs;
@@ -108,7 +108,7 @@ typedef struct {
     int32_t nseeds;
     const char *scan_root_dir;
     Filter filter;
-    PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_GROUP];
+    PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_BATCH];
 } PerfProfBatch;
 
 #ifndef NDEBUG
@@ -125,7 +125,7 @@ static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
 static PerfProfBatch *G_active_bgroup = NULL;
-static PerfTbl *G_perftbl = NULL;
+static PerfTblEntry *G_perftbl = NULL;
 
 static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
 static const PerfProfSolver BAPCOD_SOLVER =
@@ -168,13 +168,13 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
         sh_new_strdup(G_perftbl);
     }
     if (!shgetp_null(G_perftbl, input_instance->hash.cstr)) {
-        PerfTblEntry empty_entry = {0};
+        PerfTblValue empty_entry = {0};
         shput(G_perftbl, input_instance->hash.cstr, empty_entry);
     }
 
-    PerfTblEntry *e = NULL;
+    PerfTblValue *e = NULL;
     {
-        PerfTbl *t = shgetp(G_perftbl, input_instance->hash.cstr);
+        PerfTblEntry *t = shgetp(G_perftbl, input_instance->hash.cstr);
         assert(t);
         if (t) {
             e = &t->value;
@@ -186,7 +186,7 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
     }
 
     int32_t i = 0;
-    for (i = 0; i < e->num_perfs; i++) {
+    for (i = 0; i < e->num_runs; i++) {
         if (0 == strcmp(run->solver_name, e->runs[i].solver_name)) {
             // Need to update previous perf
             // BUT... This is an invalid case to happen
@@ -195,13 +195,13 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
         }
     }
 
-    if (i == e->num_perfs && (e->num_perfs < (int32_t)ARRAY_LEN(e->runs))) {
-        e->num_perfs++;
+    if (i == e->num_runs && (e->num_runs < (int32_t)ARRAY_LEN(e->runs))) {
+        e->num_runs++;
     } else {
         assert(0);
     }
 
-    if (i < e->num_perfs) {
+    if (i < e->num_runs) {
         memcpy(&e->runs[i], run, MIN(sizeof(e->runs[i]), sizeof(*run)));
     } else {
         log_fatal("Bad internal error. Too much solvers specified in the same "
@@ -841,7 +841,7 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
         size_t tbl_len = shlenu(G_perftbl);
         for (size_t i = 0; i < tbl_len; i++) {
             char *key = G_perftbl[i].key;
-            PerfTblEntry *value = &G_perftbl[i].value;
+            PerfTblValue *value = &G_perftbl[i].value;
 
             fprintf(fh, "%s", key);
 
@@ -856,7 +856,7 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
                 char *solver_name = batch->solvers[curr_solver_idx].name;
 
                 // Scan the list to find the matching solver perf data
-                for (int32_t run_idx = 0; run_idx < value->num_perfs;
+                for (int32_t run_idx = 0; run_idx < value->num_runs;
                      run_idx++) {
                     PerfProfRun *run = &value->runs[run_idx];
 
