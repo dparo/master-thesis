@@ -72,3 +72,7 @@ This project makes use of thirdy party projects (located under `deps`) licensed 
 1. [rxi/log.c](https://github.com/rxi/log.c) [**MIT license**](https://github.com/rxi/log.c/blob/master/LICENSE)
 2. [argtable3/argtable3](https://github.com/argtable3/argtable3) [**BSD license**](https://github.com/argtable/argtable3/blob/master/LICENSE)
 3. [silentbicycle/greatest/](https://github.com/silentbicycle/greatest/) [**MIT license**](https://github.com/silentbicycle/greatest/blob/master/LICENSE)
+4. [DavGamble/cJSON](https://github.com/DaveGamble/cJSON) [**MIT license**](https://github.com/DaveGamble/cJSON/blob/master/LICENSE)
+5. [scottt/debugbreak](https://github.com/scottt/debugbreak) [**BSD2 license**](https://github.com/scottt/debugbreak/blob/master/COPYING)
+6. [B-Con/crypto-algorithms](https://github.com/B-Con/crypto-algorithms) **Public domain**
+7. [johthepro/doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) [**MIT license**](https://github.com/jothepro/doxygen-awesome-css/blob/main/LICENSE)
