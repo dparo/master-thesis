@@ -94,7 +94,6 @@ typedef struct {
 ///       this program. It will be stored in a hashmap and will live in memory
 ///       for the entire duration of the current batch.
 typedef struct {
-    Hash hash;
     char solver_name[48];
     Perf perf;
 } PerfProfRun;
@@ -149,7 +148,7 @@ typedef struct {
 static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
-static PerfProfBatch *G_active_bgroup = NULL;
+static PerfProfBatch *G_active_batch = NULL;
 static PerfTblEntry *G_perftbl = NULL;
 
 static const Filter DEFAULT_FILTER = ((Filter){NULL, {0, 99999}, {0, 99999}});
@@ -186,20 +185,20 @@ static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
                                           char *solver_name, Hash *run_hash) {
     PerfProfRun run = {0};
     strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
-    memcpy(run.hash.cstr, run_hash->cstr, ARRAY_LEN(run.hash.cstr));
     run.perf = make_invalidated_perf(batch);
     return run;
 }
 
 void insert_run_into_table(PerfProfInputUniqueId *uid, PerfProfRun *run) {
-    printf("Inserting run into table. Instance hash: %d:%s. Run ::: sha = %s, "
+    printf("Inserting run into table. Instance hash: %d:%s. Run ::: "
            "solver_name = %s, "
            "time = %.17g, obj_ub "
            "= %.17g\n",
-           uid->seedidx, uid->hash.cstr, run->hash.cstr, run->solver_name,
-           run->perf.time, run->perf.cost);
+           uid->seedidx, uid->hash.cstr, run->solver_name, run->perf.time,
+           run->perf.cost);
 
-    PerfTblKey key = {.uid = *uid};
+    PerfTblKey key = {0};
+    memcpy(&key.uid, uid, sizeof(key.uid));
 
     if (!hmgetp_null(G_perftbl, key)) {
         PerfTblValue zero_value = {0};
@@ -281,8 +280,8 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
 }
 
 void update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
-    PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
-                                      &handle->run_hash);
+    PerfProfRun run =
+        make_solver_run(G_active_batch, handle->solver_name, &handle->run_hash);
 
     char *contents =
         fread_all_into_null_terminated_string(handle->json_output_path, NULL);
@@ -321,7 +320,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                      "%d\n\n\n",
                      handle->solver_name, exit_status);
             PerfProfRun run = make_solver_run(
-                G_active_bgroup, handle->solver_name, &handle->run_hash);
+                G_active_batch, handle->solver_name, &handle->run_hash);
             insert_run_into_table(&handle->input.uid, &run);
         }
     }
@@ -453,8 +452,8 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
 static void
 update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
                                            char *json_filepath) {
-    PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
-                                      &handle->run_hash);
+    PerfProfRun run =
+        make_solver_run(G_active_batch, handle->solver_name, &handle->run_hash);
 
     if (json_filepath) {
         char *contents =
@@ -505,16 +504,16 @@ static void run_solver(PerfProfSolver *solver, PerfProfInput *input) {
 
     char timelimit[128];
     snprintf_safe(timelimit, ARRAY_LEN(timelimit), "%g",
-                  G_active_bgroup->timelimit);
+                  G_active_batch->timelimit);
 
     char timelimit_extended[128];
     snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
-                  G_active_bgroup->timelimit * 1.05 + 2);
+                  G_active_batch->timelimit * 1.05 + 2);
 
     char killafter[128];
     snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
-                  G_active_bgroup->timelimit * 1.05 + 2 -
-                      G_active_bgroup->timelimit);
+                  G_active_batch->timelimit * 1.05 + 2 -
+                      G_active_batch->timelimit);
 
     char seed_str[128];
     snprintf_safe(seed_str, ARRAY_LEN(seed_str), "%d", input->seed);
@@ -589,9 +588,9 @@ void handle_vrp_instance(PerfProfInput *input) {
     }
     for (int32_t solver_idx = 0;
          !G_should_terminate &&
-         (G_active_bgroup->solvers[solver_idx].name != NULL);
+         (G_active_batch->solvers[solver_idx].name != NULL);
          solver_idx++) {
-        PerfProfSolver *solver = &G_active_bgroup->solvers[solver_idx];
+        PerfProfSolver *solver = &G_active_batch->solvers[solver_idx];
 
         run_solver(solver, input);
         if (G_pool.max_num_procs == 1) {
@@ -621,7 +620,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
 
             Instance instance = parse(fpath);
             if (is_valid_instance(&instance)) {
-                Filter *filter = &G_active_bgroup->filter;
+                Filter *filter = &G_active_batch->filter;
                 if (!is_filtered_instance(filter, &instance)) {
 
                     PerfProfInput input = {0};
@@ -634,7 +633,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                            input.uid.hash.cstr);
 
                     const uint8_t num_seeds = (uint8_t)(MIN(
-                        UINT8_MAX, MIN(G_active_bgroup->nseeds,
+                        UINT8_MAX, MIN(G_active_batch->nseeds,
                                        (int32_t)ARRAY_LEN(RANDOM_SEEDS))));
 
                     for (uint8_t seedidx = 0;
@@ -675,7 +674,7 @@ void scan_dir_and_solve(const char *dirpath) {
 
 static void do_batch(PerfProfBatch *bgroup) {
     proc_pool_join(&G_pool);
-    G_active_bgroup = bgroup;
+    G_active_batch = bgroup;
     G_pool.max_num_procs = bgroup->max_num_procs;
     G_pool.on_async_proc_exit = on_async_proc_exit;
 
