@@ -854,7 +854,7 @@ static void generate_performance_profile_using_python_script(
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
 
-    snprintf_safe(output_file, ARRAY_LEN(output_file), "%s/%s-plot.pdf",
+    snprintf_safe(output_file, ARRAY_LEN(output_file), "%s/%s Plot.pdf",
                   os_dirname(csv_input_file, &csv_input_file_basename),
                   xlabel_str);
 
