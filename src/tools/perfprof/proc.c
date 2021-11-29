@@ -162,7 +162,10 @@ static int32_t pool_sync2(ProcPool *pool) {
 
             if (pool->aborted) {
                 assert(p->valid);
-                kill(p->pid, SIGTERM);
+
+                // Kill it hard, we don't want CPTP to generate a suboptimal
+                // solution in its JSON output
+                kill(p->pid, SIGKILL);
             }
 
             int exit_status;

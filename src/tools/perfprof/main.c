@@ -748,14 +748,14 @@ static void main_loop(void) {
 
     PerfProfBatch batches[] = {
         {1,
-         "Integer separation vs Fractional separation",
+         "A-n37-k5",
          600.0,
-         4,
+         3,
          // "./data/ESPPRC - Test Instances/vrps",
          "data/BaPCod generated - Test instances/A-n37-k5",
          (Filter){NULL, {0, 72}, {0, 0}},
          {
-             {"A",
+             {"My CPTP MIP solver",
               {
                   "--solver",
                   "mip",
@@ -863,8 +863,9 @@ static void generate_performance_profile_using_python_script(
     snprintf_safe(timelimit_str, ARRAY_LEN(timelimit_str), "%g",
                   is_time_profile ? batch->timelimit : 1e99);
 
-    snprintf_safe(title, ARRAY_LEN(title), "%s (S=%s, M=%s)", batch->name,
-                  shift_str, max_ratio_str);
+    snprintf_safe(title, ARRAY_LEN(title), "%s of %s (S=%s, M=%s)",
+                  is_time_profile ? "Time profile" : "Cost profile",
+                  batch->name, shift_str, max_ratio_str);
 
     args[argidx++] = "python3";
     args[argidx++] = PYTHON3_PERF_SCRIPT;
