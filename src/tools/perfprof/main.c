@@ -84,6 +84,10 @@ typedef struct {
     char json_output_path[OS_MAX_PATH + 32];
 } PerfProcRunHandle;
 
+/// NOTE: This struct should remain as packed and as small as possible,
+///       since it will be the main cause of memory consumption in
+///       this program. It will be stored in a hashmap and will live in memory
+///       for the entire duration of the current batch.
 typedef struct {
     Hash hash;
     char solver_name[48];
@@ -98,7 +102,11 @@ typedef struct {
 } PerfTblValue;
 
 typedef struct {
-    char *key;
+    Hash hash;
+} PerfTblKey;
+
+typedef struct {
+    PerfTblKey key;
     PerfTblValue value;
 } PerfTblEntry;
 
@@ -176,17 +184,16 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
            input_instance->hash.cstr, run->hash.cstr, run->solver_name,
            run->perf.time, run->perf.cost);
 
-    if (!G_perftbl) {
-        sh_new_strdup(G_perftbl);
-    }
-    if (!shgetp_null(G_perftbl, input_instance->hash.cstr)) {
+    PerfTblKey key = {.hash = input_instance->hash};
+
+    if (!hmgetp_null(G_perftbl, key)) {
         PerfTblValue zero_value = {0};
-        shput(G_perftbl, input_instance->hash.cstr, zero_value);
+        hmput(G_perftbl, key, zero_value);
     }
 
     PerfTblValue *v = NULL;
     {
-        PerfTblEntry *t = shgetp(G_perftbl, input_instance->hash.cstr);
+        PerfTblEntry *t = hmgetp(G_perftbl, key);
         assert(t);
         if (t) {
             v = &t->value;
@@ -225,7 +232,7 @@ void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
 
 void clear_perf_table(void) {
     if (G_perftbl) {
-        shfree(G_perftbl);
+        hmfree(G_perftbl);
     }
 }
 
@@ -886,12 +893,14 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
         }
         fprintf(fh, "\n");
 
-        size_t tbl_len = shlenu(G_perftbl);
+        size_t tbl_len = hmlenu(G_perftbl);
         for (size_t i = 0; i < tbl_len; i++) {
-            char *key = G_perftbl[i].key;
+            PerfTblKey *key = &G_perftbl[i].key;
             PerfTblValue *value = &G_perftbl[i].value;
 
-            fprintf(fh, "%s", key);
+            Hash *hash = &key->hash;
+
+            fprintf(fh, "%s", hash->cstr);
 
             // Due to the out of order generation of the performance table,
             // the perf data may be out of order, compared to the order of
