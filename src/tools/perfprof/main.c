@@ -74,6 +74,7 @@ typedef struct {
 typedef struct {
     Hash hash;
     char filepath[OS_MAX_PATH];
+    uint8_t seedidx;
     int32_t seed;
 } PerfProfRunInput;
 
@@ -166,13 +167,23 @@ static const int32_t RANDOM_SEEDS[] = {
     13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
 };
 
-PerfProfRun make_solver_run(PerfProfBatch *batch, char *solver_name,
-                            Hash *run_hash) {
+STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
+              "Too much number of seeds. Need to be able to encode a seed index"
+              "using an uint8_t");
+
+static inline Perf make_invalidated_perf(PerfProfBatch *batch) {
+    Perf perf = {0};
+    perf.cost = INFINITY;
+    perf.time = 2 * batch->timelimit;
+    return perf;
+}
+
+static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
+                                          char *solver_name, Hash *run_hash) {
     PerfProfRun run = {0};
     strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
     memcpy(run.hash.cstr, run_hash->cstr, ARRAY_LEN(run.hash.cstr));
-    run.perf.cost = INFINITY;
-    run.perf.time = 2 * batch->timelimit;
+    run.perf = make_invalidated_perf(batch);
     return run;
 }
 
@@ -612,11 +623,14 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                     printf("--- instance_hash :: computed_hash = %s\n",
                            input.hash.cstr);
 
-                    for (int32_t seedidx = 0;
-                         seedidx < MIN(G_active_bgroup->nseeds,
-                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS)) &&
-                         !G_should_terminate;
+                    const uint8_t num_seeds = (uint8_t)(MIN(
+                        UINT8_MAX, MIN(G_active_bgroup->nseeds,
+                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS))));
+
+                    for (uint8_t seedidx = 0;
+                         seedidx < num_seeds && !G_should_terminate;
                          seedidx++) {
+                        input.seedidx = seedidx;
                         input.seed = RANDOM_SEEDS[seedidx];
 
                         // Re-hash the seed
