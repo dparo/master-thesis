@@ -443,15 +443,15 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                                    Solver *solver, const Instance *instance,
                                    int32_t threadid, int32_t numthreads) {
+    // NOTE:
+    //      Called when cplex has a new feasible LP solution (not necessarily
+    //      satisfying the integrality constraints)
+
     UNUSED_PARAM(threadid);
     UNUSED_PARAM(numthreads);
 
     // DELETE_ME: Short circuit for now
     return 0;
-
-    // NOTE:
-    //      Called when cplex has a new feasible LP solution (not necessarily
-    //      satisfying the integrality constraints)
 
     double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {

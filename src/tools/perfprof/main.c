@@ -72,18 +72,22 @@ typedef struct {
 } Perf;
 
 typedef struct {
-    Hash hash;
-    char filepath[OS_MAX_PATH];
     uint8_t seedidx;
+    Hash hash;
+} PerfProfInputUniqueId;
+
+typedef struct {
+    char filepath[OS_MAX_PATH];
+    PerfProfInputUniqueId uid;
     int32_t seed;
-} PerfProfRunInput;
+} PerfProfInput;
 
 typedef struct {
     char solver_name[48];
+    PerfProfInput input;
     Hash run_hash;
-    PerfProfRunInput input;
     char json_output_path[OS_MAX_PATH + 32];
-} PerfProcRunHandle;
+} PerfProfRunHandle;
 
 /// NOTE: This struct should remain as packed and as small as possible,
 ///       since it will be the main cause of memory consumption in
@@ -103,7 +107,7 @@ typedef struct {
 } PerfTblValue;
 
 typedef struct {
-    Hash hash;
+    PerfProfInputUniqueId uid;
 } PerfTblKey;
 
 typedef struct {
@@ -187,15 +191,15 @@ static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
     return run;
 }
 
-void insert_run_into_table(PerfProfRunInput *input_instance, PerfProfRun *run) {
-    printf("Inserting run into table. Instance hash: %s. Run ::: sha = %s, "
+void insert_run_into_table(PerfProfInputUniqueId *uid, PerfProfRun *run) {
+    printf("Inserting run into table. Instance hash: %d:%s. Run ::: sha = %s, "
            "solver_name = %s, "
            "time = %.17g, obj_ub "
            "= %.17g\n",
-           input_instance->hash.cstr, run->hash.cstr, run->solver_name,
+           uid->seedidx, uid->hash.cstr, run->hash.cstr, run->solver_name,
            run->perf.time, run->perf.cost);
 
-    PerfTblKey key = {.hash = input_instance->hash};
+    PerfTblKey key = {.uid = *uid};
 
     if (!hmgetp_null(G_perftbl, key)) {
         PerfTblValue zero_value = {0};
@@ -276,7 +280,7 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     }
 }
 
-void update_perf_tbl_with_cptp_json_perf_data(PerfProcRunHandle *handle) {
+void update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
     PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
                                       &handle->run_hash);
 
@@ -300,7 +304,7 @@ void update_perf_tbl_with_cptp_json_perf_data(PerfProcRunHandle *handle) {
         free(contents);
     }
 
-    insert_run_into_table(&handle->input, &run);
+    insert_run_into_table(&handle->input.uid, &run);
 }
 
 void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
@@ -308,7 +312,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
         return;
     }
 
-    PerfProcRunHandle *handle = user_handle;
+    PerfProfRunHandle *handle = user_handle;
     if (p) {
         if (exit_status == 0) {
             update_perf_tbl_with_cptp_json_perf_data(handle);
@@ -318,7 +322,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                      handle->solver_name, exit_status);
             PerfProfRun run = make_solver_run(
                 G_active_bgroup, handle->solver_name, &handle->run_hash);
-            insert_run_into_table(&handle->input, &run);
+            insert_run_into_table(&handle->input.uid, &run);
         }
     }
 
@@ -390,10 +394,13 @@ static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
     free(contents);
 }
 
-Hash compute_run_hash(const Hash *exe_hash, const PerfProfRunInput *input,
+Hash compute_run_hash(const Hash *exe_hash, const PerfProfInput *input,
                       char *args[PROC_MAX_ARGS], int32_t num_args) {
+    assert(input);
+
     SHA256_CTX shactx;
     sha256_init(&shactx);
+
     for (int32_t i = 0; i < num_args; i++) {
         sha256_update(&shactx, (const BYTE *)(&args[i][0]), strlen(args[i]));
     }
@@ -402,9 +409,9 @@ Hash compute_run_hash(const Hash *exe_hash, const PerfProfRunInput *input,
         sha256_update(&shactx, (const BYTE *)(&exe_hash->cstr[0]), 64);
     }
 
-    if (input && input->hash.cstr[0] != 0) {
-        sha256_update(&shactx, (const BYTE *)(&input->hash.cstr[0]), 64);
-    }
+    sha256_update(&shactx, (const BYTE *)(&input->uid.seedidx),
+                  sizeof(input->uid.seedidx));
+    sha256_update(&shactx, (const BYTE *)(&input->uid.hash.cstr[0]), 64);
 
     Hash result = {0};
     sha256_hash_finalize(&shactx, &result);
@@ -444,7 +451,7 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
 }
 
 static void
-update_perf_tbl_with_bapcod_json_perf_data(PerfProcRunHandle *handle,
+update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
                                            char *json_filepath) {
     PerfProfRun run = make_solver_run(G_active_bgroup, handle->solver_name,
                                       &handle->run_hash);
@@ -462,10 +469,10 @@ update_perf_tbl_with_bapcod_json_perf_data(PerfProcRunHandle *handle,
             free(contents);
         }
     }
-    insert_run_into_table(&handle->input, &run);
+    insert_run_into_table(&handle->input.uid, &run);
 }
 
-static void handle_bapcod_solver(PerfProcRunHandle *handle) {
+static void handle_bapcod_solver(PerfProfRunHandle *handle) {
     Path instance_filepath_dirname;
     Path instance_filepath_basename;
     char *dirname =
@@ -488,7 +495,7 @@ static void handle_bapcod_solver(PerfProcRunHandle *handle) {
     }
 }
 
-static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
+static void run_solver(PerfProfSolver *solver, PerfProfInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -528,15 +535,17 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
         args[argidx++] = solver->args[i];
     }
 
-    PerfProcRunHandle *handle = malloc(sizeof(*handle));
+    PerfProfRunHandle *handle = malloc(sizeof(*handle));
     handle->run_hash = compute_run_hash(&G_cptp_exe_hash, input, args, argidx);
     handle->input.seed = input->seed;
     snprintf_safe(handle->solver_name, ARRAY_LEN(handle->solver_name), "%s",
                   solver->name);
     snprintf_safe(handle->input.filepath, ARRAY_LEN(handle->input.filepath),
                   "%s", input->filepath);
-    strncpy_safe(handle->input.hash.cstr, input->hash.cstr,
-                 ARRAY_LEN(handle->input.hash.cstr));
+
+    handle->input.uid.seedidx = input->uid.seedidx;
+    strncpy_safe(handle->input.uid.hash.cstr, input->uid.hash.cstr,
+                 ARRAY_LEN(handle->input.uid.hash.cstr));
 
     Path fpath_basename;
     Path json_report_path_basename;
@@ -574,7 +583,7 @@ static void run_solver(PerfProfSolver *solver, PerfProfRunInput *input) {
     }
 }
 
-void handle_vrp_instance(PerfProfRunInput *input) {
+void handle_vrp_instance(PerfProfInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -615,13 +624,14 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                 Filter *filter = &G_active_bgroup->filter;
                 if (!is_filtered_instance(filter, &instance)) {
 
-                    PerfProfRunInput input = {0};
+                    PerfProfInput input = {0};
                     strncpy_safe(input.filepath, fpath,
                                  ARRAY_LEN(input.filepath));
 
-                    input.hash = hash_instance(&instance);
+                    input.uid.hash = hash_instance(&instance);
+
                     printf("--- instance_hash :: computed_hash = %s\n",
-                           input.hash.cstr);
+                           input.uid.hash.cstr);
 
                     const uint8_t num_seeds = (uint8_t)(MIN(
                         UINT8_MAX, MIN(G_active_bgroup->nseeds,
@@ -630,17 +640,9 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                     for (uint8_t seedidx = 0;
                          seedidx < num_seeds && !G_should_terminate;
                          seedidx++) {
-                        input.seedidx = seedidx;
+                        input.uid.seedidx = seedidx;
+
                         input.seed = RANDOM_SEEDS[seedidx];
-
-                        // Re-hash the seed
-                        SHA256_CTX ctx = {0};
-                        sha256_init(&ctx);
-                        sha256_update(&ctx, (const BYTE *)input.hash.cstr, 64);
-                        sha256_update(&ctx, (const BYTE *)&input.seed,
-                                      sizeof(input.seed));
-                        sha256_hash_finalize(&ctx, &input.hash);
-
                         handle_vrp_instance(&input);
                     }
                 } else {
@@ -912,9 +914,10 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
             PerfTblKey *key = &G_perftbl[i].key;
             PerfTblValue *value = &G_perftbl[i].value;
 
-            Hash *hash = &key->hash;
+            Hash *hash = &key->uid.hash;
+            uint8_t seedidx = &key->uid.seedidx;
 
-            fprintf(fh, "%s", hash->cstr);
+            fprintf(fh, "%d:%s", seedidx, hash->cstr);
 
             // Due to the out of order generation of the performance table,
             // the perf data may be out of order, compared to the order of
