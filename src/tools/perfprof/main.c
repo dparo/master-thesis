@@ -915,7 +915,7 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
             PerfTblValue *value = &G_perftbl[i].value;
 
             Hash *hash = &key->uid.hash;
-            uint8_t seedidx = &key->uid.seedidx;
+            uint8_t seedidx = key->uid.seedidx;
 
             fprintf(fh, "%d:%s", seedidx, hash->cstr);
 
