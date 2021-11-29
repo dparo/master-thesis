@@ -450,8 +450,10 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     UNUSED_PARAM(threadid);
     UNUSED_PARAM(numthreads);
 
+#if 0
     // DELETE_ME: Short circuit for now
     return 0;
+#else
 
     double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {
@@ -495,7 +497,59 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     MaxFlowResult max_flow_result =
         max_flow_result_create(instance->num_customers + 1);
     double max_flow = push_relabel_max_flow(&network, &max_flow_result);
-    (void)max_flow;
+
+    const double EPS = 1e-4;
+    if (max_flow < 2.0 - EPS) {
+        // Separate the cut
+        double rhs = 2.0;
+        char sense = 'E';
+        CPXNNZ nnz = 0;
+        CPXDIM *index = NULL;
+        double *value = NULL;
+        CPXNNZ rmatbeg = 0;
+        int purgeable = CPX_USECUT_PURGE;
+        int local_validity = 0;
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+                if (max_flow_result.bipartition.data[i] == 0 &&
+                    max_flow_result.bipartition.data[j] == 1) {
+                    nnz++;
+                }
+            }
+        }
+
+        index = malloc(nnz * sizeof(*index));
+        value = malloc(nnz * sizeof(*value));
+
+        int32_t pos = 0;
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+                if (max_flow_result.bipartition.data[i] == 0 &&
+                    max_flow_result.bipartition.data[j] == 1) {
+                    index[pos] = get_x_mip_var_idx(instance, i, j);
+                    value[pos] = 1.0;
+                    ++pos;
+                }
+            }
+        }
+
+        // NOTE::
+        //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
+        //  You can call this routine more than once in the same
+        //  callback invocation. CPLEX will accumulate the cuts from all such
+        //  calls.
+        if (0 != CPXXcallbackaddusercuts(context, 1, nnz, &rhs, &sense,
+                                         &rmatbeg, index, value, &purgeable,
+                                         &local_validity)) {
+            log_fatal("%s :: CPXXcallbackaddusercuts failed to add user cut",
+                      __func__);
+        }
+
+        free(index);
+        free(value);
+    }
+
     free(vstar);
     flow_network_destroy(&network);
     max_flow_result_destroy(&max_flow_result);
@@ -508,6 +562,7 @@ terminate:
     flow_network_destroy(&network);
     max_flow_result_destroy(&max_flow_result);
     return 1;
+#endif
 }
 
 static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
@@ -550,6 +605,8 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
     double rhs = 0;
     char sense = 'G';
+    CPXNNZ rmatbeg = 0;
+
     index = malloc(sizeof(*index) * (solver->data->num_mip_vars + 1));
     value = malloc(sizeof(*value) * (solver->data->num_mip_vars + 1));
 
@@ -588,8 +645,6 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
             if (*comp(tour, i) == comp_idx) {
                 index[nnz - 1] = get_y_mip_var_idx(instance, i);
                 value[nnz - 1] = -2.0;
-
-                CPXNNZ rmatbeg = 0;
 
                 log_trace(
                     "%s :: Adding GSEC constraint for component %d vertex %d, "
