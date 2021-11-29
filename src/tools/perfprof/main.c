@@ -77,6 +77,7 @@ typedef struct {
 } PerfProfInputUniqueId;
 
 typedef struct {
+    char instance_name[256];
     char filepath[OS_MAX_PATH];
     PerfProfInputUniqueId uid;
     int32_t seed;
@@ -182,7 +183,7 @@ static inline Perf make_invalidated_perf(PerfProfBatch *batch) {
 }
 
 static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
-                                          char *solver_name, Hash *run_hash) {
+                                          char *solver_name) {
     PerfProfRun run = {0};
     strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
     run.perf = make_invalidated_perf(batch);
@@ -280,8 +281,7 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
 }
 
 void update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
-    PerfProfRun run =
-        make_solver_run(G_active_batch, handle->solver_name, &handle->run_hash);
+    PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
 
     char *contents =
         fread_all_into_null_terminated_string(handle->json_output_path, NULL);
@@ -319,8 +319,8 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
             log_warn("\n\n\nSolver `%s` returned with non 0 exit status. Got "
                      "%d\n\n\n",
                      handle->solver_name, exit_status);
-            PerfProfRun run = make_solver_run(
-                G_active_batch, handle->solver_name, &handle->run_hash);
+            PerfProfRun run =
+                make_solver_run(G_active_batch, handle->solver_name);
             insert_run_into_table(&handle->input.uid, &run);
         }
     }
@@ -452,8 +452,7 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
 static void
 update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
                                            char *json_filepath) {
-    PerfProfRun run =
-        make_solver_run(G_active_batch, handle->solver_name, &handle->run_hash);
+    PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
 
     if (json_filepath) {
         char *contents =
@@ -494,7 +493,28 @@ static void handle_bapcod_solver(PerfProfRunHandle *handle) {
     }
 }
 
-static void run_solver(PerfProfSolver *solver, PerfProfInput *input) {
+static void init_handle_json_output_path(PerfProfRunHandle *handle,
+                                         PerfProfInput *input) {
+    snprintf_safe(handle->json_output_path, ARRAY_LEN(handle->json_output_path),
+                  "%s/%s/%s", PERFPROF_DUMP_ROOTDIR, "cache",
+                  input->instance_name);
+
+    os_mkdir(handle->json_output_path, true);
+
+    snprintf_safe(handle->json_output_path + strlen(handle->json_output_path),
+                  ARRAY_LEN(handle->json_output_path) -
+                      strlen(handle->json_output_path),
+                  "/%d:%s", input->uid.seedidx, input->uid.hash.cstr);
+
+    os_mkdir(handle->json_output_path, true);
+
+    snprintf_safe(handle->json_output_path + strlen(handle->json_output_path),
+                  ARRAY_LEN(handle->json_output_path) -
+                      strlen(handle->json_output_path),
+                  "/%s.json", handle->run_hash.cstr);
+}
+
+static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -546,19 +566,13 @@ static void run_solver(PerfProfSolver *solver, PerfProfInput *input) {
     strncpy_safe(handle->input.uid.hash.cstr, input->uid.hash.cstr,
                  ARRAY_LEN(handle->input.uid.hash.cstr));
 
-    Path fpath_basename;
-    Path json_report_path_basename;
-
-    snprintf_safe(handle->json_output_path, ARRAY_LEN(handle->json_output_path),
-                  "%s/%s/%s.json", PERFPROF_DUMP_ROOTDIR, handle->run_hash.cstr,
-                  os_basename(input->filepath, &fpath_basename));
+    if (0 != strcmp(solver->name, BAPCOD_SOLVER_NAME)) {
+        init_handle_json_output_path(handle, input);
+    }
 
     args[argidx++] = "-w";
     args[argidx++] = (char *)handle->json_output_path;
     args[argidx++] = NULL;
-
-    os_mkdir(os_dirname(handle->json_output_path, &json_report_path_basename),
-             true);
 
     //
     // Check if the JSON output is already cached on disk
@@ -592,7 +606,7 @@ void handle_vrp_instance(PerfProfInput *input) {
          solver_idx++) {
         PerfProfSolver *solver = &G_active_batch->solvers[solver_idx];
 
-        run_solver(solver, input);
+        run_cptp_solver(solver, input);
         if (G_pool.max_num_procs == 1) {
             proc_pool_join(&G_pool);
         }
@@ -626,6 +640,9 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                     PerfProfInput input = {0};
                     strncpy_safe(input.filepath, fpath,
                                  ARRAY_LEN(input.filepath));
+
+                    strncpy_safe(input.instance_name, instance.name,
+                                 ARRAY_LEN(input.instance_name));
 
                     input.uid.hash = hash_instance(&instance);
 
@@ -713,6 +730,7 @@ static void do_batch(PerfProfBatch *bgroup) {
 static void init(void) {
 
     os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
+    os_mkdir(PERFPROF_DUMP_ROOTDIR "/cache", true);
 
     // Compute the cptp exe hash
     {
