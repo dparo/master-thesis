@@ -450,7 +450,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     UNUSED_PARAM(threadid);
     UNUSED_PARAM(numthreads);
 
-#if 0
+#if 1
     // DELETE_ME: Short circuit for now
     return 0;
 #else
@@ -498,6 +498,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
         max_flow_result_create(instance->num_customers + 1);
     double max_flow = push_relabel_max_flow(&network, &max_flow_result);
 
+    printf("--- max_flow = %f\n", max_flow);
     const double EPS = 1e-4;
     if (max_flow < 2.0 - EPS) {
         // Separate the cut
