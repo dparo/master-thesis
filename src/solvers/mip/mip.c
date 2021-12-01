@@ -484,10 +484,13 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
 
     FlowNetwork network = {0};
     network.nnodes = instance->num_customers + 1;
+
     network.source_vertex = 0;
+
     do {
         network.sink_vertex = rand() % (instance->num_customers + 1);
-    } while (network.sink_vertex == 0);
+    } while (network.sink_vertex == 0 &&
+             network.sink_vertex == network.source_vertex);
 
     network.flow =
         malloc((instance->num_customers + 1) * (instance->num_customers + 1) *
@@ -524,7 +527,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
             int32_t bp_h = max_flow_result.bipartition.data[h];
 
             // Separate the cut
-            double rhs = 2.0 * y;
+            double rhs = 0;
             char sense = 'G';
             CPXNNZ nnz = 0;
             CPXDIM *index = NULL;
@@ -537,12 +540,13 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                 for (int32_t j = 0; j < instance->num_customers + 1; j++) {
                     int32_t bp_i = max_flow_result.bipartition.data[i];
                     int32_t bp_j = max_flow_result.bipartition.data[j];
-                    if (bp_i == bp_h && bp_j != bp_h) {
+                    if (bp_i == 0 && bp_j == 1) {
                         nnz++;
                     }
                 }
             }
 
+            nnz += 1;
             index = malloc(nnz * sizeof(*index));
             value = malloc(nnz * sizeof(*value));
 
@@ -551,13 +555,16 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
                 for (int32_t j = 0; j < instance->num_customers + 1; j++) {
                     int32_t bp_i = max_flow_result.bipartition.data[i];
                     int32_t bp_j = max_flow_result.bipartition.data[j];
-                    if (bp_i == bp_h && bp_j != bp_h) {
+                    if (bp_i == 0 && bp_j == 1) {
                         index[pos] = get_x_mip_var_idx(instance, i, j);
                         value[pos] = 1.0;
                         ++pos;
                     }
                 }
             }
+
+            index[pos] = get_y_mip_var_idx(instance, h);
+            value[pos] = -2.0;
 
             // NOTE::
             //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
