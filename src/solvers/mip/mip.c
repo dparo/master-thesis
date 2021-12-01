@@ -373,7 +373,6 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
     // Create all the MIP variables that we need first (eg add the columns)
     //
-    //
 
     // Create the X MIP variable
     {
@@ -465,7 +464,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     UNUSED_PARAM(threadid);
     UNUSED_PARAM(numthreads);
 
-#if 1
+#if 0
     // DELETE_ME: Short circuit for now
     return 0;
 #else
@@ -486,10 +485,14 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     FlowNetwork network = {0};
     network.nnodes = instance->num_customers + 1;
     network.source_vertex = 0;
-    network.sink_vertex = instance->num_customers;
+    do {
+        network.sink_vertex = rand() % (instance->num_customers + 1);
+    } while (network.sink_vertex == 0);
+
     network.flow =
         malloc((instance->num_customers + 1) * (instance->num_customers + 1) *
                sizeof(*network.flow));
+
     network.cap = malloc((instance->num_customers + 1) *
                          (instance->num_customers + 1) * sizeof(*network.cap));
 
@@ -513,57 +516,65 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
         max_flow_result_create(instance->num_customers + 1);
     double max_flow = push_relabel_max_flow(&network, &max_flow_result);
 
-    printf("--- max_flow = %f\n", max_flow);
+    // printf("--- max_flow = %f\n", max_flow);
     const double EPS = 1e-4;
-    if (max_flow < 2.0 - EPS) {
-        // Separate the cut
-        double rhs = 2.0;
-        char sense = 'E';
-        CPXNNZ nnz = 0;
-        CPXDIM *index = NULL;
-        double *value = NULL;
-        CPXNNZ rmatbeg = 0;
-        int purgeable = CPX_USECUT_PURGE;
-        int local_validity = 0;
+    for (int32_t h = 1; h < instance->num_customers + 1; h++) {
+        double y = vstar[get_y_mip_var_idx(instance, h)];
+        if (flt(max_flow, 2.0 * y, EPS)) {
+            int32_t bp_h = max_flow_result.bipartition.data[h];
 
-        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-                if (max_flow_result.bipartition.data[i] == 0 &&
-                    max_flow_result.bipartition.data[j] == 1) {
-                    nnz++;
+            // Separate the cut
+            double rhs = 2.0 * y;
+            char sense = 'G';
+            CPXNNZ nnz = 0;
+            CPXDIM *index = NULL;
+            double *value = NULL;
+            CPXNNZ rmatbeg = 0;
+            int purgeable = CPX_USECUT_PURGE;
+            int local_validity = 0;
+
+            for (int32_t i = 1; i < instance->num_customers + 1; i++) {
+                for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+                    int32_t bp_i = max_flow_result.bipartition.data[i];
+                    int32_t bp_j = max_flow_result.bipartition.data[j];
+                    if (bp_i == bp_h && bp_j != bp_h) {
+                        nnz++;
+                    }
                 }
             }
-        }
 
-        index = malloc(nnz * sizeof(*index));
-        value = malloc(nnz * sizeof(*value));
+            index = malloc(nnz * sizeof(*index));
+            value = malloc(nnz * sizeof(*value));
 
-        int32_t pos = 0;
-        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-                if (max_flow_result.bipartition.data[i] == 0 &&
-                    max_flow_result.bipartition.data[j] == 1) {
-                    index[pos] = get_x_mip_var_idx(instance, i, j);
-                    value[pos] = 1.0;
-                    ++pos;
+            int32_t pos = 0;
+            for (int32_t i = 1; i < instance->num_customers + 1; i++) {
+                for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+                    int32_t bp_i = max_flow_result.bipartition.data[i];
+                    int32_t bp_j = max_flow_result.bipartition.data[j];
+                    if (bp_i == bp_h && bp_j != bp_h) {
+                        index[pos] = get_x_mip_var_idx(instance, i, j);
+                        value[pos] = 1.0;
+                        ++pos;
+                    }
                 }
             }
-        }
 
-        // NOTE::
-        //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
-        //  You can call this routine more than once in the same
-        //  callback invocation. CPLEX will accumulate the cuts from all such
-        //  calls.
-        if (0 != CPXXcallbackaddusercuts(context, 1, nnz, &rhs, &sense,
-                                         &rmatbeg, index, value, &purgeable,
-                                         &local_validity)) {
-            log_fatal("%s :: CPXXcallbackaddusercuts failed to add user cut",
-                      __func__);
-        }
+            // NOTE::
+            //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
+            //  You can call this routine more than once in the same
+            //  callback invocation. CPLEX will accumulate the cuts from all
+            //  such calls.
+            if (0 != CPXXcallbackaddusercuts(context, 1, nnz, &rhs, &sense,
+                                             &rmatbeg, index, value, &purgeable,
+                                             &local_validity)) {
+                log_fatal(
+                    "%s :: CPXXcallbackaddusercuts failed to add user cut",
+                    __func__);
+            }
 
-        free(index);
-        free(value);
+            free(index);
+            free(value);
+        }
     }
 
     free(vstar);
