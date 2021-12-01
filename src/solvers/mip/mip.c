@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include "core-utils.h"
 #include "network.h"
+#include "validation.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -69,7 +70,7 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 #endif
 }
 
-#define MAX_NUM_CORES 256
+#define MAX_NUM_CORES 1
 
 /// Struct that is used as a userhandle to be passed to the cplex generic
 /// callback
@@ -178,7 +179,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
 
         // a new component is found
         t->num_comps += 1;
-        int i = start;
+        int32_t i = start;
         bool done = false;
 
         int32_t tour_length = 0;
@@ -191,8 +192,9 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
                     continue;
                 }
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
-                assert(v >= -0.5 && v <= 1.5);
-                if (v > 0.5 && *comp(t, j) < 0) {
+                assert(feq(v, 0.0, 1e-3) || feq(v, 1.0, 1e-3));
+                bool j_was_already_visited = *comp(t, j) >= 0;
+                if (v > 0.5 && !j_was_already_visited) {
                     *succ(t, i) = j;
                     i = j;
                     done = false;
@@ -220,7 +222,7 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
 
     for (int32_t i = 0; i < n; i++) {
         double v = vstar[get_y_mip_var_idx(instance, i)];
-        assert(v >= -0.5 && v <= 1.5);
+        assert(feq(v, 0.0, 1e-3) || feq(v, 1.0, 1e-3));
         if (i == 0 || v >= 0.5) {
             assert(*comp(t, i) >= 0);
             assert(*succ(t, i) >= 0);
@@ -255,7 +257,7 @@ static bool add_degree_constraints(Solver *self, const Instance *instance) {
     }
 
     for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        snprintf(cname, ARRAY_LEN(cname), "deg(%d)", i);
+        snprintf_safe(cname, ARRAY_LEN(cname), "deg(%d)", i);
         int32_t cnt = 0;
 
         for (int32_t j = 0; j < instance->num_customers + 1; j++) {
@@ -342,7 +344,7 @@ static bool add_capacity_constraint(Solver *self, const Instance *instance) {
         value[i] = demand(instance, i);
     }
 
-    snprintf(cname, ARRAY_LEN(cname), "capacity");
+    snprintf_safe(cname, ARRAY_LEN(cname), "capacity");
 
     if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
                     rmatbeg, index, value, NULL, pcname)) {
@@ -369,50 +371,55 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     //
     // Create all the MIP variables that we need first (eg add the columns)
     //
+    //
 
-    char cname[128];
-    const char *pcname[] = {(const char *)cname};
+    // Create the X MIP variable
+    {
+        double obj[1];
+        double lb[1] = {0.0};
+        double ub[1] = {1.0};
+        char xctype[] = {'B'};
 
-    double obj[1];
-    double lb[1] = {0.0};
-    double ub[1] = {1.0};
-    char xctype[] = {'B'};
+        char cname[128];
+        const char *pcname[] = {(const char *)cname};
 
-    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
-            if (i == j)
-                continue;
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+                if (i == j)
+                    continue;
 
-            snprintf(cname, sizeof(cname), "x(%d,%d)", i, j);
-            obj[0] = cost(instance, i, j);
+                snprintf_safe(cname, sizeof(cname), "x(%d,%d)", i, j);
+                obj[0] = cost(instance, i, j);
+
+                if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub,
+                                xctype, pcname)) {
+                    log_fatal("%s :: CPXXnewcols returned an error", __func__);
+                    return false;
+                }
+            }
+        }
+    }
+
+    // Create the Y MIP variable
+    {
+
+        double obj[1];
+        double lb[1] = {0.0};
+        double ub[1] = {1.0};
+        char xctype[] = {'B'};
+
+        char cname[128];
+        const char *pcname[] = {(const char *)cname};
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            snprintf_safe(cname, sizeof(cname), "y(%d)", i);
+            obj[0] = -1.0 * profit(instance, i);
 
             if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub,
                             xctype, pcname)) {
                 log_fatal("%s :: CPXXnewcols returned an error", __func__);
                 return false;
             }
-        }
-    }
-
-    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        snprintf(cname, sizeof(cname), "y(%d)", i);
-        obj[0] = -1.0 * profit(instance, i);
-
-        // NOTE: __EMAIL__ the professor
-        //           Should we add this line of code which ensures and enforces
-        //           that the profit acheived at the depot is 0.0
-
-#if 0
-        if (i == 0) {
-            // We are the depot, make sure that the obj factor is 0.0
-            obj[0] = 0.0;
-        }
-#endif
-
-        if (CPXXnewcols(self->data->env, self->data->lp, 1, obj, lb, ub, xctype,
-                        pcname)) {
-            log_fatal("%s :: CPXXnewcols returned an error", __func__);
-            return false;
         }
     }
 
@@ -574,13 +581,12 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
     assert(tour->num_comps != 1);
 
-    int32_t *num_of_nodes_in_each_comp =
-        calloc(tour->num_comps, sizeof(*num_of_nodes_in_each_comp));
+    int32_t *cnnodes = calloc(tour->num_comps, sizeof(*cnnodes));
 
     CPXDIM *index = NULL;
     double *value = NULL;
 
-    if (num_of_nodes_in_each_comp == NULL) {
+    if (cnnodes == NULL) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto failure;
     }
@@ -591,7 +597,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
     for (int32_t i = 0; i < n; i++) {
         assert(*comp(tour, i) < tour->num_comps);
         if (*comp(tour, i) >= 0) {
-            ++num_of_nodes_in_each_comp[*comp(tour, i)];
+            ++cnnodes[*comp(tour, i)];
         }
     }
 
@@ -599,14 +605,14 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 #ifndef NDEBUG
     {
         for (int32_t i = 0; i < tour->num_comps; i++) {
-            assert(num_of_nodes_in_each_comp[i] >= 2);
+            assert(cnnodes[i] >= 2);
         }
     }
 #endif
 
     double rhs = 0;
     char sense = 'G';
-    CPXNNZ rmatbeg = 0;
+    CPXNNZ rmatbeg[] = {0};
 
     index = malloc(sizeof(*index) * (solver->data->num_mip_vars + 1));
     value = malloc(sizeof(*value) * (solver->data->num_mip_vars + 1));
@@ -616,23 +622,25 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         goto failure;
     }
 
-    // Create the cut to feed CPLEX
-    for (int32_t comp_idx = 0; comp_idx < tour->num_comps; comp_idx++) {
-        assert(num_of_nodes_in_each_comp[comp_idx] >= 2);
+    assert(*comp(tour, 0) == 0);
 
-        CPXNNZ nnz = 1 + num_of_nodes_in_each_comp[comp_idx] *
-                             (n - num_of_nodes_in_each_comp[comp_idx]);
+    // Note start from c = 1. Subtour Elimination Constraints that include the
+    // depot are NOT valid.
+    for (int32_t c = 1; c < tour->num_comps; c++) {
+        assert(cnnodes[c] >= 2);
 
+        CPXNNZ nnz = 1 + cnnodes[c] * (n - cnnodes[c]);
         CPXNNZ cnt = 0;
         for (int32_t i = 0; i < n; i++) {
-            if (*comp(tour, i) == comp_idx) {
+            if (*comp(tour, i) == c) {
                 for (int32_t j = 0; j < n; j++) {
                     if (i == j) {
                         continue;
                     }
-                    // if node i belongs to S and node j does NOT belong to S
-                    if (*comp(tour, j) != comp_idx) {
-                        index[cnt] = get_x_mip_var_idx(instance, i, j);
+
+                    // If node i belongs to S and node j does NOT belong to S
+                    if (*comp(tour, j) != c) {
+                        index[cnt] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                         value[cnt] = +1.0;
                         cnt++;
                     }
@@ -642,16 +650,26 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
         assert(cnt == nnz - 1);
 
+#ifndef NDEBUG
+        // Assert that index array does not contain duplicates
+        for (int32_t i = 0; i < nnz - 1; i++) {
+            for (int32_t j = 0; j < nnz - 1; j++) {
+                if (i != j) {
+                    assert(index[i] != index[j]);
+                }
+            }
+        }
+#endif
+
         for (int32_t i = 0; i < n; i++) {
-            if (*comp(tour, i) == comp_idx) {
-                index[nnz - 1] = get_y_mip_var_idx(instance, i);
+            if (*comp(tour, i) == c) {
+                index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
                 value[nnz - 1] = -2.0;
 
                 log_trace(
                     "%s :: Adding GSEC constraint for component %d vertex %d, "
                     "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                    __func__, comp_idx, i, comp_idx,
-                    num_of_nodes_in_each_comp[comp_idx], nnz);
+                    __func__, c, i, c, cnnodes[c], nnz);
 
                 // NOTE::
                 //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
@@ -659,7 +677,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
                 //  callback invocation. CPLEX will accumulate the constraints
                 //  from all such calls.
                 if (CPXXcallbackrejectcandidate(context, 1, nnz, &rhs, &sense,
-                                                &rmatbeg, index, value) != 0) {
+                                                rmatbeg, index, value) != 0) {
                     log_fatal("%s :: Failed CPXXcallbackrejectcandidate",
                               __func__);
                     goto failure;
@@ -668,12 +686,12 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         }
     }
 
-    free(num_of_nodes_in_each_comp);
+    free(cnnodes);
     free(index);
     free(value);
     return true;
 failure:
-    free(num_of_nodes_in_each_comp);
+    free(cnnodes);
     free(index);
     free(value);
     return false;
@@ -714,14 +732,13 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
 
     unpack_mip_solution(instance, &tour, vstar);
 
-    if (tour.num_comps > 1) {
+    if (tour.num_comps >= 2) {
         log_info("%s :: num_comps of unpacked tour is %d -- rejecting "
                  "candidate point...",
                  __func__, tour.num_comps);
         reject_candidate_point(&tour, context, solver, instance, threadid,
                                numthreads);
     } else {
-
         log_info("%s :: num_comps of unpacked tour is %d -- accepting "
                  "candidate point...",
                  __func__, tour.num_comps);
