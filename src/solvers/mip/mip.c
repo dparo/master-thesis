@@ -1063,6 +1063,25 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
 
     if (cplex_found_a_solution) {
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+                double v = vstar[get_x_mip_var_idx(instance, i, j)];
+                if (feq(v, 1.0, 1e-3)) {
+                    printf("x(%d, %d) = %g\n", i, j,
+                           vstar[get_x_mip_var_idx(instance, i, j)]);
+                }
+            }
+        }
+        printf("\n");
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            double v = vstar[get_y_mip_var_idx(instance, i)];
+            if (feq(v, 1.0, 1e-3)) {
+                printf("y(%d) = %g\n", i, v);
+            }
+        }
+
         unpack_mip_solution(instance, &solution->tour, vstar);
     }
 
