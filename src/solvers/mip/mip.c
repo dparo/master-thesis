@@ -523,9 +523,8 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     const double EPS = 1e-4;
     for (int32_t h = 1; h < instance->num_customers + 1; h++) {
         double y = vstar[get_y_mip_var_idx(instance, h)];
-        if (flt(max_flow, 2.0 * y, EPS)) {
-            int32_t bp_h = max_flow_result.bipartition.data[h];
-
+        int32_t bp_h = max_flow_result.bipartition.data[h];
+        if (bp_h == 0 && flt(max_flow, 2.0 * y, EPS)) {
             // Separate the cut
             double rhs = 0;
             char sense = 'G';
