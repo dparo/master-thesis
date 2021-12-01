@@ -427,7 +427,8 @@ static void print_tour(Tour *t) {
     int32_t curr_vertex = 0;
     int32_t next_vertex = curr_vertex;
 
-    while ((next_vertex = *tsucc(t, curr_vertex)) != 0) {
+    do {
+        next_vertex = *tsucc(t, curr_vertex);
         if (next_vertex == 0) {
             // Do not put the space for cleanliness if is the last vertex to be
             // printed
@@ -436,7 +437,7 @@ static void print_tour(Tour *t) {
             printf("%d ", curr_vertex);
         }
         curr_vertex = next_vertex;
-    }
+    } while (curr_vertex != 0);
 
     printf("\n");
 }
