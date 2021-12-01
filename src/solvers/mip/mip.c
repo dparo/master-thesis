@@ -339,6 +339,8 @@ static bool add_capacity_constraint(Solver *self, const Instance *instance) {
     index = malloc(nnz * sizeof(*index));
     value = malloc(nnz * sizeof(*value));
 
+    assert(demand(instance, 0) == 0.0);
+
     for (int32_t i = 0; i < nnz; i++) {
         index[i] = get_y_mip_var_idx(instance, i);
         value[i] = demand(instance, i);
@@ -665,7 +667,9 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 #ifndef NDEBUG
         // Assert that index array does not contain duplicates
         for (int32_t i = 0; i < nnz - 1; i++) {
+            assert(index[i] >= 0);
             for (int32_t j = 0; j < nnz - 1; j++) {
+                assert(index[j] >= 0);
                 if (i != j) {
                     assert(index[i] != index[j]);
                 }
@@ -673,9 +677,10 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
         }
 #endif
 
+        int32_t added_cuts = 0;
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == c) {
-                assert(*comp(tour, i) != 0);
+                assert(*comp(tour, i) >= 1);
 
                 index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
                 value[nnz - 1] = -2.0;
@@ -696,14 +701,17 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
                               __func__);
                     goto failure;
                 }
+                added_cuts += 1;
             }
         }
+        assert(added_cuts == cnnodes[c]);
     }
 
     free(cnnodes);
     free(index);
     free(value);
     return true;
+
 failure:
     free(cnnodes);
     free(index);
