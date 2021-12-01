@@ -70,7 +70,7 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 #endif
 }
 
-#define MAX_NUM_CORES 1
+#define MAX_NUM_CORES 256
 
 /// Struct that is used as a userhandle to be passed to the cplex generic
 /// callback
@@ -383,6 +383,7 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
         char cname[128];
         const char *pcname[] = {(const char *)cname};
 
+        int32_t cnt = 0;
         for (int32_t i = 0; i < instance->num_customers + 1; i++) {
             for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
                 if (i == j)
@@ -396,9 +397,14 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
                     log_fatal("%s :: CPXXnewcols returned an error", __func__);
                     return false;
                 }
+                cnt++;
             }
         }
+        assert(cnt == hm_nentries(instance->num_customers + 1));
     }
+
+    assert(hm_nentries(instance->num_customers + 1) ==
+           CPXXgetnumcols(self->data->env, self->data->lp));
 
     // Create the Y MIP variable
     {
@@ -614,8 +620,9 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
     char sense = 'G';
     CPXNNZ rmatbeg[] = {0};
 
-    index = malloc(sizeof(*index) * (solver->data->num_mip_vars + 1));
-    value = malloc(sizeof(*value) * (solver->data->num_mip_vars + 1));
+    int32_t nnz_upper_bound = 1 + (n * n) / 4;
+    index = malloc(sizeof(*index) * nnz_upper_bound);
+    value = malloc(sizeof(*value) * nnz_upper_bound);
 
     if (!index || !value) {
         log_fatal("%s :: Failed memory allocation", __func__);
@@ -631,7 +638,11 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
         CPXNNZ nnz = 1 + cnnodes[c] * (n - cnnodes[c]);
         CPXNNZ cnt = 0;
-        for (int32_t i = 0; i < n; i++) {
+
+        assert(nnz <= nnz_upper_bound);
+
+        // Again, skip the depot (start from i = 1)
+        for (int32_t i = 1; i < n; i++) {
             if (*comp(tour, i) == c) {
                 for (int32_t j = 0; j < n; j++) {
                     if (i == j) {
@@ -648,6 +659,7 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
             }
         }
 
+        assert(cnt < nnz_upper_bound);
         assert(cnt == nnz - 1);
 
 #ifndef NDEBUG
@@ -663,6 +675,8 @@ static bool reject_candidate_point(Tour *tour, CPXCALLBACKCONTEXTptr context,
 
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == c) {
+                assert(*comp(tour, i) != 0);
+
                 index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
                 value[nnz - 1] = -2.0;
 
