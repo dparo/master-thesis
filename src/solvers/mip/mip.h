@@ -51,14 +51,24 @@ typedef struct SolverData {
 struct CutSeparationIface;
 
 typedef struct {
-    CutSeparationPrivCtx *ctx;
-    struct CutSeparationIface *iface;
+    int32_t num_seps;
+    int64_t accum_usecs;
+} CutSeparationStatistics;
 
-    CPXCALLBACKCONTEXTptr cplex_cb_ctx;
+typedef struct {
+    CutSeparationPrivCtx *ctx;
+
     int32_t thread_id;
     int32_t num_threads;
     const Instance *instance;
     Solver *solver;
+
+    /// These fields are internally used/updated from the MIP solver.
+    /// User cuts should not bother modifying and/or reading these fields.
+    struct {
+        CPXCALLBACKCONTEXTptr cplex_cb_ctx;
+        CutSeparationStatistics stats;
+    } internal;
 } CutSeparationFunctor;
 
 typedef struct {
@@ -67,7 +77,6 @@ typedef struct {
 
     bool (*fractional_sep)(CutSeparationFunctor *self);
     bool (*integral_sep)(CutSeparationFunctor *self);
-
 } CutSeparationIface;
 
 static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }

@@ -40,6 +40,8 @@ typedef enum DistanceRounding {
     CPTP_DIST_FLOOR = 3,
 } DistanceRounding;
 
+#define DEPOT_NODE_ID 0
+
 typedef struct Instance {
     char *name;
     char *comment;

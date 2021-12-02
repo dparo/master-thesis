@@ -30,11 +30,6 @@ extern "C" {
 #include "types.h"
 #include "mip.h"
 
-typedef struct CutStatistics {
-    int32_t num_seps;
-    int64_t accum_usecs;
-} CutStatistics;
-
 typedef struct CutDescriptor {
     const char *name;
     const CutSeparationIface *iface;

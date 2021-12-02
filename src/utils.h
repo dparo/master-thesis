@@ -99,8 +99,8 @@ static inline size_t get_file_size(FILE *f) {
     return result;
 }
 
-static char *fread_all_into_null_terminated_string(const char *filepath,
-                                                   size_t *len) {
+static inline char *fread_all_into_null_terminated_string(const char *filepath,
+                                                          size_t *len) {
     FILE *fh = fopen(filepath, "r");
     if (!fh) {
         return NULL;
