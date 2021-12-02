@@ -129,6 +129,7 @@ void instance_destroy(Instance *instance);
 
 Tour tour_create(const Instance *instance);
 void tour_destroy(Tour *tour);
+void tour_clear(Tour *tour);
 bool tour_is_valid(Tour *tour);
 Tour tour_copy(Tour const *other);
 Tour tour_move(Tour *other);

@@ -71,12 +71,12 @@ typedef struct {
 
 typedef struct {
     CutSeparationPrivCtx *(*activate)(const Instance *instance, Solver *solver);
-    void (*deactivate)(CutSeparationFunctor *self);
+    void (*deactivate)(CutSeparationPrivCtx *ctx);
 
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
-                         const double *vstar, const Tour *tour);
+                         const double *vstar, Tour *tour);
 } CutSeparationIface;
 
 static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
@@ -131,11 +131,18 @@ static inline bool mip_cut_integral_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
                                         double *value) {
     CPXNNZ rmatbeg[] = {0};
     ctx->internal.integral_stats.num_cuts += 1;
-    if (CPXXcallbackrejectcandidate(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
-                                    &sense, rmatbeg, index, value) != 0) {
+
+    // NOTE::
+    //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
+    //  You can call this routine more than once in the same
+    //  callback invocation. CPLEX will accumulate the constraints
+    //  from all such calls.
+    if (0 != CPXXcallbackrejectcandidate(ctx->internal.cplex_cb_ctx, 1, nnz,
+                                         &rhs, &sense, rmatbeg, index, value)) {
         log_fatal("%s :: Failed CPXXcallbackrejectcandidate", __func__);
         return false;
     }
+
     return true;
 }
 
@@ -145,9 +152,15 @@ static inline bool mip_cut_fractional_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
                                           int local_validity) {
     CPXNNZ rmatbeg[] = {0};
     ctx->internal.fractional_stats.num_cuts += 1;
-    if (CPXXcallbackaddusercuts(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
-                                &sense, rmatbeg, index, value, &purgeable,
-                                &local_validity) != 0) {
+
+    // NOTE::
+    //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
+    //  You can call this routine more than once in the same
+    //  callback invocation. CPLEX will accumulate the cuts from all
+    //  such calls.
+    if (0 != CPXXcallbackaddusercuts(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
+                                     &sense, rmatbeg, index, value, &purgeable,
+                                     &local_validity)) {
         log_fatal("%s :: Failed CPXXcallbackaddusercuts", __func__);
         return false;
     }

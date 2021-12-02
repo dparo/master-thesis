@@ -57,7 +57,7 @@ bool tour_is_valid(Tour *tour) {
     return tour->comp && tour->succ && tour->num_customers > 0;
 }
 
-void tour_invalidate(Tour *tour) {
+void tour_clear(Tour *tour) {
     tour->num_comps = 0;
 
     if (tour->succ) {
@@ -77,7 +77,7 @@ Tour tour_create(const Instance *instance) {
     result.succ = veci32_create(instance->num_customers + 1);
     result.comp = veci32_create(instance->num_customers + 1);
 
-    tour_invalidate(&result);
+    tour_clear(&result);
     return result;
 }
 
@@ -98,7 +98,7 @@ Solution solution_create(const Instance *instance) {
 void solution_invalidate(Solution *solution) {
     solution->lower_bound = INFINITY;
     solution->upper_bound = -INFINITY;
-    tour_invalidate(&solution->tour);
+    tour_clear(&solution->tour);
 }
 
 void solution_destroy(Solution *solution) {

@@ -80,6 +80,7 @@ typedef struct {
 
 static bool
 create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
+                                  CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                   const Instance *instance, Solver *solver) {
     memset(thread_local_data, 0, sizeof(*thread_local_data));
 
@@ -88,11 +89,15 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     thread_local_data->vstar =
         malloc(sizeof(*thread_local_data->vstar) * solver->data->num_mip_vars);
 
-    thread_local_data->gsec_functor.ctx =
-        CUT_GSEC_IFACE.activate(instance, solver);
+    const CutSeparationIface *iface = CUT_GSEC_DESCRIPTOR.iface;
+    CutSeparationFunctor *functor = &thread_local_data->gsec_functor;
 
-    bool success = thread_local_data->gsec_functor.ctx &&
-                   thread_local_data->vstar &&
+    functor->ctx = iface->activate(instance, solver);
+    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+    functor->instance = instance;
+    functor->solver = solver;
+
+    bool success = functor->ctx && thread_local_data->vstar &&
                    tour_is_valid(&thread_local_data->tour);
     return success;
 }
@@ -100,7 +105,9 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
 static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     if (thread_local_data->gsec_functor.ctx) {
-        CUT_GSEC_IFACE.deactivate(&thread_local_data->gsec_functor);
+        CUT_GSEC_IFACE.deactivate(thread_local_data->gsec_functor.ctx);
+        memset(&thread_local_data->gsec_functor, 0,
+               sizeof(thread_local_data->gsec_functor));
     }
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
@@ -128,8 +135,10 @@ static void validate_mip_vars_packing(const Instance *instance) {
 
 static void unpack_mip_solution(const Instance *instance, Tour *t,
                                 double *vstar) {
+
     int32_t n = t->num_customers + 1;
 
+    tour_clear(t);
     for (int32_t start = 0; start < n; start++) {
         if (*comp(t, start) >= 0)
             continue; // node "start" was already visited, just skip it
@@ -522,11 +531,6 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
             index[pos] = get_y_mip_var_idx(instance, h);
             value[pos] = -2.0;
 
-            // NOTE::
-            //      https://www.ibm.com/docs/en/icos/12.9.0?topic=c-cpxxcallbackaddusercuts-cpxcallbackaddusercuts
-            //  You can call this routine more than once in the same
-            //  callback invocation. CPLEX will accumulate the cuts from all
-            //  such calls.
             if (0 != CPXXcallbackaddusercuts(context, 1, nnz, &rhs, &sense,
                                              &rmatbeg, index, value, &purgeable,
                                              &local_validity)) {
@@ -693,61 +697,67 @@ failure:
     return false;
 }
 
-static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr context,
-                                        Solver *solver,
-                                        const Instance *instance,
-                                        int32_t threadid, int32_t numthreads) {
+static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
+                                        CplexCallbackCtx *ctx, int32_t threadid,
+                                        int32_t numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible integral solution
     //      satisfying all constraints
 
-    // NOTE:
-    //   Subtour Elimination Constraints (SECs) separation based on
-    //   the connected components
+    assert(threadid < numthreads);
+    assert(threadid < MAX_NUM_CORES);
 
-    // NOTE: In alternative see function CCcut_connect_component of Concorde to
-    // use a more efficient function
+    Solver *solver = ctx->solver;
+    const Instance *instance = ctx->instance;
+    CallbackThreadLocalData *tld = &ctx->thread_local_data[threadid];
+    double *vstar = tld->vstar;
+    Tour *tour = &tld->tour;
 
-    double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto terminate;
     }
 
-    Tour tour = tour_create(instance);
-    if (!tour.comp || !tour.succ) {
+    if (!tour_is_valid(tour)) {
         goto terminate;
     }
 
     double obj_p;
-    if (CPXXcallbackgetcandidatepoint(context, vstar, 0,
+    if (CPXXcallbackgetcandidatepoint(cplex_cb_ctx, vstar, 0,
                                       solver->data->num_mip_vars - 1, &obj_p)) {
         log_fatal("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
         goto terminate;
     }
 
-    unpack_mip_solution(instance, &tour, vstar);
+    unpack_mip_solution(instance, tour, vstar);
 
-    if (tour.num_comps >= 2) {
+    if (tour->num_comps >= 2) {
         log_info("%s :: num_comps of unpacked tour is %d -- rejecting "
                  "candidate point...",
-                 __func__, tour.num_comps);
-        reject_candidate_point(&tour, context, solver, instance, threadid,
-                               numthreads);
+                 __func__, tour->num_comps);
+
+        CutSeparationFunctor *functor = &tld->gsec_functor;
+        const int64_t begin_time = os_get_usecs();
+        bool separation_success =
+            CUT_GSEC_IFACE.integral_sep(functor, obj_p, vstar, tour);
+        functor->internal.integral_stats.accum_usecs +=
+            os_get_usecs() - begin_time;
+
+        if (!separation_success) {
+            log_fatal("Separation of integral `%s` cuts failed", "GSEC");
+            goto terminate;
+        }
+
     } else {
         log_info("%s :: num_comps of unpacked tour is %d -- accepting "
                  "candidate point...",
-                 __func__, tour.num_comps);
+                 __func__, tour->num_comps);
     }
 
-    free(vstar);
-    tour_destroy(&tour);
     return 0;
 
 terminate:
     log_fatal("%s :: Fatal termination error", __func__);
-    free(vstar);
-    tour_destroy(&tour);
     return 1;
 }
 
@@ -789,10 +799,12 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
-static int cplex_on_thread_activation(int activation, CplexCallbackCtx *ctx,
-                                      CPXLONG threadid, CPXLONG numthreads) {
+static int cplex_on_thread_activation(int activation,
+                                      CPXCALLBACKCONTEXTptr cplex_cb_ctx,
+                                      CplexCallbackCtx *ctx, CPXLONG threadid,
+                                      CPXLONG numthreads) {
     assert(activation == -1 || activation == 1);
-    assert(numthreads < MAX_NUM_CORES);
+    assert(numthreads <= MAX_NUM_CORES);
 
     CallbackThreadLocalData *thread_local_data =
         &ctx->thread_local_data[threadid];
@@ -802,8 +814,8 @@ static int cplex_on_thread_activation(int activation, CplexCallbackCtx *ctx,
                  "%lld, numthreads = %lld",
                  threadid, numthreads);
 
-        if (!create_callback_thread_local_data(thread_local_data, ctx->instance,
-                                               ctx->solver)) {
+        if (!create_callback_thread_local_data(thread_local_data, cplex_cb_ctx,
+                                               ctx->instance, ctx->solver)) {
             destroy_callback_thread_local_data(thread_local_data);
             log_fatal("%s :: Failed create_callback_thread_local_data()",
                       __func__);
@@ -820,21 +832,20 @@ static int cplex_on_thread_activation(int activation, CplexCallbackCtx *ctx,
     return 0;
 }
 
-CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
+CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                     CPXLONG contextid, void *userhandle) {
-    CplexCallbackCtx *data = (CplexCallbackCtx *)userhandle;
-
+    CplexCallbackCtx *ctx = (CplexCallbackCtx *)userhandle;
     int result = 0;
 
     int32_t numthreads;
     int32_t threadid;
-    CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_THREADS, &numthreads);
-    CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_THREADID, &threadid);
+    CPXXcallbackgetinfoint(cplex_cb_ctx, CPXCALLBACKINFO_THREADS, &numthreads);
+    CPXXcallbackgetinfoint(cplex_cb_ctx, CPXCALLBACKINFO_THREADID, &threadid);
     assert(threadid >= 0 && threadid < numthreads);
 
     log_debug("%s :: numthreads = %d, numcores = %d", __func__, numthreads,
-              data->solver->data->numcores);
-    assert(numthreads <= data->solver->data->numcores);
+              ctx->solver->data->numcores);
+    assert(numthreads <= ctx->solver->data->numcores);
 
     // NOTE:
     //      Look at
@@ -843,32 +854,32 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     switch (contextid) {
     case CPX_CALLBACKCONTEXT_CANDIDATE: {
         int is_point = false;
-        if (CPXXcallbackcandidateispoint(context, &is_point) != 0) {
+        if (CPXXcallbackcandidateispoint(cplex_cb_ctx, &is_point) != 0) {
             result = 1;
         }
 
         if (is_point && result == 0) {
-            result = cplex_on_new_candidate_point(
-                context, data->solver, data->instance, threadid, numthreads);
+            result = cplex_on_new_candidate_point(cplex_cb_ctx, ctx, threadid,
+                                                  numthreads);
         }
         break;
     }
     case CPX_CALLBACKCONTEXT_RELAXATION:
-        result = cplex_on_new_relaxation(context, data->solver, data->instance,
-                                         threadid, numthreads);
+        result = cplex_on_new_relaxation(cplex_cb_ctx, ctx->solver,
+                                         ctx->instance, threadid, numthreads);
         break;
     case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
         // NOTE: Global progress is inherently thread safe
         //            See:
         //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
         result =
-            cplex_on_global_progress(context, data->solver, data->instance);
+            cplex_on_global_progress(cplex_cb_ctx, ctx->solver, ctx->instance);
         break;
     case CPX_CALLBACKCONTEXT_THREAD_UP:
     case CPX_CALLBACKCONTEXT_THREAD_DOWN: {
         int activation = contextid == CPX_CALLBACKCONTEXT_THREAD_UP ? 1 : -1;
-        result =
-            cplex_on_thread_activation(activation, data, threadid, numthreads);
+        result = cplex_on_thread_activation(activation, cplex_cb_ctx, ctx,
+                                            threadid, numthreads);
         break;
     }
 
@@ -877,8 +888,8 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
         break;
     }
 
-    if (data->solver->should_terminate) {
-        CPXXcallbackabort(context);
+    if (ctx->solver->should_terminate) {
+        CPXXcallbackabort(cplex_cb_ctx);
     }
 
     // NOTE:
