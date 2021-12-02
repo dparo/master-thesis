@@ -26,6 +26,7 @@
 #include "core-utils.h"
 #include "network.h"
 #include "validation.h"
+#include "cuts.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -52,15 +53,6 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
 
 #include <string.h>
 #include "log.h"
-
-typedef struct SolverData {
-    int64_t begin_time;
-    CPXENVptr env;
-    CPXLPptr lp;
-    int numcores;
-    CPXDIM num_mip_vars;
-    CPXDIM num_mip_constraints;
-} SolverData;
 
 ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
     (void)self;

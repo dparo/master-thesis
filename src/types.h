@@ -170,6 +170,28 @@ __str_to_enum_default(const EnumToStrMapping *table, int32_t table_len,
     return *lookup;
 }
 
+typedef enum {
+    TYPED_PARAM_DOUBLE,
+    TYPED_PARAM_FLOAT,
+    TYPED_PARAM_BOOL,
+    TYPED_PARAM_INT32,
+    TYPED_PARAM_USIZE,
+    TYPED_PARAM_STR,
+} ParamType;
+
+typedef struct {
+    int32_t count;
+    ParamType type;
+    union {
+        double dval;
+        float fval;
+        int32_t ival;
+        size_t sizeval;
+        bool bval;
+        const char *sval;
+    };
+} TypedParam;
+
 #if __cplusplus
 }
 #endif

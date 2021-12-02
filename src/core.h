@@ -73,7 +73,7 @@ typedef struct SolverData SolverData;
 
 #define MAX_NUM_SOLVER_PARAMS (256)
 
-typedef struct SolverParams {
+typedef struct {
     int32_t num_params;
     struct {
         const char *name;
@@ -81,45 +81,22 @@ typedef struct SolverParams {
     } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
 
-typedef enum {
-    SOLVER_TYPED_PARAM_DOUBLE,
-    SOLVER_TYPED_PARAM_FLOAT,
-    SOLVER_TYPED_PARAM_BOOL,
-    SOLVER_TYPED_PARAM_INT32,
-    SOLVER_TYPED_PARAM_USIZE,
-    SOLVER_TYPED_PARAM_STR,
-} SolverParamType;
-
-typedef struct SolverTypedParam {
-    int32_t count;
-    SolverParamType type;
-    union {
-        double dval;
-        float fval;
-        int32_t ival;
-        size_t sizeval;
-        bool bval;
-        const char *sval;
-    };
-} SolverTypedParam;
-
 typedef struct SolverTypedParams {
-
     // NOTE: Hashtable use <stb_ds.h> : shput(), shget() and alike
     struct {
         char *key;
-        SolverTypedParam value;
+        TypedParam value;
     } * __sm;
 } SolverTypedParams;
 
 typedef struct SolverDescriptor {
-    char *name;
+    const char *name;
     struct {
         const char *name;
-        SolverParamType type;
+        const ParamType type;
         const char *default_value;
         const char *glossary;
-    } params[];
+    } const params[];
 } SolverDescriptor;
 
 typedef enum SolveStatus {
