@@ -420,22 +420,21 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
-static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
-                                   Solver *solver, const Instance *instance,
-                                   int32_t threadid, int32_t numthreads) {
+static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
+                                   CplexCallbackCtx *ctx, int32_t threadid,
+                                   int32_t numthreads) {
     // NOTE:
     //      Called when cplex has a new feasible LP solution (not necessarily
     //      satisfying the integrality constraints)
 
-    UNUSED_PARAM(threadid);
-    UNUSED_PARAM(numthreads);
+    assert(threadid < numthreads);
+    assert(threadid <= MAX_NUM_CORES);
 
-#if 0
-    // DELETE_ME: Short circuit for now
-    return 0;
-#else
+    Solver *solver = ctx->solver;
+    const Instance *instance = ctx->instance;
+    CallbackThreadLocalData *tld = &ctx->thread_local_data[threadid];
+    double *vstar = tld->vstar;
 
-    double *vstar = malloc(sizeof(*vstar) * solver->data->num_mip_vars);
     if (!vstar) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto terminate;
@@ -443,120 +442,42 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
 
     double obj_p;
     if (CPXXcallbackgetrelaxationpoint(
-            context, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
+            cplex_cb_ctx, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
         log_fatal("%s :: Failed `CPXXcallbackgetrelaxationpoint`", __func__);
         goto terminate;
     }
 
-    FlowNetwork network = {0};
-    network.nnodes = instance->num_customers + 1;
+    CutSeparationFunctor *functor = &tld->gsec_functor;
+#if 0
+        printf("  threadid = %d, cplex_cb_ctx = %p\n", threadid, cplex_cb_ctx);
+        printf("  threadid = %d, tld = %p\n", threadid, tld);
+        printf("  threadid = %d, vstar = %p\n", threadid, vstar);
+        printf("  threadid = %d, tour = %p\n", threadid, tour);
+        printf("  threadid = %d, functor.ctx = %p\n", threadid, functor->ctx);
+        printf("  threadid = %d, functor.internal.cplex_cb_ctx = %p\n",
+               threadid, functor->internal.cplex_cb_ctx);
+        printf("\n");
+#endif
 
-    network.source_vertex = 0;
+    const int64_t begin_time = os_get_usecs();
+    // NOTE: We need to reset the cplex_cb_ctx since it might change during
+    // the execution. The same threadid id, is not guaranteed to have the
+    // same cplex_cb_ctx for the entire duration of the thread
+    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+    bool separation_success =
+        CUT_GSEC_IFACE.fractional_sep(functor, obj_p, vstar);
+    functor->internal.fractional_stats.accum_usecs +=
+        os_get_usecs() - begin_time;
 
-    do {
-        network.sink_vertex = rand() % (instance->num_customers + 1);
-    } while (network.sink_vertex == 0 &&
-             network.sink_vertex == network.source_vertex);
-
-    network.flow =
-        malloc((instance->num_customers + 1) * (instance->num_customers + 1) *
-               sizeof(*network.flow));
-
-    network.cap = malloc((instance->num_customers + 1) *
-                         (instance->num_customers + 1) * sizeof(*network.cap));
-
-    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-            double cap =
-                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
-            assert(fgte(cap, 0.0, 1e-8));
-            // NOTE: Fix floating point rounding errors. In fact cap may be
-            // slightly negative...
-            cap = MAX(0.0, cap);
-            if (feq(cap, 0.0, 1e-6)) {
-                cap = 0.0;
-            }
-            assert(cap >= 0.0);
-            *network_cap(&network, i, j) = cap;
-        }
+    if (!separation_success) {
+        log_fatal("Separation of integral `%s` cuts failed", "GSEC");
+        goto terminate;
     }
 
-    MaxFlowResult max_flow_result =
-        max_flow_result_create(instance->num_customers + 1);
-    double max_flow = push_relabel_max_flow(&network, &max_flow_result);
-
-    // printf("--- max_flow = %f\n", max_flow);
-    const double EPS = 1e-6;
-    for (int32_t h = 1; h < instance->num_customers + 1; h++) {
-        double y = vstar[get_y_mip_var_idx(instance, h)];
-        int32_t bp_h = max_flow_result.bipartition.data[h];
-        if (bp_h == 0 && flt(max_flow, 2.0 * y, EPS)) {
-            // Separate the cut
-            double rhs = 0;
-            char sense = 'G';
-            CPXNNZ nnz = 0;
-            CPXDIM *index = NULL;
-            double *value = NULL;
-            CPXNNZ rmatbeg = 0;
-            int purgeable = CPX_USECUT_PURGE;
-            int local_validity = 0;
-
-            for (int32_t i = 1; i < instance->num_customers + 1; i++) {
-                for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-                    int32_t bp_i = max_flow_result.bipartition.data[i];
-                    int32_t bp_j = max_flow_result.bipartition.data[j];
-                    if (bp_i == 0 && bp_j == 1) {
-                        nnz++;
-                    }
-                }
-            }
-
-            nnz += 1;
-            index = malloc(nnz * sizeof(*index));
-            value = malloc(nnz * sizeof(*value));
-
-            int32_t pos = 0;
-            for (int32_t i = 1; i < instance->num_customers + 1; i++) {
-                for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-                    int32_t bp_i = max_flow_result.bipartition.data[i];
-                    int32_t bp_j = max_flow_result.bipartition.data[j];
-                    if (bp_i == 0 && bp_j == 1) {
-                        index[pos] = get_x_mip_var_idx(instance, i, j);
-                        value[pos] = 1.0;
-                        ++pos;
-                    }
-                }
-            }
-
-            index[pos] = get_y_mip_var_idx(instance, h);
-            value[pos] = -2.0;
-
-            if (0 != CPXXcallbackaddusercuts(context, 1, nnz, &rhs, &sense,
-                                             &rmatbeg, index, value, &purgeable,
-                                             &local_validity)) {
-                log_fatal(
-                    "%s :: CPXXcallbackaddusercuts failed to add user cut",
-                    __func__);
-            }
-
-            free(index);
-            free(value);
-        }
-    }
-
-    free(vstar);
-    flow_network_destroy(&network);
-    max_flow_result_destroy(&max_flow_result);
     return 0;
-
 terminate:
     log_fatal("%s :: Fatal termination error", __func__);
-
-    free(vstar);
-    flow_network_destroy(&network);
-    max_flow_result_destroy(&max_flow_result);
     return 1;
-#endif
 }
 
 static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
@@ -599,17 +520,6 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                  __func__, tour->num_comps);
 
         CutSeparationFunctor *functor = &tld->gsec_functor;
-#if 0
-        printf("  threadid = %d, cplex_cb_ctx = %p\n", threadid, cplex_cb_ctx);
-        printf("  threadid = %d, tld = %p\n", threadid, tld);
-        printf("  threadid = %d, vstar = %p\n", threadid, vstar);
-        printf("  threadid = %d, tour = %p\n", threadid, tour);
-        printf("  threadid = %d, functor.ctx = %p\n", threadid, functor->ctx);
-        printf("  threadid = %d, functor.internal.cplex_cb_ctx = %p\n",
-               threadid, functor->internal.cplex_cb_ctx);
-        printf("\n");
-#endif
-
         const int64_t begin_time = os_get_usecs();
         // NOTE: We need to reset the cplex_cb_ctx since it might change during
         // the execution. The same threadid id, is not guaranteed to have the
@@ -742,8 +652,8 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         break;
     }
     case CPX_CALLBACKCONTEXT_RELAXATION:
-        result = cplex_on_new_relaxation(cplex_cb_ctx, ctx->solver,
-                                         ctx->instance, threadid, numthreads);
+        result =
+            cplex_on_new_relaxation(cplex_cb_ctx, ctx, threadid, numthreads);
         break;
     case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
         // NOTE: Global progress is inherently thread safe

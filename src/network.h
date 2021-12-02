@@ -67,6 +67,12 @@ typedef struct PushRelabelCtx {
     int32_t *list;
 } PushRelabelCtx;
 
+static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {
+    bool result =
+        ctx->height && ctx->excess_flow && ctx->curr_neigh && ctx->list;
+    return result;
+}
+
 FlowNetwork flow_network_create(int32_t nnodes);
 void flow_network_clear(FlowNetwork *net, bool clear_cap);
 void flow_network_destroy(FlowNetwork *net);

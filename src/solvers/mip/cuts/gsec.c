@@ -22,6 +22,7 @@
 
 #include "../mip.h"
 #include "../cuts.h"
+#include "network.h"
 
 const double EPS = 1e-6;
 
@@ -29,6 +30,10 @@ struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
     int32_t *cnnodes;
+
+    PushRelabelCtx push_relabel_ctx;
+    FlowNetwork network;
+    MaxFlowResult max_flow_result;
 };
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
@@ -36,7 +41,14 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     return 1 + (n * n) / 4;
 }
 
+static inline bool is_violated_cut(double flow, double y_i) {
+    return flt(flow, 2.0 * y_i, EPS);
+}
+
 static void deactivate(CutSeparationPrivCtx *ctx) {
+    flow_network_destroy(&ctx->network);
+    max_flow_result_destroy(&ctx->max_flow_result);
+    push_relabel_ctx_destroy(&ctx->push_relabel_ctx);
     free(ctx->index);
     free(ctx->value);
     free(ctx->cnnodes);
@@ -52,8 +64,13 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
     ctx->cnnodes = malloc(n * sizeof(*ctx->cnnodes));
+    ctx->network = flow_network_create(n);
+    ctx->max_flow_result = max_flow_result_create(n);
+    ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->cnnodes) {
+    if (!ctx->index || !ctx->value || !ctx->cnnodes || !ctx->network.cap ||
+        !ctx->network.flow || !ctx->max_flow_result.bipartition.data ||
+        !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
         deactivate(ctx);
         return NULL;
     }
@@ -63,6 +80,96 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar) {
+
+    CutSeparationPrivCtx *ctx = self->ctx;
+    const Instance *instance = self->instance;
+    Solver *solver = self->solver;
+    const int32_t n = instance->num_customers + 1;
+
+    ctx->network.source_vertex = 0;
+
+    do {
+        ctx->network.sink_vertex = rand() % (instance->num_customers + 1);
+    } while (ctx->network.sink_vertex == 0 &&
+             ctx->network.sink_vertex == ctx->network.source_vertex);
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            double cap =
+                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
+            assert(fgte(cap, 0.0, 1e-8));
+            // NOTE: Fix floating point rounding errors. In fact cap may be
+            // slightly negative...
+            cap = MAX(0.0, cap);
+            if (feq(cap, 0.0, 1e-6)) {
+                cap = 0.0;
+            }
+            assert(cap >= 0.0);
+            *network_cap(&ctx->network, i, j) = cap;
+        }
+    }
+
+    double max_flow = push_relabel_max_flow2(
+        &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
+
+    log_trace("%s :: max_flow = %g\n", __func__, max_flow);
+
+    // Skip the depot node (start from h=1)
+    for (int32_t h = 1; h < n; h++) {
+        double y_h = vstar[get_y_mip_var_idx(instance, h)];
+        int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
+
+        if (bp_h == 0 && is_violated_cut(max_flow, y_h)) {
+
+            // Separate the cut
+            double rhs = 0;
+            char sense = 'G';
+            CPXNNZ nnz = 0;
+            int purgeable = CPX_USECUT_PURGE;
+            int local_validity = 0;
+
+            for (int32_t i = 1; i < n; i++) {
+                for (int32_t j = 0; j < n; j++) {
+                    int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+                    int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
+                    if (bp_i == 0 && bp_j == 1) {
+                        nnz++;
+                    }
+                }
+            }
+
+            nnz += 1;
+
+            int32_t pos = 0;
+            for (int32_t i = 1; i < n; i++) {
+                for (int32_t j = 0; j < n; j++) {
+                    int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+                    int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
+                    if (bp_i == 0 && bp_j == 1) {
+                        ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
+                        ctx->value[pos] = 1.0;
+                        ++pos;
+                    }
+                }
+            }
+
+            ctx->index[pos] = get_y_mip_var_idx(instance, h);
+            ctx->value[pos] = -2.0;
+
+            if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
+                                        ctx->value, purgeable,
+                                        local_validity)) {
+                log_fatal(
+                    "%s :: Failed to generate cut for fractional solution",
+                    __func__);
+                goto failure;
+            }
+        }
+    }
+
+    return true;
+
+failure:
     return false;
 }
 
@@ -82,7 +189,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
-    Solver *solver = self->solver;
     const int32_t n = instance->num_customers + 1;
 
     for (int32_t c = 0; c < tour->num_comps; c++) {
@@ -121,7 +227,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
         double flow = 0.0;
         CPXNNZ nnz = 1 + ctx->cnnodes[c] * (n - ctx->cnnodes[c]);
-        CPXNNZ cnt = 0;
+        CPXNNZ pos = 0;
 
         assert(nnz <= nnz_upper_bound);
 
@@ -135,18 +241,19 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
                     // If node i belongs to S and node j does NOT belong to S
                     if (*comp(tour, j) != c) {
-                        ctx->index[cnt] =
+                        ctx->index[pos] =
                             (CPXDIM)get_x_mip_var_idx(instance, i, j);
-                        ctx->value[cnt] = +1.0;
-                        flow += vstar[get_x_mip_var_idx(instance, i, j)];
-                        cnt++;
+                        ctx->value[pos] = +1.0;
+                        double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                        flow += x;
+                        ++pos;
                     }
                 }
             }
         }
 
-        assert(cnt < nnz_upper_bound);
-        assert(cnt == nnz - 1);
+        assert(pos < nnz_upper_bound);
+        assert(pos == nnz - 1);
 
 #ifndef NDEBUG
         // Assert that index array does not contain duplicates
@@ -165,10 +272,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == c) {
 
-                double v = vstar[get_y_mip_var_idx(instance, i)];
-                bool is_violated_cut = flt(flow, 2.0 * v, EPS);
-
-                assert(is_violated_cut);
+                double y = vstar[get_y_mip_var_idx(instance, i)];
+                assert(is_violated_cut(flow, y));
                 assert(*comp(tour, i) >= 1);
 
                 ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
@@ -178,7 +283,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                           "component %d, vertex "
                           "%d "
                           "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                          __func__, flow, v, c, i, c, ctx->cnnodes[c], nnz);
+                          __func__, flow, y, c, i, c, ctx->cnnodes[c], nnz);
 
                 if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
                                           ctx->value)) {
@@ -193,6 +298,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     }
 
     return true;
+
 failure:
     return false;
 }
