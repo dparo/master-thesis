@@ -23,6 +23,8 @@
 #include "../mip.h"
 #include "../cuts.h"
 
+const double EPS = 1e-6;
+
 struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
@@ -104,19 +106,20 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     }
 #endif
 
-    double rhs = 0;
+    double rhs = 0.0;
     char sense = 'G';
 
     assert(*comp(tour, 0) == 0);
 
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
 
-    // Note start from c = 1. Subtour Elimination Constraints that include the
-    // depot are NOT valid.
+    // NOTE:
+    // Start from c = 1. GSECS that include the depot node are NOT valid.
     for (int32_t c = 1; c < tour->num_comps; c++) {
 
         assert(ctx->cnnodes[c] >= 2);
 
+        double flow = 0.0;
         CPXNNZ nnz = 1 + ctx->cnnodes[c] * (n - ctx->cnnodes[c]);
         CPXNNZ cnt = 0;
 
@@ -135,6 +138,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                         ctx->index[cnt] =
                             (CPXDIM)get_x_mip_var_idx(instance, i, j);
                         ctx->value[cnt] = +1.0;
+                        flow += vstar[get_x_mip_var_idx(instance, i, j)];
                         cnt++;
                     }
                 }
@@ -160,16 +164,21 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         int32_t added_cuts = 0;
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == c) {
-                // TODO: Cut the integral solution only if it is violated...
+
+                double v = vstar[get_y_mip_var_idx(instance, i)];
+                bool is_violated_cut = flt(flow, 2.0 * v, EPS);
+
+                assert(is_violated_cut);
                 assert(*comp(tour, i) >= 1);
 
                 ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
                 ctx->value[nnz - 1] = -2.0;
 
-                log_trace(
-                    "%s :: Adding GSEC constraint for component %d vertex %d, "
-                    "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                    __func__, c, i, c, ctx->cnnodes[c], nnz);
+                log_trace("%s :: Adding GSEC constraint (%g >= 2.0 * %g) for "
+                          "component %d, vertex "
+                          "%d "
+                          "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
+                          __func__, flow, v, c, i, c, ctx->cnnodes[c], nnz);
 
                 if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
                                           ctx->value)) {

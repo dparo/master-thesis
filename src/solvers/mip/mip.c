@@ -838,7 +838,7 @@ static int cplex_on_thread_activation(int activation,
         }
     } else if (activation < 0) {
         log_info("cplex_callback deactivated an old thread :: threadid = "
-                 "%lld, numthreads = %lld",
+                 "%lld, numthreads = %lld\n",
                  threadid, numthreads);
         destroy_callback_thread_local_data(thread_local_data);
     } else {
