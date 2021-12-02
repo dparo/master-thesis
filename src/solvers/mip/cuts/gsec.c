@@ -25,20 +25,31 @@
 
 struct CutSeparationPrivCtx {};
 
+static inline get_nnz_upper_bound(const Instance *instance) {}
+
 static CutSeparationPrivCtx *activate(const Instance *instance,
                                       Solver *solver) {
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
     return ctx;
 }
 
+static void destroy_ctx(CutSeparationPrivCtx *ctx) {}
+
 static void deactivate(CutSeparationFunctor *self) {
+    destroy_ctx(self->ctx);
     free(self->ctx);
     memset(self, 0, sizeof(*self));
 }
 
-static bool fractional_sep(CutSeparationFunctor *self) { return false; }
+static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
+                           const double *vstar) {
+    return false;
+}
 
-static bool integral_sep(CutSeparationFunctor *self) { return false; }
+static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
+                         const Tour *tour) {
+    return false;
+}
 
 const CutSeparationIface CUT_GSEC_IFACE = {
     .activate = activate,

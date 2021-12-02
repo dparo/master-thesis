@@ -51,15 +51,12 @@ typedef struct SolverData {
 struct CutSeparationIface;
 
 typedef struct {
-    int32_t num_seps;
+    int64_t num_cuts;
     int64_t accum_usecs;
 } CutSeparationStatistics;
 
 typedef struct {
     CutSeparationPrivCtx *ctx;
-
-    int32_t thread_id;
-    int32_t num_threads;
     const Instance *instance;
     Solver *solver;
 
@@ -67,7 +64,8 @@ typedef struct {
     /// User cuts should not bother modifying and/or reading these fields.
     struct {
         CPXCALLBACKCONTEXTptr cplex_cb_ctx;
-        CutSeparationStatistics stats;
+        CutSeparationStatistics fractional_stats;
+        CutSeparationStatistics integral_stats;
     } internal;
 } CutSeparationFunctor;
 
@@ -75,8 +73,10 @@ typedef struct {
     CutSeparationPrivCtx *(*activate)(const Instance *instance, Solver *solver);
     void (*deactivate)(CutSeparationFunctor *self);
 
-    bool (*fractional_sep)(CutSeparationFunctor *self);
-    bool (*integral_sep)(CutSeparationFunctor *self);
+    bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
+                           const double *vstar);
+    bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
+                         const Tour *tour);
 } CutSeparationIface;
 
 static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
@@ -124,6 +124,34 @@ static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
 
     assert(i >= 0 && i < instance->num_customers + 1);
     return (size_t)i + get_y_mip_var_idx_offset(instance);
+}
+
+static inline bool mip_cut_integral_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
+                                        double rhs, char sense, CPXDIM *index,
+                                        double *value) {
+    CPXNNZ rmatbeg[] = {0};
+    ctx->internal.integral_stats.num_cuts += 1;
+    if (CPXXcallbackrejectcandidate(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
+                                    &sense, rmatbeg, index, value) != 0) {
+        log_fatal("%s :: Failed CPXXcallbackrejectcandidate", __func__);
+        return false;
+    }
+    return true;
+}
+
+static inline bool mip_cut_fractional_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
+                                          double rhs, char sense, CPXDIM *index,
+                                          double *value, int purgeable,
+                                          int local_validity) {
+    CPXNNZ rmatbeg[] = {0};
+    ctx->internal.fractional_stats.num_cuts += 1;
+    if (CPXXcallbackaddusercuts(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
+                                &sense, rmatbeg, index, value, &purgeable,
+                                &local_validity) != 0) {
+        log_fatal("%s :: Failed CPXXcallbackaddusercuts", __func__);
+        return false;
+    }
+    return true;
 }
 
 #if __cplusplus

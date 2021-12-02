@@ -64,17 +64,39 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 
 #define MAX_NUM_CORES 256
 
+typedef struct {
+    double *vstar;
+    Tour tour;
+    CutSeparationFunctor gsec_functor;
+} CallbackThreadLocalData;
+
 /// Struct that is used as a userhandle to be passed to the cplex generic
 /// callback
 typedef struct {
     Solver *solver;
     const Instance *instance;
-
-    struct {
-        double *vstar;
-        Tour *tour;
-    } threadctx[MAX_NUM_CORES];
+    CallbackThreadLocalData thread_local_data[MAX_NUM_CORES];
 } CplexCallbackCtx;
+
+static void
+create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
+                                  const Instance *instance, Solver *solver) {
+    thread_local_data->tour = tour_create(instance);
+
+    thread_local_data->vstar =
+        malloc(sizeof(*thread_local_data->vstar) * solver->data->num_mip_vars);
+
+    thread_local_data->gsec_functor.ctx =
+        CUT_GSEC_IFACE.activate(instance, solver);
+}
+
+static void
+destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
+    CUT_GSEC_IFACE.deactivate(&thread_local_data->gsec_functor);
+    free(thread_local_data->vstar);
+    tour_destroy(&thread_local_data->tour);
+    memset(thread_local_data, 0, sizeof(*thread_local_data));
+}
 
 static void validate_mip_vars_packing(const Instance *instance) {
 #ifndef NDEBUG
