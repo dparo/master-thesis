@@ -158,6 +158,9 @@ static inline bool mip_cut_fractional_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
     //  You can call this routine more than once in the same
     //  callback invocation. CPLEX will accumulate the cuts from all
     //  such calls.
+
+    // NOTE: local_validity = 1: Means the cut is only locally valid. 0 instead,
+    // means Globally valid
     if (0 != CPXXcallbackaddusercuts(ctx->internal.cplex_cb_ctx, 1, nnz, &rhs,
                                      &sense, rmatbeg, index, value, &purgeable,
                                      &local_validity)) {

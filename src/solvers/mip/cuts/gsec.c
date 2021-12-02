@@ -83,7 +83,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
-    Solver *solver = self->solver;
     const int32_t n = instance->num_customers + 1;
 
     ctx->network.source_vertex = 0;
@@ -126,7 +125,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             char sense = 'G';
             CPXNNZ nnz = 0;
             int purgeable = CPX_USECUT_PURGE;
-            int local_validity = 0;
+            int local_validity = 0; // (Globally valid)
 
             for (int32_t i = 1; i < n; i++) {
                 for (int32_t j = 0; j < n; j++) {
