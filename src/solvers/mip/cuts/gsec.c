@@ -115,18 +115,16 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         }
     }
 
+    //
+    // Heuristic separation. Pick random source and sink vertex
+    //
     ctx->network.source_vertex = rand() % n;
-
     do {
         ctx->network.sink_vertex = rand() % (instance->num_customers + 1);
     } while (ctx->network.sink_vertex == ctx->network.source_vertex);
 
     // Solve the max flow and create the violated cuts
-    for (ctx->network.sink_vertex = 0; ctx->network.sink_vertex < n;
-         ++ctx->network.sink_vertex) {
-        if (ctx->network.source_vertex == ctx->network.sink_vertex) {
-            continue;
-        }
+    {
         double max_flow = push_relabel_max_flow2(
             &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
 
