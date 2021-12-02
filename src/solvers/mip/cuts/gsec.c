@@ -99,13 +99,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
 
-    ctx->network.source_vertex = 0;
-
-    do {
-        ctx->network.sink_vertex = rand() % (instance->num_customers + 1);
-    } while (ctx->network.sink_vertex == 0 &&
-             ctx->network.sink_vertex == ctx->network.source_vertex);
-
     for (int32_t i = 0; i < n; i++) {
         for (int32_t j = 0; j < n; j++) {
             double cap =
@@ -122,68 +115,75 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         }
     }
 
-    double max_flow = push_relabel_max_flow2(
-        &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
+    ctx->network.source_vertex = 0;
+    for (ctx->network.sink_vertex = 1; ctx->network.sink_vertex < n;
+         ctx->network.sink_vertex++) {
 
-    log_trace("%s :: max_flow = %g\n", __func__, max_flow);
+        double max_flow = push_relabel_max_flow2(
+            &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
 
-    CPXNNZ nnz = 0;
-    const double rhs = 0;
-    const char sense = 'G';
-    const int purgeable = CPX_USECUT_PURGE;
-    const int local_validity = 0; // (Globally valid)
+        log_trace("%s :: max_flow = %g\n", __func__, max_flow);
 
-    assert(ctx->network.source_vertex == 0);
-    int32_t bp_s =
-        ctx->max_flow_result.bipartition.data[ctx->network.source_vertex];
-    int32_t bp_t =
-        ctx->max_flow_result.bipartition.data[ctx->network.sink_vertex];
+        CPXNNZ nnz = 0;
+        const double rhs = 0;
+        const char sense = 'G';
+        const int purgeable = CPX_USECUT_PURGE;
+        const int local_validity = 0; // (Globally valid)
 
-    assert(bp_s == 1);
-    assert(bp_t == 0);
+        assert(ctx->network.source_vertex == 0);
+        int32_t bp_s =
+            ctx->max_flow_result.bipartition.data[ctx->network.source_vertex];
+        int32_t bp_t =
+            ctx->max_flow_result.bipartition.data[ctx->network.sink_vertex];
 
-    double flow = 0.0;
-    for (int32_t i = 0; i < n; i++) {
-        int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
-        if (bp_i == bp_t) {
-            for (int32_t j = 0; j < n; j++) {
-                int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
-                if (bp_j == bp_s) {
-                    ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
-                    ctx->value[nnz] = +1.0;
-                    double x = vstar[get_x_mip_var_idx(instance, i, j)];
-                    flow += x;
-                    ++nnz;
+        assert(bp_s == 1);
+        assert(bp_t == 0);
+
+        double flow = 0.0;
+
+        // Separate the cut
+        for (int32_t i = 1; i < n; i++) {
+            int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+            if (bp_i == bp_t) {
+                for (int32_t j = 0; j < n; j++) {
+                    int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
+                    if (j == 0 || bp_j == bp_s) {
+                        ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
+                        ctx->value[nnz] = +1.0;
+                        double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                        flow += x;
+                        ++nnz;
+                    }
+                }
+            }
+        }
+
+        assert(feq(flow, max_flow, 1e-6));
+        validate_index_array(ctx, nnz - 1);
+
+        for (int32_t h = 1; h < n; h++) {
+            double y_h = vstar[get_y_mip_var_idx(instance, h)];
+            int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
+            if (bp_h == bp_t && is_violated_cut(max_flow, y_h)) {
+                ctx->index[nnz] = get_y_mip_var_idx(instance, h);
+                ctx->value[nnz] = -2.0;
+
+                log_trace(
+                    "%s :: Adding GSEC fractional constraint (%g >= 2.0 * %g)"
+                    " (nnz = %lld)",
+                    __func__, max_flow, y_h, nnz);
+
+                if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
+                                            ctx->value, purgeable,
+                                            local_validity)) {
+                    log_fatal(
+                        "%s :: Failed to generate cut for fractional solution",
+                        __func__);
+                    goto failure;
                 }
             }
         }
     }
-
-    assert(feq(flow, max_flow, 1e-6));
-    validate_index_array(ctx, nnz - 1);
-
-    for (int32_t h = 0; h < n; h++) {
-        double y_h = vstar[get_y_mip_var_idx(instance, h)];
-        int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
-        if (bp_h == bp_t && is_violated_cut(max_flow, y_h)) {
-            ctx->index[nnz] = get_y_mip_var_idx(instance, h);
-            ctx->value[nnz] = -2.0;
-
-            log_trace("%s :: Adding GSEC fractional constraint (%g >= 2.0 * %g)"
-                      " (nnz = %lld)",
-                      __func__, max_flow, y_h, nnz);
-
-            if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
-                                        ctx->value, purgeable,
-                                        local_validity)) {
-                log_fatal(
-                    "%s :: Failed to generate cut for fractional solution",
-                    __func__);
-                goto failure;
-            }
-        }
-    }
-
     return true;
 
 failure:
@@ -257,7 +257,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                     }
 
                     // If node i belongs to S and node j does NOT belong to S
-                    if (*comp(tour, j) != c) {
+                    if (j == 0 || *comp(tour, j) != c) {
                         ctx->index[pos] =
                             (CPXDIM)get_x_mip_var_idx(instance, i, j);
                         ctx->value[pos] = +1.0;

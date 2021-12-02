@@ -515,9 +515,9 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     unpack_mip_solution(instance, tour, vstar);
 
     if (tour->num_comps >= 2) {
-        log_info("%s :: num_comps of unpacked tour is %d -- rejecting "
-                 "candidate point...",
-                 __func__, tour->num_comps);
+        log_trace("%s :: num_comps of unpacked tour is %d -- rejecting "
+                  "candidate point...",
+                  __func__, tour->num_comps);
 
         CutSeparationFunctor *functor = &tld->gsec_functor;
         const int64_t begin_time = os_get_usecs();
@@ -580,7 +580,7 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     }
 
     log_info("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
-             "lower_bound = %f, upper_bound = %f, incumbent = %f\n",
+             "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f\n",
              __func__, num_processed_nodes, simplex_iterations, lower_bound,
              incumbent, upper_bound);
     return 0;
