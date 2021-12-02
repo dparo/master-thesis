@@ -53,6 +53,10 @@ void instance_destroy(Instance *instance) {
     memset(instance, 0, sizeof(*instance));
 }
 
+bool tour_is_valid(Tour *tour) {
+    return tour->comp && tour->succ && tour->num_customers > 0;
+}
+
 void tour_invalidate(Tour *tour) {
     tour->num_comps = 0;
 

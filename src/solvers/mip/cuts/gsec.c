@@ -23,17 +23,36 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-struct CutSeparationPrivCtx {};
+struct CutSeparationPrivCtx {
+    CPXDIM *index;
+    double *value;
+};
 
-static inline get_nnz_upper_bound(const Instance *instance) {}
+static inline get_nnz_upper_bound(const Instance *instance) {
+    int32_t n = instance->num_customers + 1;
+    return 1 + (n * n) / 4;
+}
+
+static void destroy_ctx(CutSeparationPrivCtx *ctx) {
+    free(ctx->index);
+    free(ctx->value);
+}
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
                                       Solver *solver) {
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
+    int32_t nnz_ub = get_nnz_upper_bound(instance);
+
+    ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
+    ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
+
+    if (!ctx->index || !ctx->value) {
+        destroy_ctx(ctx);
+        return NULL;
+    }
+
     return ctx;
 }
-
-static void destroy_ctx(CutSeparationPrivCtx *ctx) {}
 
 static void deactivate(CutSeparationFunctor *self) {
     destroy_ctx(self->ctx);

@@ -78,9 +78,11 @@ typedef struct {
     CallbackThreadLocalData thread_local_data[MAX_NUM_CORES];
 } CplexCallbackCtx;
 
-static void
+static bool
 create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
                                   const Instance *instance, Solver *solver) {
+    memset(thread_local_data, 0, sizeof(*thread_local_data));
+
     thread_local_data->tour = tour_create(instance);
 
     thread_local_data->vstar =
@@ -88,14 +90,20 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
 
     thread_local_data->gsec_functor.ctx =
         CUT_GSEC_IFACE.activate(instance, solver);
+
+    bool success = thread_local_data->gsec_functor.ctx &&
+                   thread_local_data->vstar &&
+                   tour_is_valid(&thread_local_data->tour);
+    return success;
 }
 
 static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
-    CUT_GSEC_IFACE.deactivate(&thread_local_data->gsec_functor);
+    if (thread_local_data->gsec_functor.ctx) {
+        CUT_GSEC_IFACE.deactivate(&thread_local_data->gsec_functor);
+    }
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
-    memset(thread_local_data, 0, sizeof(*thread_local_data));
 }
 
 static void validate_mip_vars_packing(const Instance *instance) {
@@ -793,8 +801,14 @@ static int cplex_on_thread_activation(int activation, CplexCallbackCtx *ctx,
         log_info("cplex_callback activated a thread :: threadid = "
                  "%lld, numthreads = %lld",
                  threadid, numthreads);
-        create_callback_thread_local_data(thread_local_data, ctx->instance,
-                                          ctx->solver);
+
+        if (!create_callback_thread_local_data(thread_local_data, ctx->instance,
+                                               ctx->solver)) {
+            destroy_callback_thread_local_data(thread_local_data);
+            log_fatal("%s :: Failed create_callback_thread_local_data()",
+                      __func__);
+            return 1;
+        }
     } else if (activation < 0) {
         log_info("cplex_callback deactivated an old thread :: threadid = "
                  "%lld, numthreads = %lld",
