@@ -76,7 +76,7 @@ typedef struct {
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
-                         const Tour *tour);
+                         const double *vstar, const Tour *tour);
 } CutSeparationIface;
 
 static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }

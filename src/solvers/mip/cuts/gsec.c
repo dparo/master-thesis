@@ -47,7 +47,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 }
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
-                         const Tour *tour) {
+                         const double *vstar, const Tour *tour) {
     return false;
 }
 

@@ -781,23 +781,25 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
     return 0;
 }
 
-static int cplex_on_thread_activation(int activation,
-                                      CPXCALLBACKCONTEXTptr context,
-                                      Solver *solver, const Instance *instance,
+static int cplex_on_thread_activation(int activation, CplexCallbackCtx *ctx,
                                       CPXLONG threadid, CPXLONG numthreads) {
-    UNUSED_PARAM(context);
-    UNUSED_PARAM(solver);
-    UNUSED_PARAM(instance);
     assert(activation == -1 || activation == 1);
+    assert(numthreads < MAX_NUM_CORES);
+
+    CallbackThreadLocalData *thread_local_data =
+        &ctx->thread_local_data[threadid];
 
     if (activation > 0) {
         log_info("cplex_callback activated a thread :: threadid = "
                  "%lld, numthreads = %lld",
                  threadid, numthreads);
+        create_callback_thread_local_data(thread_local_data, ctx->instance,
+                                          ctx->solver);
     } else if (activation < 0) {
         log_info("cplex_callback deactivated an old thread :: threadid = "
                  "%lld, numthreads = %lld",
                  threadid, numthreads);
+        destroy_callback_thread_local_data(thread_local_data);
     } else {
         assert(!"Invalid code path");
     }
@@ -852,8 +854,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr context,
     case CPX_CALLBACKCONTEXT_THREAD_DOWN: {
         int activation = contextid == CPX_CALLBACKCONTEXT_THREAD_UP ? 1 : -1;
         result =
-            cplex_on_thread_activation(activation, context, data->solver,
-                                       data->instance, threadid, numthreads);
+            cplex_on_thread_activation(activation, data, threadid, numthreads);
         break;
     }
 
