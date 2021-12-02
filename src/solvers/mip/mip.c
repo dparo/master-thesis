@@ -477,7 +477,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr context,
     double max_flow = push_relabel_max_flow(&network, &max_flow_result);
 
     // printf("--- max_flow = %f\n", max_flow);
-    const double EPS = 1e-4;
+    const double EPS = 1e-6;
     for (int32_t h = 1; h < instance->num_customers + 1; h++) {
         double y = vstar[get_y_mip_var_idx(instance, h)];
         int32_t bp_h = max_flow_result.bipartition.data[h];

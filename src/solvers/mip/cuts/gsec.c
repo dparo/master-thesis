@@ -26,6 +26,7 @@
 struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
+    int32_t *cnnodes;
 };
 
 static inline get_nnz_upper_bound(const Instance *instance) {
@@ -36,6 +37,7 @@ static inline get_nnz_upper_bound(const Instance *instance) {
 static void destroy_ctx(CutSeparationPrivCtx *ctx) {
     free(ctx->index);
     free(ctx->value);
+    free(ctx->cnnodes);
 }
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
@@ -43,10 +45,12 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
     int32_t nnz_ub = get_nnz_upper_bound(instance);
 
+    int32_t n = instance->num_customers + 1;
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
+    ctx->cnnodes = malloc(n * sizeof(*ctx->cnnodes));
 
-    if (!ctx->index || !ctx->value) {
+    if (!ctx->index || !ctx->value || !ctx->cnnodes) {
         destroy_ctx(ctx);
         return NULL;
     }
@@ -67,6 +71,17 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, const Tour *tour) {
+    // No separation is needed
+    if (tour->num_comps == 1) {
+        return true;
+    }
+
+    CutSeparationPrivCtx *ctx = self->ctx;
+
+    for (int32_t c = 0; c < tour->num_comps; c++) {
+        ctx->cnnodes[c] = 0;
+    }
+
     return false;
 }
 
