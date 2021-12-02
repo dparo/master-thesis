@@ -37,6 +37,7 @@ typedef struct CutStatistics {
 
 typedef struct CutDescriptor {
     const char *name;
+    const CutSeparationIface *iface;
     struct {
         const char *name;
         const ParamType type;
@@ -44,6 +45,14 @@ typedef struct CutDescriptor {
         const char *glossary;
     } const params[];
 } CutDescriptor;
+
+extern const CutSeparationIface CUT_GSEC_IFACE;
+
+static const CutDescriptor CUT_GSEC_DESCRIPTOR = {
+    "GSEC",
+    &CUT_GSEC_IFACE,
+    {{0}},
+};
 
 #if __cplusplus
 }

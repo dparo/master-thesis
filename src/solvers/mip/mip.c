@@ -76,71 +76,6 @@ typedef struct {
     } threadctx[MAX_NUM_CORES];
 } CplexCallbackCtx;
 
-static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
-
-static inline int32_t *comp(Tour *tour, int32_t i) { return tcomp(tour, i); }
-
-static inline double cost(const Instance *instance, int32_t i, int32_t j) {
-    return cptp_dist(instance, i, j);
-}
-
-static inline double profit(const Instance *instance, int32_t i) {
-    assert(i >= 0 && i < instance->num_customers + 1);
-    return instance->duals[i];
-}
-
-static inline double demand(const Instance *instance, int32_t i) {
-    assert(i >= 0 && i < instance->num_customers + 1);
-    return instance->demands[i];
-}
-
-void mip_solver_destroy(Solver *self) {
-
-    if (self->data) {
-        if (self->data->lp) {
-            CPXXfreeprob(self->data->env, &self->data->lp);
-        }
-
-        if (self->data->env) {
-            CPXXcloseCPLEX(&self->data->env);
-        }
-
-        free(self->data);
-    }
-
-    memset(self, 0, sizeof(*self));
-    self->destroy = mip_solver_destroy;
-}
-
-static inline size_t get_x_mip_var_idx_impl(const Instance *instance, int32_t i,
-                                            int32_t j) {
-    assert(i >= 0 && i < instance->num_customers + 1);
-    assert(j >= 0 && j < instance->num_customers + 1);
-
-    assert(i < j);
-
-    size_t N = (size_t)instance->num_customers + 1;
-    size_t d = ((size_t)(i + 1) * (size_t)(i + 2)) / 2;
-    size_t result = i * N + j - d;
-    return result;
-}
-
-static inline size_t get_x_mip_var_idx(const Instance *instance, int32_t i,
-                                       int32_t j) {
-    assert(i != j);
-    return get_x_mip_var_idx_impl(instance, MIN(i, j), MAX(i, j));
-}
-
-static inline size_t get_y_mip_var_idx_offset(const Instance *instance) {
-    return hm_nentries(instance->num_customers + 1);
-}
-
-static inline size_t get_y_mip_var_idx(const Instance *instance, int32_t i) {
-
-    assert(i >= 0 && i < instance->num_customers + 1);
-    return (size_t)i + get_y_mip_var_idx_offset(instance);
-}
-
 static void validate_mip_vars_packing(const Instance *instance) {
 #ifndef NDEBUG
     size_t cnt = 0;
@@ -1147,6 +1082,24 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
 fail:
     solver->destroy(solver);
     return false;
+}
+
+static void mip_solver_destroy(Solver *self) {
+
+    if (self->data) {
+        if (self->data->lp) {
+            CPXXfreeprob(self->data->env, &self->data->lp);
+        }
+
+        if (self->data->env) {
+            CPXXcloseCPLEX(&self->data->env);
+        }
+
+        free(self->data);
+    }
+
+    memset(self, 0, sizeof(*self));
+    self->destroy = mip_solver_destroy;
 }
 
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,

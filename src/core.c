@@ -133,19 +133,19 @@ static const struct SolverLookup {
 #endif
 };
 
-const char *param_type_as_str(SolverParamType type) {
+const char *param_type_as_str(ParamType type) {
     switch (type) {
-    case SOLVER_TYPED_PARAM_DOUBLE:
+    case TYPED_PARAM_DOUBLE:
         return "DOUBLE";
-    case SOLVER_TYPED_PARAM_FLOAT:
+    case TYPED_PARAM_FLOAT:
         return "FLOAT";
-    case SOLVER_TYPED_PARAM_BOOL:
+    case TYPED_PARAM_BOOL:
         return "BOOL";
-    case SOLVER_TYPED_PARAM_INT32:
+    case TYPED_PARAM_INT32:
         return "INT32";
-    case SOLVER_TYPED_PARAM_USIZE:
+    case TYPED_PARAM_USIZE:
         return "USIZE";
-    case SOLVER_TYPED_PARAM_STR:
+    case TYPED_PARAM_STR:
         return "STR";
     }
 
@@ -203,9 +203,8 @@ static const SolverLookup *lookup_solver(const char *solver_name) {
     return NULL;
 }
 
-bool parse_solver_param_val(SolverTypedParam *out, const char *val,
-                            SolverParamType type) {
-    SolverTypedParam local = {0};
+bool parse_solver_param_val(TypedParam *out, const char *val, ParamType type) {
+    TypedParam local = {0};
     if (out == NULL) {
         out = &local;
     }
@@ -213,23 +212,23 @@ bool parse_solver_param_val(SolverTypedParam *out, const char *val,
     bool parse_success = false;
 
     switch (type) {
-    case SOLVER_TYPED_PARAM_STR:
+    case TYPED_PARAM_STR:
         out->sval = val;
         parse_success = true;
         break;
-    case SOLVER_TYPED_PARAM_BOOL:
+    case TYPED_PARAM_BOOL:
         parse_success = str_to_bool(val, &out->bval);
         break;
-    case SOLVER_TYPED_PARAM_INT32:
+    case TYPED_PARAM_INT32:
         parse_success = str_to_int32(val, &out->ival);
         break;
-    case SOLVER_TYPED_PARAM_USIZE:
+    case TYPED_PARAM_USIZE:
         parse_success = str_to_usize(val, &out->sizeval);
         break;
-    case SOLVER_TYPED_PARAM_DOUBLE:
+    case TYPED_PARAM_DOUBLE:
         parse_success = str_to_double(val, &out->dval);
         break;
-    case SOLVER_TYPED_PARAM_FLOAT:
+    case TYPED_PARAM_FLOAT:
         parse_success = str_to_float(val, &out->fval);
         break;
     }
@@ -329,7 +328,7 @@ bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
         // NOTE:
         // The descriptor may not contain a default_value: therefore
         // `value` may still be NULL
-        SolverTypedParam t = {0};
+        TypedParam t = {0};
         t.type = desc->params[di].type;
 
         if (!value) {
