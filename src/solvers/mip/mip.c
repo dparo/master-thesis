@@ -737,7 +737,22 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                  __func__, tour->num_comps);
 
         CutSeparationFunctor *functor = &tld->gsec_functor;
+#if 0
+        printf("  threadid = %d, cplex_cb_ctx = %p\n", threadid, cplex_cb_ctx);
+        printf("  threadid = %d, tld = %p\n", threadid, tld);
+        printf("  threadid = %d, vstar = %p\n", threadid, vstar);
+        printf("  threadid = %d, tour = %p\n", threadid, tour);
+        printf("  threadid = %d, functor.ctx = %p\n", threadid, functor->ctx);
+        printf("  threadid = %d, functor.internal.cplex_cb_ctx = %p\n",
+               threadid, functor->internal.cplex_cb_ctx);
+        printf("\n");
+#endif
+
         const int64_t begin_time = os_get_usecs();
+        // NOTE: We need to reset the cplex_cb_ctx since it might change during
+        // the execution. The same threadid id, is not guaranteed to have the
+        // same cplex_cb_ctx for the entire duration of the thread
+        functor->internal.cplex_cb_ctx = cplex_cb_ctx;
         bool separation_success =
             CUT_GSEC_IFACE.integral_sep(functor, obj_p, vstar, tour);
         functor->internal.integral_stats.accum_usecs +=

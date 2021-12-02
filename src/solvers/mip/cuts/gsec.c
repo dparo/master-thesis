@@ -160,6 +160,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         int32_t added_cuts = 0;
         for (int32_t i = 0; i < n; i++) {
             if (*comp(tour, i) == c) {
+                // TODO: Cut the integral solution only if it is violated...
                 assert(*comp(tour, i) >= 1);
 
                 ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
@@ -169,12 +170,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                     "%s :: Adding GSEC constraint for component %d vertex %d, "
                     "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
                     __func__, c, i, c, ctx->cnnodes[c], nnz);
-
-                // NOTE::
-                //      https://www.ibm.com/docs/en/icos/12.10.0?topic=c-cpxxcallbackrejectcandidate-cpxcallbackrejectcandidate
-                //  You can call this routine more than once in the same
-                //  callback invocation. CPLEX will accumulate the constraints
-                //  from all such calls.
 
                 if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
                                           ctx->value)) {
