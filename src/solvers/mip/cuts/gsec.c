@@ -115,10 +115,18 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         }
     }
 
-    ctx->network.source_vertex = 0;
-    for (ctx->network.sink_vertex = 1; ctx->network.sink_vertex < n;
-         ctx->network.sink_vertex++) {
+    ctx->network.source_vertex = rand() % n;
 
+    do {
+        ctx->network.sink_vertex = rand() % (instance->num_customers + 1);
+    } while (ctx->network.sink_vertex == ctx->network.source_vertex);
+
+    // Solve the max flow and create the violated cuts
+    for (ctx->network.sink_vertex = 0; ctx->network.sink_vertex < n;
+         ++ctx->network.sink_vertex) {
+        if (ctx->network.source_vertex == ctx->network.sink_vertex) {
+            continue;
+        }
         double max_flow = push_relabel_max_flow2(
             &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
 
@@ -127,27 +135,26 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         CPXNNZ nnz = 0;
         const double rhs = 0;
         const char sense = 'G';
-        const int purgeable = CPX_USECUT_PURGE;
+        const int purgeable = CPX_USECUT_FILTER;
         const int local_validity = 0; // (Globally valid)
 
-        assert(ctx->network.source_vertex == 0);
-        int32_t bp_s =
-            ctx->max_flow_result.bipartition.data[ctx->network.source_vertex];
-        int32_t bp_t =
-            ctx->max_flow_result.bipartition.data[ctx->network.sink_vertex];
+        int32_t bp_depot = ctx->max_flow_result.bipartition.data[0];
 
-        assert(bp_s == 1);
-        assert(bp_t == 0);
+        assert(
+            1 ==
+            ctx->max_flow_result.bipartition.data[ctx->network.source_vertex]);
+        assert(0 ==
+               ctx->max_flow_result.bipartition.data[ctx->network.sink_vertex]);
 
         double flow = 0.0;
 
         // Separate the cut
         for (int32_t i = 1; i < n; i++) {
             int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
-            if (bp_i == bp_t) {
+            if (bp_i != bp_depot) {
                 for (int32_t j = 0; j < n; j++) {
                     int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
-                    if (j == 0 || bp_j == bp_s) {
+                    if (bp_j == bp_depot) {
                         ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
                         ctx->value[nnz] = +1.0;
                         double x = vstar[get_x_mip_var_idx(instance, i, j)];
@@ -164,7 +171,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         for (int32_t h = 1; h < n; h++) {
             double y_h = vstar[get_y_mip_var_idx(instance, h)];
             int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
-            if (bp_h == bp_t && is_violated_cut(max_flow, y_h)) {
+            if (bp_h != bp_depot && is_violated_cut(max_flow, y_h)) {
                 ctx->index[nnz] = get_y_mip_var_idx(instance, h);
                 ctx->value[nnz] = -2.0;
 
@@ -184,8 +191,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             }
         }
     }
-    return true;
 
+    return true;
 failure:
     return false;
 }
@@ -257,7 +264,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                     }
 
                     // If node i belongs to S and node j does NOT belong to S
-                    if (j == 0 || *comp(tour, j) != c) {
+                    if (*comp(tour, j) != c) {
                         ctx->index[pos] =
                             (CPXDIM)get_x_mip_var_idx(instance, i, j);
                         ctx->value[pos] = +1.0;

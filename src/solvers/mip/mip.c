@@ -531,14 +531,14 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
             os_get_usecs() - begin_time;
 
         if (!separation_success) {
-            log_fatal("Separation of integral `%s` cuts failed", "GSEC");
+            log_trace("Separation of integral `%s` cuts failed", "GSEC");
             goto terminate;
         }
 
     } else {
-        log_info("%s :: num_comps of unpacked tour is %d -- accepting "
-                 "candidate point...",
-                 __func__, tour->num_comps);
+        log_trace("%s :: num_comps of unpacked tour is %d -- accepting "
+                  "candidate point...",
+                  __func__, tour->num_comps);
     }
 
     return 0;
@@ -597,9 +597,9 @@ static int cplex_on_thread_activation(int activation,
         &ctx->thread_local_data[threadid];
 
     if (activation > 0) {
-        log_info("cplex_callback activated a thread :: threadid = "
-                 "%lld, numthreads = %lld",
-                 threadid, numthreads);
+        log_trace("cplex_callback activated a thread :: threadid = "
+                  "%lld, numthreads = %lld",
+                  threadid, numthreads);
 
         if (!create_callback_thread_local_data(thread_local_data, cplex_cb_ctx,
                                                ctx->instance, ctx->solver)) {
@@ -609,9 +609,9 @@ static int cplex_on_thread_activation(int activation,
             return 1;
         }
     } else if (activation < 0) {
-        log_info("cplex_callback deactivated an old thread :: threadid = "
-                 "%lld, numthreads = %lld\n",
-                 threadid, numthreads);
+        log_trace("cplex_callback deactivated an old thread :: threadid = "
+                  "%lld, numthreads = %lld\n",
+                  threadid, numthreads);
         destroy_callback_thread_local_data(thread_local_data);
     } else {
         assert(!"Invalid code path");
@@ -889,6 +889,9 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
         log_fatal("CPXcreateprob FAILURE :: returned status_p: %d", status_p);
         goto fail;
     }
+
+    CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
+    CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 3);
 
     // Clamp the number of available cores to MAX_NUM_CORES
     {
