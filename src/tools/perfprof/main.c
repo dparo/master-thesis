@@ -722,8 +722,10 @@ static void do_batch(PerfProfBatch *bgroup) {
         }
     }
 
-    if (!G_should_terminate) {
-        scan_dir_and_solve(bgroup->scan_root_dir);
+    if (bgroup->nseeds > 0) {
+        if (!G_should_terminate) {
+            scan_dir_and_solve(bgroup->scan_root_dir);
+        }
     }
 }
 
@@ -748,11 +750,11 @@ static void main_loop(void) {
 
     PerfProfBatch batches[] = {
         {1,
-         "A-n37-k5",
-         600.0,
-         3,
+         "F-n45-k4",
+         120.0,
+         1,
          // "./data/ESPPRC - Test Instances/vrps",
-         "data/BaPCod generated - Test instances/A-n37-k5",
+         "data/BaPCod generated - Test instances/F-n45-k4",
          (Filter){NULL, {0, 72}, {0, 0}},
          {
              {"My CPTP MIP solver",

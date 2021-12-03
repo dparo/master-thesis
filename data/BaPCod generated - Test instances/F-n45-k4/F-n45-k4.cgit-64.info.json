@@ -1,0 +1,25 @@
+{
+    "instanceName": "F-n45-k4",
+    "comment": "(Fisher: problem 10, No of trucks: 4, Optimal value: 724)",
+    "type": "CVRP",
+    "dimension": 45,
+    "vehicles": 4,
+    "capacity": 2010,
+    "columnGenerationIteration": 64,
+    "zeroReducedCostThreshold": 12000,
+    "rcsp-infos": {
+         "seconds": 0.068592,
+         "generatedColumns": 1,
+         "columns-cost": [-83573.684040893771],
+         "columns-relative-cost": [-95573.684040893771],
+         "columns": [
+                [
+                    { "id": "X[1,0,25]", "name": "Xd1i0j25_1_OspV", "val": 2 },
+                    { "id": "X[1,3,5]", "name": "Xd1i3j5_1_OspV", "val": 1 },
+                    { "id": "X[1,3,39]", "name": "Xd1i3j39_1_OspV", "val": 1 },
+                    { "id": "X[1,5,39]", "name": "Xd1i5j39_1_OspV", "val": 1 },
+                    { "id": "X[1,25,39]", "name": "Xd1i25j39_1_OspV", "val": 4 }
+                ]
+        ]
+    }
+}

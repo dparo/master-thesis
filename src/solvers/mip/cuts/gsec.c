@@ -166,6 +166,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         assert(feq(flow, max_flow, 1e-6));
         validate_index_array(ctx, nnz - 1);
 
+        int32_t added_cuts = 0;
+
         for (int32_t h = 1; h < n; h++) {
             double y_h = vstar[get_y_mip_var_idx(instance, h)];
             int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
@@ -186,6 +188,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                         __func__);
                     goto failure;
                 }
+
+                added_cuts += 1;
             }
         }
     }

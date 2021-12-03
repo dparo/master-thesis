@@ -1,0 +1,42 @@
+{
+    "instanceName": "F-n45-k4",
+    "comment": "(Fisher: problem 10, No of trucks: 4, Optimal value: 724)",
+    "type": "CVRP",
+    "dimension": 45,
+    "vehicles": 4,
+    "capacity": 2010,
+    "columnGenerationIteration": 163,
+    "zeroReducedCostThreshold": 53.892689517026312,
+    "rcsp-infos": {
+         "seconds": 0.23760700000000001,
+         "generatedColumns": 1,
+         "columns-cost": [-121.43518601705127],
+         "columns-relative-cost": [-175.32787553407758],
+         "columns": [
+                [
+                    { "id": "X[1,0,37]", "name": "Xd1i0j37_1_OspV", "val": 2 },
+                    { "id": "X[1,3,4]", "name": "Xd1i3j4_1_OspV", "val": 2 },
+                    { "id": "X[1,3,7]", "name": "Xd1i3j7_1_OspV", "val": 1 },
+                    { "id": "X[1,3,34]", "name": "Xd1i3j34_1_OspV", "val": 1 },
+                    { "id": "X[1,4,35]", "name": "Xd1i4j35_1_OspV", "val": 2 },
+                    { "id": "X[1,5,6]", "name": "Xd1i5j6_1_OspV", "val": 2 },
+                    { "id": "X[1,5,7]", "name": "Xd1i5j7_1_OspV", "val": 2 },
+                    { "id": "X[1,6,27]", "name": "Xd1i6j27_1_OspV", "val": 2 },
+                    { "id": "X[1,7,35]", "name": "Xd1i7j35_1_OspV", "val": 1 },
+                    { "id": "X[1,27,29]", "name": "Xd1i27j29_1_OspV", "val": 2 },
+                    { "id": "X[1,29,33]", "name": "Xd1i29j33_1_OspV", "val": 2 },
+                    { "id": "X[1,30,31]", "name": "Xd1i30j31_1_OspV", "val": 1 },
+                    { "id": "X[1,30,41]", "name": "Xd1i30j41_1_OspV", "val": 1 },
+                    { "id": "X[1,31,33]", "name": "Xd1i31j33_1_OspV", "val": 2 },
+                    { "id": "X[1,31,34]", "name": "Xd1i31j34_1_OspV", "val": 1 },
+                    { "id": "X[1,31,35]", "name": "Xd1i31j35_1_OspV", "val": 1 },
+                    { "id": "X[1,31,40]", "name": "Xd1i31j40_1_OspV", "val": 1 },
+                    { "id": "X[1,34,40]", "name": "Xd1i34j40_1_OspV", "val": 2 },
+                    { "id": "X[1,37,38]", "name": "Xd1i37j38_1_OspV", "val": 2 },
+                    { "id": "X[1,38,42]", "name": "Xd1i38j42_1_OspV", "val": 2 },
+                    { "id": "X[1,40,41]", "name": "Xd1i40j41_1_OspV", "val": 1 },
+                    { "id": "X[1,40,42]", "name": "Xd1i40j42_1_OspV", "val": 2 }
+                ]
+        ]
+    }
+}

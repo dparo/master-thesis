@@ -1,0 +1,38 @@
+{
+    "instanceName": "F-n45-k4",
+    "comment": "(Fisher: problem 10, No of trucks: 4, Optimal value: 724)",
+    "type": "CVRP",
+    "dimension": 45,
+    "vehicles": 4,
+    "capacity": 2010,
+    "columnGenerationIteration": 240,
+    "zeroReducedCostThreshold": 10.115495977121387,
+    "rcsp-infos": {
+         "seconds": 0.095520999999999995,
+         "generatedColumns": 1,
+         "columns-cost": [-14.657048816405734],
+         "columns-relative-cost": [-24.772544793527121],
+         "columns": [
+                [
+                    { "id": "X[1,0,37]", "name": "Xd1i0j37_1_OspV", "val": 2 },
+                    { "id": "X[1,3,4]", "name": "Xd1i3j4_1_OspV", "val": 2 },
+                    { "id": "X[1,3,34]", "name": "Xd1i3j34_1_OspV", "val": 2 },
+                    { "id": "X[1,4,35]", "name": "Xd1i4j35_1_OspV", "val": 2 },
+                    { "id": "X[1,5,6]", "name": "Xd1i5j6_1_OspV", "val": 2 },
+                    { "id": "X[1,5,7]", "name": "Xd1i5j7_1_OspV", "val": 2 },
+                    { "id": "X[1,6,27]", "name": "Xd1i6j27_1_OspV", "val": 2 },
+                    { "id": "X[1,7,35]", "name": "Xd1i7j35_1_OspV", "val": 2 },
+                    { "id": "X[1,27,29]", "name": "Xd1i27j29_1_OspV", "val": 2 },
+                    { "id": "X[1,28,29]", "name": "Xd1i28j29_1_OspV", "val": 2 },
+                    { "id": "X[1,28,33]", "name": "Xd1i28j33_1_OspV", "val": 2 },
+                    { "id": "X[1,31,33]", "name": "Xd1i31j33_1_OspV", "val": 2 },
+                    { "id": "X[1,31,34]", "name": "Xd1i31j34_1_OspV", "val": 2 },
+                    { "id": "X[1,34,40]", "name": "Xd1i34j40_1_OspV", "val": 2 },
+                    { "id": "X[1,37,38]", "name": "Xd1i37j38_1_OspV", "val": 2 },
+                    { "id": "X[1,38,42]", "name": "Xd1i38j42_1_OspV", "val": 2 },
+                    { "id": "X[1,39,40]", "name": "Xd1i39j40_1_OspV", "val": 2 },
+                    { "id": "X[1,39,42]", "name": "Xd1i39j42_1_OspV", "val": 2 }
+                ]
+        ]
+    }
+}

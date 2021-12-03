@@ -165,7 +165,7 @@ static int32_t pool_sync2(ProcPool *pool) {
 
                 // Kill it hard, we don't want CPTP to generate a suboptimal
                 // solution in its JSON output
-                kill(p->pid, SIGKILL);
+                kill(p->pid, SIGTERM);
             }
 
             int exit_status;

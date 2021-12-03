@@ -680,13 +680,14 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     }
 
     // NOTE:
-    // from
-    // https://www.ibm.com/docs/en/cofz/12.10.0?topic=manual-cpxcallbackfunc
-    //  The routine returns 0 (zero) if successful and nonzero if an error
-    //  occurs. Any value different from zero will result in an ungraceful exit
-    //  of CPLEX (usually with CPXERR_CALLBACK). Note that the actual value
-    //  returned is not propagated up the call stack. The only thing that CPLEX
-    //  checks is whether the returned value is zero or not.
+    // From
+    //  https://www.ibm.com/docs/en/cofz/12.10.0?topic=manual-cpxcallbackfunc
+    //
+    // The routine returns 0 (zero) if successful and nonzero if an error
+    // occurs. Any value different from zero will result in an ungraceful exit
+    // of CPLEX (usually with CPXERR_CALLBACK). Note that the actual value
+    // returned is not propagated up the call stack. The only thing that CPLEX
+    // checks is whether the returned value is zero or not.
     // Do not use a non-zero return value to stop optimization in case there is
     // no error. Use CPXXcallbackabort and CPXcallbackabort for that purpose.
 

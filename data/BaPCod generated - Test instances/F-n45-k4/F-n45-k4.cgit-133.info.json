@@ -1,0 +1,38 @@
+{
+    "instanceName": "F-n45-k4",
+    "comment": "(Fisher: problem 10, No of trucks: 4, Optimal value: 724)",
+    "type": "CVRP",
+    "dimension": 45,
+    "vehicles": 4,
+    "capacity": 2010,
+    "columnGenerationIteration": 133,
+    "zeroReducedCostThreshold": 16.727077041013711,
+    "rcsp-infos": {
+         "seconds": 0.33134799999999998,
+         "generatedColumns": 1,
+         "columns-cost": [-335.24697772100939],
+         "columns-relative-cost": [-351.97405476202312],
+         "columns": [
+                [
+                    { "id": "X[1,0,2]", "name": "Xd1i0j2_1_OspV", "val": 1 },
+                    { "id": "X[1,0,15]", "name": "Xd1i0j15_1_OspV", "val": 1 },
+                    { "id": "X[1,2,15]", "name": "Xd1i2j15_1_OspV", "val": 1 },
+                    { "id": "X[1,2,37]", "name": "Xd1i2j37_1_OspV", "val": 1 },
+                    { "id": "X[1,2,38]", "name": "Xd1i2j38_1_OspV", "val": 1 },
+                    { "id": "X[1,3,4]", "name": "Xd1i3j4_1_OspV", "val": 2 },
+                    { "id": "X[1,3,39]", "name": "Xd1i3j39_1_OspV", "val": 2 },
+                    { "id": "X[1,4,35]", "name": "Xd1i4j35_1_OspV", "val": 2 },
+                    { "id": "X[1,5,7]", "name": "Xd1i5j7_1_OspV", "val": 2 },
+                    { "id": "X[1,5,27]", "name": "Xd1i5j27_1_OspV", "val": 2 },
+                    { "id": "X[1,7,35]", "name": "Xd1i7j35_1_OspV", "val": 2 },
+                    { "id": "X[1,27,29]", "name": "Xd1i27j29_1_OspV", "val": 2 },
+                    { "id": "X[1,28,29]", "name": "Xd1i28j29_1_OspV", "val": 2 },
+                    { "id": "X[1,28,33]", "name": "Xd1i28j33_1_OspV", "val": 4 },
+                    { "id": "X[1,28,43]", "name": "Xd1i28j43_1_OspV", "val": 2 },
+                    { "id": "X[1,37,38]", "name": "Xd1i37j38_1_OspV", "val": 1 },
+                    { "id": "X[1,38,42]", "name": "Xd1i38j42_1_OspV", "val": 2 },
+                    { "id": "X[1,39,42]", "name": "Xd1i39j42_1_OspV", "val": 2 }
+                ]
+        ]
+    }
+}
