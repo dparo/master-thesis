@@ -23,8 +23,12 @@ def remove_duplicates_from_list(x):
 
 
 def get_plt_ticks(lb, ub, cnt):
-    return [round(x, 2) for x in remove_duplicates_from_list([lb, ub] + list(
-        np.arange(lb, ub, step=(ub - lb) / cnt)))]
+    return [
+        round(x, 2)
+        for x in remove_duplicates_from_list(
+            [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
+        )
+    ]
 
 
 # parameters
@@ -64,7 +68,7 @@ class CmdLineParser(object):
             "-m",
             "--minratio",
             dest="minratio",
-            default=1,
+            default=None,
             type=float,
             help="minratio for perf. profile",
         )
@@ -72,7 +76,7 @@ class CmdLineParser(object):
             "-M",
             "--maxratio",
             dest="maxratio",
-            default=4,
+            default=None,
             type=float,
             help="maxratio for perf. profile",
         )
@@ -87,12 +91,18 @@ class CmdLineParser(object):
             help="log scale for x",
         )
         self.parser.add_option(
-            "-L",
-            "--limit",
-            dest="limit",
-            default=1e99,
+            "--ratio-lower-limit",
+            dest="ratio_lower_limit",
+            default=-1e99,
             type=float,
-            help="time limit for runs",
+            help="upper limit for runs",
+        )
+        self.parser.add_option(
+            "--ratio-upper-limit",
+            dest="ratio_upper_limit",
+            default=+1e99,
+            type=float,
+            help="lower limit for runs",
         )
         self.parser.add_option(
             "-P", "--plot-title", dest="plottitle", default=None, help="plot title"
@@ -158,7 +168,7 @@ def main():
     max_len = 64
     for i in range(0, len(cnames)):
         if len(cnames[i]) >= max_len:
-            cnames[i] = (cnames[i])[0: max_len - 4] + " ..."
+            cnames[i] = (cnames[i])[0 : max_len - 4] + " ..."
 
     if data.shape == (0,):
         return
@@ -172,15 +182,21 @@ def main():
     ratio = data
     for j in range(ncols):
         ratio[:, j] = data[:, j] / minima
-    # compute maxratio
-    if opt.maxratio <= 0:
-        opt.maxratio = max(1.0, ratio.max())
 
-    # any time >= limit will count as maxratio + bigM (so that it does not show up in plots)
+    # Deduce minratio and maxratio if they are not specified on the command line
+    if opt.minratio is None or opt.minratio <= -1e21:
+        opt.minratio = max(opt.ratio_lower_limit, ratio.min())
+
+    if opt.maxratio is None or opt.maxratio >= 1e21:
+        opt.maxratio = min(opt.ratio_upper_limit, ratio.max())
+
+    # any time value exceeds limit, we push the sample out of bounds
     for i in range(nrows):
         for j in range(ncols):
-            if data[i, j] >= opt.limit:
+            if data[i, j] >= opt.ratio_upper_limit:
                 ratio[i, j] = opt.maxratio + 1e6
+            if data[i, j] <= opt.ratio_lower_limit:
+                ratio[i, j] = opt.minratio - 1e6
 
     # sort ratios
     ratio.sort(axis=0)

@@ -868,15 +868,22 @@ static void generate_performance_profile_using_python_script(
     char min_ratio_str[128];
     char max_ratio_str[128];
 
-    char limit_str[128];
+    char lower_limit_str[128];
+    char upper_limit_str[128];
     char *xlabel_str = is_time_profile ? "Time Ratio" : "Cost ratio";
 
     // double shift = batch->shift > 0 ? batch->shift : 1.0;
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
     double shift = 1.0;
-    double min_ratio = is_time_profile ? 1.0 : 0.0;
-    double max_ratio = -1; // -1: automatically compute it (zoom-to-fit)
+    double min_ratio =
+        is_time_profile
+            ? 1.0
+            : -1e99;         // -1e99: automatically compute it (zoom-to-fit)
+    double max_ratio = 1e99; // 1e99: automatically compute it (zoom-to-fit)
+    double lower_limit = -1e99;
+    double upper_limit =
+        is_time_profile ? get_extended_timelimit(batch->timelimit) : 1e99;
 
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
@@ -888,9 +895,11 @@ static void generate_performance_profile_using_python_script(
     snprintf_safe(shift_str, ARRAY_LEN(shift_str), "%g", shift);
     snprintf_safe(max_ratio_str, ARRAY_LEN(max_ratio_str), "%g", max_ratio);
     snprintf_safe(min_ratio_str, ARRAY_LEN(min_ratio_str), "%g", min_ratio);
-    snprintf_safe(limit_str, ARRAY_LEN(limit_str), "%g",
-                  is_time_profile ? get_extended_timelimit(batch->timelimit)
-                                  : 1e99);
+
+    snprintf_safe(lower_limit_str, ARRAY_LEN(lower_limit_str), "%g",
+                  lower_limit);
+    snprintf_safe(upper_limit_str, ARRAY_LEN(upper_limit_str), "%g",
+                  upper_limit);
 
     snprintf_safe(title, ARRAY_LEN(title), "%s of %s",
                   is_time_profile ? "Time profile" : "Cost profile",
@@ -906,8 +915,10 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = min_ratio_str;
     args[argidx++] = "--maxratio";
     args[argidx++] = max_ratio_str;
-    args[argidx++] = "--limit";
-    args[argidx++] = limit_str;
+    args[argidx++] = "--ratio-lower-limit";
+    args[argidx++] = lower_limit_str;
+    args[argidx++] = "--ratio-upper-limit";
+    args[argidx++] = upper_limit_str;
     args[argidx++] = "--plot-title";
     args[argidx++] = title;
     args[argidx++] = "--startidx"; // Start index to associated with the colors
