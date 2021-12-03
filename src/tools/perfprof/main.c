@@ -514,6 +514,14 @@ static void init_handle_json_output_path(PerfProfRunHandle *handle,
                   "/%s.json", handle->run_hash.cstr);
 }
 
+static double get_extended_timelimit(double timelimit) {
+    return ceil(1.05 * timelimit + 2);
+}
+
+static double get_kill_timelimit(double timelimit) {
+    return ceil(1.05 * get_extended_timelimit(timelimit));
+}
+
 static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     if (G_should_terminate) {
         return;
@@ -528,11 +536,11 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
 
     char timelimit_extended[128];
     snprintf_safe(timelimit_extended, ARRAY_LEN(timelimit_extended), "%g",
-                  G_active_batch->timelimit * 1.05 + 2);
+                  get_extended_timelimit(G_active_batch->timelimit));
 
     char killafter[128];
     snprintf_safe(killafter, ARRAY_LEN(killafter), "%g",
-                  G_active_batch->timelimit * 1.05 + 2 -
+                  get_kill_timelimit(G_active_batch->timelimit) -
                       G_active_batch->timelimit);
 
     char seed_str[128];
@@ -747,14 +755,28 @@ static void init(void) {
 static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
-
     PerfProfBatch batches[] = {
         {1,
-         "F-n45-k4",
+         "F-n45-k4-last-10",
          120.0,
          1,
          // "./data/ESPPRC - Test Instances/vrps",
-         "data/BaPCod generated - Test instances/F-n45-k4",
+         "data/BaPCod generated - Test instances/F-n45-k4-last-10",
+         (Filter){NULL, {0, 72}, {0, 0}},
+         {
+             {"My CPTP MIP solver",
+              {
+                  "--solver",
+                  "mip",
+              }},
+             BAPCOD_SOLVER,
+         }},
+        {1,
+         "F-n45-k4-first-10",
+         120.0,
+         1,
+         // "./data/ESPPRC - Test Instances/vrps",
+         "data/BaPCod generated - Test instances/F-n45-k4-first-10",
          (Filter){NULL, {0, 72}, {0, 0}},
          {
              {"My CPTP MIP solver",
@@ -781,8 +803,9 @@ static void main_loop(void) {
         }
     }
 
-    for (int32_t i = 0; i < !G_should_terminate && (int32_t)ARRAY_LEN(batches);
+    for (int32_t i = 0; !G_should_terminate && i < (int32_t)ARRAY_LEN(batches);
          i++) {
+        batches[i].timelimit = ceil(batches[i].timelimit);
 
         printf("\n\n");
         printf("###########################################################"
@@ -851,7 +874,7 @@ static void generate_performance_profile_using_python_script(
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
     double shift = 1.0;
-    double max_ratio = 4.0;
+    double max_ratio = 10; // Eg: automatically compute it (zoom-to-fit)
 
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
@@ -863,7 +886,8 @@ static void generate_performance_profile_using_python_script(
     snprintf_safe(shift_str, ARRAY_LEN(shift_str), "%g", shift);
     snprintf_safe(max_ratio_str, ARRAY_LEN(max_ratio_str), "%g", max_ratio);
     snprintf_safe(timelimit_str, ARRAY_LEN(timelimit_str), "%g",
-                  is_time_profile ? batch->timelimit : 1e99);
+                  is_time_profile ? get_extended_timelimit(batch->timelimit)
+                                  : 1e99);
 
     snprintf_safe(title, ARRAY_LEN(title), "%s of %s (S=%s, M=%s)",
                   is_time_profile ? "Time profile" : "Cost profile",

@@ -891,8 +891,10 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
         goto fail;
     }
 
+#ifndef NDEBUG
     CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
     CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 3);
+#endif
 
     // Clamp the number of available cores to MAX_NUM_CORES
     {

@@ -157,7 +157,7 @@ def main():
     for j in range(ncols):
         ratio[:, j] = data[:, j] / minima
     # compute maxratio
-    if opt.maxratio == -1:
+    if opt.maxratio < 0:
         opt.maxratio = ratio.max()
     # any time >= timelimit will count as maxratio + bigM (so that it does not show up in plots)
 
