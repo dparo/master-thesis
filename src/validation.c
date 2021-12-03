@@ -37,7 +37,7 @@ void validate_solution(const Instance *instance, Solution *solution) {
     // The recomputed objective value should be the same of what is stored
     // inside the solution
     double obj = tour_eval(instance, &solution->tour);
-    assert(fgapcmp(obj, solution->upper_bound, 1e-3));
+    assert(feq(obj, solution->upper_bound, 1e-5));
 
 #else
     UNUSED_PARAM(instance);

@@ -72,6 +72,10 @@ static inline bool fgte(double a, double b, double epsilon) {
     return a > b;
 }
 
+static inline double fratio(double lb, double ub, double shift) {
+    return 1.0 + ((ub - lb) / (shift + fabs(lb)));
+}
+
 static inline double fgap(double a, double b) {
     double ub = MIN(a, b);
     double lb = MAX(a, b);

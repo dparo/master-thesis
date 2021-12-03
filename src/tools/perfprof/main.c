@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <signal.h>
 
+#include "types.h"
 #include "utils.h"
 #include "misc.h"
 #include "proc.h"
@@ -864,25 +865,22 @@ static void generate_performance_profile_using_python_script(
 
     char title[512];
 
-    char shift_str[128];
-    char min_ratio_str[128];
-    char max_ratio_str[128];
+    char x_min_str[128];
+    char x_max_str[128];
 
-    char lower_limit_str[128];
-    char upper_limit_str[128];
-    char *xlabel_str = is_time_profile ? "Time Ratio" : "Cost ratio";
+    char x_lower_limit_str[128];
+    char x_upper_limit_str[128];
+    char *xlabel_str = is_time_profile ? "Time Ratio" : "Cost Ratio";
 
     // double shift = batch->shift > 0 ? batch->shift : 1.0;
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
-    double shift = 1.0;
-    double min_ratio =
-        is_time_profile
-            ? 1.0
-            : -1e99;         // -1e99: automatically compute it (zoom-to-fit)
-    double max_ratio = 1e99; // 1e99: automatically compute it (zoom-to-fit)
-    double lower_limit = -1e99;
-    double upper_limit =
+    // -1e99, +1e99 for some parameters means automatically compute it
+    // (zoom-to-fit)
+    double x_min = 1.0;
+    double x_max = 1e99;
+    double x_lower_limit = -1e99;
+    double x_upper_limit =
         is_time_profile ? get_extended_timelimit(batch->timelimit) : 1e99;
 
     Path csv_input_file_basename;
@@ -892,14 +890,13 @@ static void generate_performance_profile_using_python_script(
                   os_dirname(csv_input_file, &csv_input_file_basename),
                   xlabel_str);
 
-    snprintf_safe(shift_str, ARRAY_LEN(shift_str), "%g", shift);
-    snprintf_safe(max_ratio_str, ARRAY_LEN(max_ratio_str), "%g", max_ratio);
-    snprintf_safe(min_ratio_str, ARRAY_LEN(min_ratio_str), "%g", min_ratio);
+    snprintf_safe(x_max_str, ARRAY_LEN(x_max_str), "%g", x_max);
+    snprintf_safe(x_min_str, ARRAY_LEN(x_min_str), "%g", x_min);
 
-    snprintf_safe(lower_limit_str, ARRAY_LEN(lower_limit_str), "%g",
-                  lower_limit);
-    snprintf_safe(upper_limit_str, ARRAY_LEN(upper_limit_str), "%g",
-                  upper_limit);
+    snprintf_safe(x_lower_limit_str, ARRAY_LEN(x_lower_limit_str), "%g",
+                  x_lower_limit);
+    snprintf_safe(x_upper_limit_str, ARRAY_LEN(x_upper_limit_str), "%g",
+                  x_upper_limit);
 
     snprintf_safe(title, ARRAY_LEN(title), "%s of %s",
                   is_time_profile ? "Time profile" : "Cost profile",
@@ -909,16 +906,18 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = PYTHON3_PERF_SCRIPT;
     args[argidx++] = "--delimiter";
     args[argidx++] = ",";
-    args[argidx++] = "--shift";
-    args[argidx++] = shift_str;
-    args[argidx++] = "--minratio";
-    args[argidx++] = min_ratio_str;
-    args[argidx++] = "--maxratio";
-    args[argidx++] = max_ratio_str;
-    args[argidx++] = "--ratio-lower-limit";
-    args[argidx++] = lower_limit_str;
-    args[argidx++] = "--ratio-upper-limit";
-    args[argidx++] = upper_limit_str;
+    // NOTE: This parameters make little sense now that we are encoding our own
+    // custom baked data
+    args[argidx++] = "--x-min";
+    args[argidx++] = x_min_str;
+#if 0
+    args[argidx++] = "--x-max";
+    args[argidx++] = x_max_str;
+    args[argidx++] = "--x-lower-limit";
+    args[argidx++] = x_lower_limit_str;
+    args[argidx++] = "--x-upper-limit";
+    args[argidx++] = x_upper_limit_str;
+#endif
     args[argidx++] = "--plot-title";
     args[argidx++] = title;
     args[argidx++] = "--startidx"; // Start index to associated with the colors
@@ -930,6 +929,32 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = NULL;
 
     proc_spawn_sync(args);
+}
+
+static inline double get_costval_for_csv(double costval, double min_val,
+                                         double shift) {
+    return fratio(min_val, costval, shift);
+}
+
+static inline double get_timeval_for_csv(double timeval, double min_val,
+                                         double shift) {
+    return (timeval + shift) / min_val;
+}
+
+static inline double get_raw_val_from_perf(PerfProfRun *run,
+                                           bool is_time_profile) {
+    return is_time_profile ? run->perf.time : run->perf.cost;
+}
+
+static inline double get_baked_val_from_perf(PerfProfRun *run,
+                                             bool is_time_profile,
+                                             double min_val, double shift) {
+    double val = get_raw_val_from_perf(run, is_time_profile);
+    if (is_time_profile) {
+        return get_timeval_for_csv(val, min_val, shift);
+    } else {
+        return get_costval_for_csv(val, min_val, shift);
+    }
 }
 
 static void generate_perfs_imgs(PerfProfBatch *batch) {
@@ -946,6 +971,8 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
     for (int32_t data_dump_idx = 0; data_dump_idx < 2; data_dump_idx++) {
         bool is_time_profile = data_dump_idx == 0;
         char *filename = is_time_profile ? "time-data.csv" : "cost-data.csv";
+
+        const double shift = is_time_profile ? 1e-4 : 1e-4;
 
         snprintf_safe(data_csv_file, ARRAY_LEN(data_csv_file), "%s/%s",
                       dump_dir, filename);
@@ -973,11 +1000,25 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
         for (size_t i = 0; i < tbl_len; i++) {
             PerfTblKey *key = &G_perftbl[i].key;
             PerfTblValue *value = &G_perftbl[i].value;
+            assert(value->num_runs == num_solvers);
 
             Hash *hash = &key->uid.hash;
             uint8_t seedidx = key->uid.seedidx;
 
             fprintf(fh, "%d:%s", seedidx, hash->cstr);
+
+            //
+            // Compute the min_val, max_val for this instance
+            //
+            double min_val = INFINITY;
+            double max_val = -INFINITY;
+            assert(value->num_runs == num_solvers);
+            for (int32_t run_idx = 0; run_idx < value->num_runs; run_idx++) {
+                PerfProfRun *run = &value->runs[run_idx];
+                double val = get_raw_val_from_perf(run, is_time_profile);
+                min_val = MIN(min_val, val);
+                max_val = MAX(max_val, val);
+            }
 
             // Due to the out of order generation of the performance table,
             // the perf data may be out of order, compared to the order of
@@ -989,16 +1030,13 @@ static void generate_perfs_imgs(PerfProfBatch *batch) {
                 // Fix the solver name as in order
                 char *solver_name = batch->solvers[curr_solver_idx].name;
 
-                // Scan the list to find the matching solver perf data
                 for (int32_t run_idx = 0; run_idx < value->num_runs;
                      run_idx++) {
                     PerfProfRun *run = &value->runs[run_idx];
-
-                    double data =
-                        is_time_profile ? run->perf.time : run->perf.cost;
-
                     if (0 == strcmp(run->solver_name, solver_name)) {
-                        fprintf(fh, ",%.17g", data);
+                        double baked_data = get_baked_val_from_perf(
+                            run, is_time_profile, min_val, shift);
+                        fprintf(fh, ",%.17g", baked_data);
                     }
                 }
             }

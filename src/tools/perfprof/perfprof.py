@@ -3,7 +3,7 @@
 ## Internal use only, not to be distributed
 ##
 
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 
 from __future__ import print_function
 
@@ -23,6 +23,8 @@ def remove_duplicates_from_list(x):
 
 
 def get_plt_ticks(lb, ub, cnt):
+    if ub == lb:
+        ub = lb + 1.0
     return [
         round(x, 2)
         for x in remove_duplicates_from_list(
@@ -54,7 +56,7 @@ colors = [
 class CmdLineParser(object):
     def __init__(self):
         self.parser = OptionParser(
-            usage="usage: python3 perfprof.py [options] cvsfile.csv outputfile.pdf"
+            usage="Usage: python3 perfprof.py [options] cvsfile.csv outputfile.pdf"
         )
         # default options
         self.parser.add_option(
@@ -62,47 +64,47 @@ class CmdLineParser(object):
             "--delimiter",
             dest="delimiter",
             default=None,
-            help="delimiter for input files",
+            help="Delimiter for input files",
         )
         self.parser.add_option(
             "-m",
-            "--minratio",
-            dest="minratio",
+            "--x-min",
+            dest="x_min",
             default=None,
             type=float,
-            help="minratio for perf. profile",
+            help="Minimum X value for perf. profile",
         )
         self.parser.add_option(
             "-M",
-            "--maxratio",
-            dest="maxratio",
+            "--x-max",
+            dest="x_max",
             default=None,
             type=float,
-            help="maxratio for perf. profile",
+            help="Minimum X value for perf. profile",
         )
         self.parser.add_option(
-            "-S", "--shift", dest="shift", default=1, type=float, help="shift for data"
+            "-S", "--shift", dest="shift", default=0, type=float, help="shift for data"
         )
         self.parser.add_option(
             "--logplot",
             dest="logplot",
             action="store_true",
             default=False,
-            help="log scale for x",
+            help="Enable logscale for X",
         )
         self.parser.add_option(
-            "--ratio-lower-limit",
-            dest="ratio_lower_limit",
+            "--x-lower-limit",
+            dest="x_lower_limit",
             default=-1e99,
             type=float,
-            help="upper limit for runs",
+            help="Lower limit for runs",
         )
         self.parser.add_option(
-            "--ratio-upper-limit",
-            dest="ratio_upper_limit",
+            "--x-upper-limit",
+            dest="x_upper_limit",
             default=+1e99,
             type=float,
-            help="lower limit for runs",
+            help="Upper limit for runs",
         )
         self.parser.add_option(
             "-P", "--plot-title", dest="plottitle", default=None, help="plot title"
@@ -117,16 +119,19 @@ class CmdLineParser(object):
             "-B", "--bw", dest="bw", action="store_true", default=False, help="plot B/W"
         )
         self.parser.add_option(
-            "-0",
+            "--plot-as-ratios",
+            dest="plot_as_ratios",
+            action="store_true",
+            default=False,
+            help="To plot data as ratios or not",
+        )
+        self.parser.add_option(
             "--startidx",
             dest="startidx",
             default=0,
             type=int,
             help="Start index to associate with the colors",
         )
-
-    def addOption(self, *args, **kwargs):
-        self.parser.add_option(*args, **kwargs)
 
     def parseArgs(self):
         (options, args) = self.parser.parse_args()
@@ -159,16 +164,18 @@ def readTable(fp, delimiter):
     return (rnames, cnames, data)
 
 
+MAX_SOLVER_NAME_LENGTH = 64
+
+
 def main():
     parser = CmdLineParser()
     opt = parser.parseArgs()
     # read data
     rnames, cnames, data = readTable(open(opt.input, "r"), opt.delimiter)
 
-    max_len = 64
     for i in range(0, len(cnames)):
-        if len(cnames[i]) >= max_len:
-            cnames[i] = (cnames[i])[0 : max_len - 4] + " ..."
+        if len(cnames[i]) >= MAX_SOLVER_NAME_LENGTH:
+            cnames[i] = (cnames[i])[0 : MAX_SOLVER_NAME_LENGTH - 4] + " ..."
 
     if data.shape == (0,):
         return
@@ -177,29 +184,39 @@ def main():
     # add shift
     data = data + opt.shift
 
+    eps = 1e6
+
     # compute ratios
-    minima = data.min(axis=1)
-    ratio = data
-    for j in range(ncols):
-        ratio[:, j] = data[:, j] / minima
+    if opt.plot_as_ratios:
+        minima = data.min(axis=1)
+        for j in range(ncols):
+            data[:, j] = data[:, j] / minima
+        opt.x_lower_limit /= minima
+        opt.x_upper_limit /= minima
+        opt.x_min /= minima
+        opt.x_max /= minima
+        eps /= minima
 
     # Deduce minratio and maxratio if they are not specified on the command line
-    if opt.minratio is None or opt.minratio <= -1e21:
-        opt.minratio = max(opt.ratio_lower_limit, ratio.min())
+    if opt.x_min is None or opt.x_min <= -1e21:
+        opt.x_min = max(opt.x_lower_limit, data.min())
 
-    if opt.maxratio is None or opt.maxratio >= 1e21:
-        opt.maxratio = min(opt.ratio_upper_limit, ratio.max())
+    if opt.x_max is None or opt.x_max >= 1e21:
+        opt.x_max = min(opt.x_upper_limit, data.max())
 
     # any time value exceeds limit, we push the sample out of bounds
     for i in range(nrows):
         for j in range(ncols):
-            if data[i, j] >= opt.ratio_upper_limit:
-                ratio[i, j] = opt.maxratio + 1e6
-            if data[i, j] <= opt.ratio_lower_limit:
-                ratio[i, j] = opt.minratio - 1e6
+            if data[i, j] >= opt.x_upper_limit:
+                data[i, j] = opt.x_max + eps
+            if data[i, j] <= opt.x_lower_limit:
+                data[i, j] = opt.x_min - eps
 
-    # sort ratios
-    ratio.sort(axis=0)
+    if opt.x_min == opt.x_max:
+        opt.x_max = opt.x_min + 1.0
+
+    # sort data
+    data.sort(axis=0)
     # plot first
     y = np.arange(nrows, dtype=np.float64) / nrows
     for j in range(ncols):
@@ -220,12 +237,12 @@ def main():
         else:
             options["color"] = colors[(opt.startidx + j) % len(colors)]
         if opt.logplot:
-            plt.semilogx(ratio[:, j], y, **options)
+            plt.semilogx(data[:, j], y, **options)
         else:
-            plt.plot(ratio[:, j], y, **options)
+            plt.plot(data[:, j], y, **options)
 
-    plt.axis([opt.minratio, opt.maxratio, 0, 1])
-    plt.xticks(get_plt_ticks(opt.minratio, opt.maxratio, 8))
+    plt.axis([opt.x_min, opt.x_max, 0, 1])
+    plt.xticks(get_plt_ticks(opt.x_min, opt.x_max, 8))
     plt.yticks(get_plt_ticks(0.0, 1.0, 8))
     plt.grid(visible=True, linewidth=0.1, alpha=0.5)
     if opt.plotlegend is not None and opt.plotlegend is True:
