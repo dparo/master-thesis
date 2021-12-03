@@ -18,12 +18,21 @@ matplotlib.use("PDF")
 matplotlib.rcParams["figure.dpi"] = 300
 
 
+def remove_duplicates_from_list(x):
+    return list(dict.fromkeys(x))
+
+
+def get_plt_ticks(lb, ub, cnt):
+    return [round(x, 2) for x in remove_duplicates_from_list([lb, ub] + list(
+        np.arange(lb, ub, step=(ub - lb) / cnt)))]
+
+
 # parameters
 defLW = 1.2  # default line width
 defMS = 7  # default marker size
 dashes = ["solid", "dotted", "dashed", "dashdot"]
 
-markers = ["+", "x", "s", "^", "o", "d", "v", "<", ">", "*", "2"]
+markers = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "+", "x", "2"]
 colors = [
     "tab:blue",
     "tab:orange",
@@ -52,6 +61,14 @@ class CmdLineParser(object):
             help="delimiter for input files",
         )
         self.parser.add_option(
+            "-m",
+            "--minratio",
+            dest="minratio",
+            default=1,
+            type=float,
+            help="minratio for perf. profile",
+        )
+        self.parser.add_option(
             "-M",
             "--maxratio",
             dest="maxratio",
@@ -63,7 +80,6 @@ class CmdLineParser(object):
             "-S", "--shift", dest="shift", default=1, type=float, help="shift for data"
         )
         self.parser.add_option(
-            "-L",
             "--logplot",
             dest="logplot",
             action="store_true",
@@ -71,9 +87,9 @@ class CmdLineParser(object):
             help="log scale for x",
         )
         self.parser.add_option(
-            "-T",
-            "--timelimit",
-            dest="timelimit",
+            "-L",
+            "--limit",
+            dest="limit",
             default=1e99,
             type=float,
             help="time limit for runs",
@@ -142,7 +158,7 @@ def main():
     max_len = 64
     for i in range(0, len(cnames)):
         if len(cnames[i]) >= max_len:
-            cnames[i] = (cnames[i])[0 : max_len - 4] + " ..."
+            cnames[i] = (cnames[i])[0: max_len - 4] + " ..."
 
     if data.shape == (0,):
         return
@@ -157,15 +173,14 @@ def main():
     for j in range(ncols):
         ratio[:, j] = data[:, j] / minima
     # compute maxratio
-    if opt.maxratio < 0:
-        opt.maxratio = ratio.max()
-    # any time >= timelimit will count as maxratio + bigM (so that it does not show up in plots)
+    if opt.maxratio <= 0:
+        opt.maxratio = max(1.0, ratio.max())
 
-    if False:
-        for i in range(nrows):
-            for j in range(ncols):
-                if data[i, j] >= opt.timelimit:
-                    ratio[i, j] = opt.maxratio + 1e6
+    # any time >= limit will count as maxratio + bigM (so that it does not show up in plots)
+    for i in range(nrows):
+        for j in range(ncols):
+            if data[i, j] >= opt.limit:
+                ratio[i, j] = opt.maxratio + 1e6
 
     # sort ratios
     ratio.sort(axis=0)
@@ -192,7 +207,11 @@ def main():
             plt.semilogx(ratio[:, j], y, **options)
         else:
             plt.plot(ratio[:, j], y, **options)
-    plt.axis([1, opt.maxratio, 0, 1])
+
+    plt.axis([opt.minratio, opt.maxratio, 0, 1])
+    plt.xticks(get_plt_ticks(opt.minratio, opt.maxratio, 8))
+    plt.yticks(get_plt_ticks(0.0, 1.0, 8))
+    plt.grid(visible=True, linewidth=0.1, alpha=0.5)
     if opt.plotlegend is not None and opt.plotlegend is True:
         plt.legend(loc="best", fontsize=6, prop={"size": 6})
     if opt.plottitle is not None:

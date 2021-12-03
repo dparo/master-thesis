@@ -6,6 +6,8 @@
 .cache
 *.swp
 
+/.idea
+
 /*.lp
 /logs/
 
