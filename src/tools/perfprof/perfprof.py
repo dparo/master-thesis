@@ -13,8 +13,27 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-matplotlib.use("PDF")
+# parameters
+PLOT_LINE_WIDTH = 1.2
+PLOT_MARKER_SIZE = 7
+PLOT_MAX_LEGEND_NAME_LEN = 64
 
+DASHES = ["solid", "dotted", "dashed", "dashdot"]
+MARKERS = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "+", "x", "2"]
+COLORS = [
+    "tab:blue",
+    "tab:orange",
+    "tab:green",
+    "tab:red",
+    "tab:purple",
+    "tab:brown",
+    "tab:pink",
+    "tab:gray",
+    "tab:olive",
+    "magenta",
+]
+
+matplotlib.use("PDF")
 matplotlib.rcParams["figure.dpi"] = 300
 
 
@@ -31,26 +50,6 @@ def get_plt_ticks(lb, ub, cnt):
             [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
         )
     ]
-
-
-# parameters
-defLW = 1.2  # default line width
-defMS = 7  # default marker size
-dashes = ["solid", "dotted", "dashed", "dashdot"]
-
-markers = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "+", "x", "2"]
-colors = [
-    "tab:blue",
-    "tab:orange",
-    "tab:green",
-    "tab:red",
-    "tab:purple",
-    "tab:brown",
-    "tab:pink",
-    "tab:gray",
-    "tab:olive",
-    "magenta",
-]
 
 
 class CmdLineParser(object):
@@ -164,9 +163,6 @@ def readTable(fp, delimiter):
     return (rnames, cnames, data)
 
 
-MAX_SOLVER_NAME_LENGTH = 64
-
-
 def main():
     parser = CmdLineParser()
     opt = parser.parseArgs()
@@ -174,8 +170,8 @@ def main():
     rnames, cnames, data = readTable(open(opt.input, "r"), opt.delimiter)
 
     for i in range(0, len(cnames)):
-        if len(cnames[i]) >= MAX_SOLVER_NAME_LENGTH:
-            cnames[i] = (cnames[i])[0 : MAX_SOLVER_NAME_LENGTH - 4] + " ..."
+        if len(cnames[i]) >= PLOT_MAX_LEGEND_NAME_LEN:
+            cnames[i] = (cnames[i])[0 : PLOT_MAX_LEGEND_NAME_LEN - 4] + " ..."
 
     if data.shape == (0,):
         return
@@ -223,11 +219,11 @@ def main():
         options = dict(
             label=cnames[j],
             drawstyle="steps-post",
-            linewidth=defLW,
-            linestyle=dashes[(opt.startidx + j) % len(dashes)],
-            marker=markers[(opt.startidx + j) % len(markers)],
-            markeredgewidth=defLW,
-            markersize=defMS,
+            linewidth=PLOT_LINE_WIDTH,
+            linestyle=DASHES[(opt.startidx + j) % len(DASHES)],
+            marker=MARKERS[(opt.startidx + j) % len(MARKERS)],
+            markeredgewidth=PLOT_LINE_WIDTH,
+            markersize=PLOT_MARKER_SIZE,
             alpha=0.75,
         )
         if opt.bw:
@@ -235,7 +231,7 @@ def main():
             options["markeredgecolor"] = "k"
             options["color"] = "k"
         else:
-            options["color"] = colors[(opt.startidx + j) % len(colors)]
+            options["color"] = COLORS[(opt.startidx + j) % len(COLORS)]
         if opt.logplot:
             plt.semilogx(data[:, j], y, **options)
         else:
