@@ -132,7 +132,7 @@ typedef struct {
 #define CPTP_EXE "./build/Release/src/cptp"
 #endif
 
-#define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/perfprof.py"
+#define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/plot.py"
 #define BAPCOD_SOLVER_NAME "BaPCod"
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
@@ -924,21 +924,23 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = "0";
     args[argidx++] = "--x-label"; // Start index to associated with the colors
     args[argidx++] = xlabel_str;
+    args[argidx++] = "-i";
     args[argidx++] = csv_input_file;
+    args[argidx++] = "-o";
     args[argidx++] = output_file;
     args[argidx++] = NULL;
 
     proc_spawn_sync(args);
 }
 
-static inline double get_costval_for_csv(double costval, double min_val,
+static inline double get_costval_for_csv(double costval, double base_ref_val,
                                          double shift) {
-    return fratio(min_val, costval, shift);
+    return fratio(base_ref_val, costval, shift);
 }
 
-static inline double get_timeval_for_csv(double timeval, double min_val,
+static inline double get_timeval_for_csv(double timeval, double base_ref_val,
                                          double shift) {
-    return (timeval + shift) / min_val;
+    return (timeval + shift) / base_ref_val;
 }
 
 static inline double get_raw_val_from_perf(PerfProfRun *run,
@@ -948,12 +950,13 @@ static inline double get_raw_val_from_perf(PerfProfRun *run,
 
 static inline double get_baked_val_from_perf(PerfProfRun *run,
                                              bool is_time_profile,
-                                             double min_val, double shift) {
+                                             double base_ref_val,
+                                             double shift) {
     double val = get_raw_val_from_perf(run, is_time_profile);
     if (is_time_profile) {
-        return get_timeval_for_csv(val, min_val, shift);
+        return get_timeval_for_csv(val, base_ref_val, shift);
     } else {
-        return get_costval_for_csv(val, min_val, shift);
+        return get_costval_for_csv(val, base_ref_val, shift);
     }
 }
 

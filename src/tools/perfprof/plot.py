@@ -1,13 +1,20 @@
+## This script is a highly customized version of the perfprof.py script from:
 ##
-## Performance Profile by D. Salvagnin (2016)
-## Internal use only, not to be distributed
+##      Performance Profile by D. Salvagnin (2016)
+##      Internal use only, not to be distributed
 ##
+## The script was modified:
+##   - Porting to python3
+##   - More command line options
+##   - Visual enhancements of the generated plot
+##   - Generalized how data is processed. Ratios computations are in fact now optional.
+#      Thus, this utility can be used to plot different kinds of already processed data.
 
 # !/usr/bin/env python3
 
 from __future__ import print_function
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -54,18 +61,18 @@ def get_plt_ticks(lb, ub, cnt):
 
 class CmdLineParser(object):
     def __init__(self):
-        self.parser = OptionParser(
+        self.parser = ArgumentParser(
             usage="Usage: python3 perfprof.py [options] cvsfile.csv outputfile.pdf"
         )
         # default options
-        self.parser.add_option(
+        self.parser.add_argument(
             "-D",
             "--delimiter",
             dest="delimiter",
             default=None,
             help="Delimiter for input files",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-m",
             "--x-min",
             dest="x_min",
@@ -73,7 +80,7 @@ class CmdLineParser(object):
             type=float,
             help="Minimum X value for perf. profile",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-M",
             "--x-max",
             dest="x_max",
@@ -81,62 +88,65 @@ class CmdLineParser(object):
             type=float,
             help="Minimum X value for perf. profile",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-S", "--shift", dest="shift", default=0, type=float, help="shift for data"
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "--logplot",
             dest="logplot",
             action="store_true",
             default=False,
             help="Enable logscale for X",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "--x-lower-limit",
             dest="x_lower_limit",
             default=-1e99,
             type=float,
             help="Lower limit for runs",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "--x-upper-limit",
             dest="x_upper_limit",
             default=+1e99,
             type=float,
             help="Upper limit for runs",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-P", "--plot-title", dest="plottitle", default=None, help="plot title"
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-l", "--legend", dest="plotlegend", default=True, help="plot the legend"
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-X", "--x-label", dest="xlabel", default="Time Ratio", help="x axis label"
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "-B", "--bw", dest="bw", action="store_true", default=False, help="plot B/W"
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "--plot-as-ratios",
             dest="plot_as_ratios",
             action="store_true",
             default=False,
             help="To plot data as ratios or not",
         )
-        self.parser.add_option(
+        self.parser.add_argument(
             "--startidx",
             dest="startidx",
             default=0,
             type=int,
             help="Start index to associate with the colors",
         )
+        self.parser.add_argument(
+            "-i", dest="input", type=str, required=True, help="Input csv file"
+        )
+        self.parser.add_argument(
+            "-o", dest="output", type=str, required=True, help="Output PDF plot file"
+        )
 
-    def parseArgs(self):
-        (options, args) = self.parser.parse_args()
-        options.input = args[0]
-        options.output = args[1]
-        return options
+    def parse(self):
+        return self.parser.parse_args()
 
 
 def readTable(fp, delimiter):
@@ -165,7 +175,7 @@ def readTable(fp, delimiter):
 
 def main():
     parser = CmdLineParser()
-    opt = parser.parseArgs()
+    opt = parser.parse()
     # read data
     rnames, cnames, data = readTable(open(opt.input, "r"), opt.delimiter)
 
