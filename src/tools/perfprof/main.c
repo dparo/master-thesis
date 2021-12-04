@@ -882,7 +882,7 @@ static void generate_performance_profile_using_python_script(
 
     char x_lower_limit_str[128];
     char x_upper_limit_str[128];
-    char *xlabel_str = is_time_profile ? "Time Ratio" : "Reduced Cost";
+    char *xlabel_str = is_time_profile ? "Time Ratio" : "Relative Cost";
 
     // double shift = batch->shift > 0 ? batch->shift : 1.0;
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
@@ -920,6 +920,9 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = ",";
     // NOTE: This parameters make little sense now that we are encoding our own
     // custom baked data
+    if (!is_time_profile) {
+        args[argidx++] = "--draw-separated-regions";
+    }
 #if 0
     args[argidx++] = "--x-min";
     args[argidx++] = x_min_str;
