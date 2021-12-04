@@ -12,8 +12,6 @@
 
 # !/usr/bin/env python3
 
-from __future__ import print_function
-
 from argparse import ArgumentParser
 from math import inf
 
@@ -30,7 +28,7 @@ PLOT_GRID_LINE_WIDTH = 0.1
 PLOT_GRID_ALPHA = 0.5
 
 DASHES = ["solid", "dotted", "dashed", "dashdot"]
-MARKERS = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "+", "x", "2"]
+MARKERS = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "x", "+"]
 COLORS = [
     "tab:blue",
     "tab:orange",
@@ -201,9 +199,6 @@ def draw_regions(data, ncols):
     x_gte_0 = x >= zero
     x_lt_0 = x < zero
 
-    print(f"x = {x}")
-    print(f"x_gte_0 = {x_gte_0}")
-    print(f"x_lt_0 = {x_lt_0}")
     if np.any(x_gte_0):
         plt.fill_between(
             x,
