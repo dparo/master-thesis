@@ -67,10 +67,21 @@ typedef struct {
     char *args[PROC_MAX_ARGS];
 } PerfProfSolver;
 
+typedef enum StatKind {
+    STAT_TIME,
+    STAT_COST,
+    STAT_REL_COST,
+
+    //
+    // Last field
+    //
+    MAX_NUM_STATS,
+} StatKind;
+
 typedef struct {
     double time;
     double cost;
-} Perf;
+} PerfStats;
 
 typedef struct {
     uint8_t seedidx;
@@ -97,7 +108,7 @@ typedef struct {
 ///       for the entire duration of the current batch.
 typedef struct {
     char solver_name[48];
-    Perf perf;
+    PerfStats perf;
 } PerfProfRun;
 
 #define MAX_NUM_SOLVERS_PER_BATCH 8
@@ -176,8 +187,8 @@ STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
               "Too much number of seeds. Need to be able to encode a seed index"
               "using an uint8_t");
 
-static inline Perf make_invalidated_perf(PerfProfBatch *batch) {
-    Perf perf = {0};
+static inline PerfStats make_invalidated_perf(PerfProfBatch *batch) {
+    PerfStats perf = {0};
     perf.cost = INFINITY;
     perf.time = 2 * batch->timelimit;
     return perf;
@@ -271,7 +282,7 @@ static void my_sighandler(int signum) {
 
 void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
-    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
+    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "relativeCost");
 
     if (itm_took && cJSON_IsNumber(itm_took)) {
         run->perf.time = cJSON_GetNumberValue(itm_took);
@@ -422,8 +433,8 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
 
-        cJSON *columns_cost =
-            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "columns-cost");
+        cJSON *columns_cost = cJSON_GetObjectItemCaseSensitive(
+            rcsp_infos, "columns-relative-cost");
 
         cJSON *itm_took =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
@@ -635,6 +646,7 @@ static bool is_filtered_instance(Filter *f, const Instance *instance) {
 
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                  struct FTW *ftwbuf) {
+    UNUSED_PARAM(ftwbuf);
     if (typeflag == FTW_F || typeflag == FTW_SL) {
         // Is a regular file
         const char *ext = os_get_fext(fpath);
@@ -870,14 +882,14 @@ static void generate_performance_profile_using_python_script(
 
     char x_lower_limit_str[128];
     char x_upper_limit_str[128];
-    char *xlabel_str = is_time_profile ? "Time Ratio" : "Cost Ratio";
+    char *xlabel_str = is_time_profile ? "Time Ratio" : "Reduced Cost";
 
     // double shift = batch->shift > 0 ? batch->shift : 1.0;
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
 
     // -1e99, +1e99 for some parameters means automatically compute it
     // (zoom-to-fit)
-    double x_min = 1.0;
+    double x_min = 0.0;
     double x_max = 1e99;
     double x_lower_limit = -1e99;
     double x_upper_limit =
@@ -908,9 +920,9 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = ",";
     // NOTE: This parameters make little sense now that we are encoding our own
     // custom baked data
+#if 0
     args[argidx++] = "--x-min";
     args[argidx++] = x_min_str;
-#if 0
     args[argidx++] = "--x-max";
     args[argidx++] = x_max_str;
     args[argidx++] = "--x-lower-limit";
@@ -956,7 +968,8 @@ static inline double get_baked_val_from_perf(PerfProfRun *run,
     if (is_time_profile) {
         return get_timeval_for_csv(val, base_ref_val, shift);
     } else {
-        return get_costval_for_csv(val, base_ref_val, shift);
+        return get_raw_val_from_perf(run, is_time_profile);
+        // return get_costval_for_csv(val, base_ref_val, shift);
     }
 }
 

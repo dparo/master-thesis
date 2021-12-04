@@ -24,6 +24,8 @@ import numpy as np
 PLOT_LINE_WIDTH = 1.2
 PLOT_MARKER_SIZE = 7
 PLOT_MAX_LEGEND_NAME_LEN = 64
+PLOT_GRID_LINE_WIDTH = 0.1
+PLOT_GRID_ALPHA = 0.5
 
 DASHES = ["solid", "dotted", "dashed", "dashdot"]
 MARKERS = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "+", "x", "2"]
@@ -226,12 +228,16 @@ def main():
     # plot first
     y = np.arange(nrows, dtype=np.float64) / nrows
     for j in range(ncols):
+        linestyle = DASHES[(opt.startidx + j) % len(DASHES)]
+        marker = MARKERS[(opt.startidx + j) % len(MARKERS)]
+        color = COLORS[(opt.startidx + j) % len(COLORS)]
+
         options = dict(
             label=cnames[j],
             drawstyle="steps-post",
             linewidth=PLOT_LINE_WIDTH,
-            linestyle=DASHES[(opt.startidx + j) % len(DASHES)],
-            marker=MARKERS[(opt.startidx + j) % len(MARKERS)],
+            linestyle=linestyle,
+            marker=marker,
             markeredgewidth=PLOT_LINE_WIDTH,
             markersize=PLOT_MARKER_SIZE,
             alpha=0.75,
@@ -241,7 +247,7 @@ def main():
             options["markeredgecolor"] = "k"
             options["color"] = "k"
         else:
-            options["color"] = COLORS[(opt.startidx + j) % len(COLORS)]
+            options["color"] = color
         if opt.logplot:
             plt.semilogx(data[:, j], y, **options)
         else:
@@ -250,7 +256,10 @@ def main():
     plt.axis([opt.x_min, opt.x_max, 0, 1])
     plt.xticks(get_plt_ticks(opt.x_min, opt.x_max, 8))
     plt.yticks(get_plt_ticks(0.0, 1.0, 8))
-    plt.grid(visible=True, linewidth=0.1, alpha=0.5)
+
+    plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
+    plt.axvline(x=0.0, linewidth=12.0 * PLOT_GRID_LINE_WIDTH, alpha=0.8, color="r")
+
     if opt.plotlegend is not None and opt.plotlegend is True:
         plt.legend(loc="best", fontsize=6, prop={"size": 6})
     if opt.plottitle is not None:
