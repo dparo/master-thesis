@@ -42,10 +42,17 @@ typedef struct CutDescriptor {
 } CutDescriptor;
 
 extern const CutSeparationIface CUT_GSEC_IFACE;
+extern const CutSeparationIface CUT_GLM_IFACE;
 
 static const CutDescriptor CUT_GSEC_DESCRIPTOR = {
     "GSEC",
     &CUT_GSEC_IFACE,
+    {{0}},
+};
+
+static const CutDescriptor CUT_GLM_DESCRIPTOR = {
+    "GLM",
+    &CUT_GLM_IFACE,
     {{0}},
 };
 

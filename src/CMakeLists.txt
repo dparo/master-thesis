@@ -64,6 +64,7 @@ add_library(libcptp
     # MIP solver
     solvers/mip/mip.c
     solvers/mip/cuts/gsec.c
+    solvers/mip/cuts/glm.c
     )
 target_include_directories(libcptp PUBLIC ./)
 target_link_libraries(libcptp PUBLIC debugbreak logc libstb cjson-static libcrypto)
