@@ -34,9 +34,10 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
-static void print_network(FlowNetwork *net) {
+static void print_network(FlowNetwork *net, int32_t source_vertex,
+                          int32_t sink_vertex) {
     printf("net->nnodes = %d, source = %d, sink = %d\n", net->nnodes,
-           net->source_vertex, net->sink_vertex);
+           source_vertex, sink_vertex);
     printf("EDGES:\n");
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = 0; j < net->nnodes; j++) {
@@ -47,8 +48,10 @@ static void print_network(FlowNetwork *net) {
     printf("\n");
 }
 
-TEST validate_with_slow_max_flow(FlowNetwork *net, MaxFlowResult *result) {
-    BruteforceMaxFlowResult bf = max_flow_bruteforce(net);
+TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
+                                 int32_t sink_vertex, MaxFlowResult *result) {
+    BruteforceMaxFlowResult bf =
+        max_flow_bruteforce(net, source_vertex, sink_vertex);
 
     printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
            bf.maxflow);
@@ -103,8 +106,8 @@ TEST weird_network(void) {
     int32_t nnodes = 4;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 1;
-    net.sink_vertex = 0;
+    int32_t source_vertex = 1;
+    int32_t sink_vertex = 0;
 
     *network_cap(&net, 1, 2) = 0.4;
     *network_cap(&net, 2, 1) = 0.6;
@@ -118,11 +121,13 @@ TEST weird_network(void) {
     *network_cap(&net, 3, 0) = 0.6;
     *network_cap(&net, 0, 3) = 0.8;
 
-    print_network(&net);
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    print_network(&net, source_vertex, sink_vertex);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
 
     ASSERT_IN_RANGE(1.4, max_flow, 1e-4);
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
 
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
@@ -152,8 +157,8 @@ TEST weird_network2(void) {
     int32_t nnodes = 4;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 2;
-    net.sink_vertex = 3;
+    int32_t source_vertex = 2;
+    int32_t sink_vertex = 3;
 
     *network_cap(&net, 0, 0) = 0;
     *network_cap(&net, 0, 1) = 0.8;
@@ -172,11 +177,13 @@ TEST weird_network2(void) {
     *network_cap(&net, 3, 2) = 0.8;
     *network_cap(&net, 3, 3) = 0;
 
-    print_network(&net);
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    print_network(&net, source_vertex, sink_vertex);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
 
     ASSERT_IN_RANGE(0.6, max_flow, 1e-4);
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
 
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
@@ -218,8 +225,8 @@ TEST weird_network3(void) {
     int32_t nnodes = 5;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = 2;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = 2;
 
     *network_cap(&net, 0, 0) = 0;
     *network_cap(&net, 0, 1) = 0.4;
@@ -247,11 +254,13 @@ TEST weird_network3(void) {
     *network_cap(&net, 4, 3) = 0.8;
     *network_cap(&net, 4, 4) = 0;
 
-    print_network(&net);
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    print_network(&net, source_vertex, sink_vertex);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
 
     ASSERT_IN_RANGE(2.0, max_flow, 1e-4);
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
 
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
@@ -262,8 +271,8 @@ TEST CLRS_network(void) {
     int32_t nnodes = 6;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = nnodes - 1;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = nnodes - 1;
 
     *network_cap(&net, 0, 1) = 16;
     *network_cap(&net, 0, 2) = 13;
@@ -276,7 +285,8 @@ TEST CLRS_network(void) {
     *network_cap(&net, 3, 5) = 20;
     *network_cap(&net, 4, 5) = 4;
 
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
     ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
@@ -286,7 +296,8 @@ TEST CLRS_network(void) {
     ASSERT_EQ(1, max_flow_result.bipartition.data[4]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[5]);
 
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -298,8 +309,8 @@ TEST non_trivial_network1(void) {
     int32_t nnodes = 7;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = 7 - 1;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = 7 - 1;
 
     *network_cap(&net, 1 - 1, 4 - 1) = 2;
     *network_cap(&net, 1 - 1, 2 - 1) = 2;
@@ -314,7 +325,8 @@ TEST non_trivial_network1(void) {
     *network_cap(&net, 3 - 1, 7 - 1) = 2;
     *network_cap(&net, 6 - 1, 7 - 1) = 4;
 
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
     ASSERT_IN_RANGE(5, max_flow, 1e-4);
     ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
@@ -324,7 +336,8 @@ TEST non_trivial_network1(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
 
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -336,8 +349,8 @@ TEST non_trivial_network2(void) {
     int32_t nnodes = 7;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = 7 - 1;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = 7 - 1;
 
     *network_cap(&net, 1 - 1, 2 - 1) = 6;
     *network_cap(&net, 1 - 1, 4 - 1) = 5;
@@ -352,7 +365,8 @@ TEST non_trivial_network2(void) {
     *network_cap(&net, 6 - 1, 7 - 1) = 15;
     *network_cap(&net, 3 - 1, 7 - 1) = 4;
 
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
     ASSERT_IN_RANGE(15, max_flow, 1e-4);
     ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
@@ -362,7 +376,8 @@ TEST non_trivial_network2(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
 
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -374,8 +389,8 @@ TEST non_trivial_network3(void) {
     int32_t nnodes = 8;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = 8 - 1;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = 8 - 1;
 
     *network_cap(&net, 1 - 1, 5 - 1) = 7;
     *network_cap(&net, 1 - 1, 2 - 1) = 3;
@@ -392,7 +407,8 @@ TEST non_trivial_network3(void) {
     *network_cap(&net, 7 - 1, 8 - 1) = 6;
     *network_cap(&net, 4 - 1, 8 - 1) = 5;
 
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
     ASSERT_IN_RANGE(10, max_flow, 1e-4);
     ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
     ASSERT_EQ(1, max_flow_result.bipartition.data[2 - 1]);
@@ -403,7 +419,8 @@ TEST non_trivial_network3(void) {
     ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
     ASSERT_EQ(0, max_flow_result.bipartition.data[8 - 1]);
 
-    CHECK_CALL(validate_with_slow_max_flow(&net, &max_flow_result));
+    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
+                                           &max_flow_result));
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
@@ -414,8 +431,8 @@ TEST no_path_flow(void) {
     int32_t nnodes = 4;
     FlowNetwork net = flow_network_create(nnodes);
     MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-    net.source_vertex = 0;
-    net.sink_vertex = 3;
+    int32_t source_vertex = 0;
+    int32_t sink_vertex = 3;
 
     // 3 Nodes are circularly linked with the source node with max capacity 2 in
     // any direction, while the sink is completely detached (capacity 0)
@@ -426,7 +443,8 @@ TEST no_path_flow(void) {
     *network_cap(&net, 2, 0) = 2;
     *network_cap(&net, 0, 2) = 2;
 
-    double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
+                                            &max_flow_result);
     ASSERT_IN_RANGE(0, max_flow, 1e-4);
     ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
     ASSERT_EQ(1, max_flow_result.bipartition.data[1]);
@@ -441,8 +459,8 @@ TEST single_path_flow(void) {
     for (int32_t nnodes = 2; nnodes < MAX_NUM_NODES_TO_TEST; nnodes++) {
         FlowNetwork net = flow_network_create(nnodes);
         MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-        net.source_vertex = 0;
-        net.sink_vertex = nnodes - 1;
+        int32_t source_vertex = 0;
+        int32_t sink_vertex = nnodes - 1;
 
         double min_cap = INFINITY;
 
@@ -453,7 +471,8 @@ TEST single_path_flow(void) {
             min_cap = MIN(min_cap, r);
         }
 
-        double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+        double max_flow = push_relabel_max_flow(&net, source_vertex,
+                                                sink_vertex, &max_flow_result);
         ASSERT_IN_RANGE(min_cap, max_flow, 1e-4);
 
         flow_network_destroy(&net);
@@ -469,8 +488,8 @@ TEST two_path_flow(void) {
         FlowNetwork net = flow_network_create(nnodes);
 
         MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-        net.source_vertex = 0;
-        net.sink_vertex = nnodes - 1;
+        int32_t source_vertex = 0;
+        int32_t sink_vertex = nnodes - 1;
 
         double min_cap1 = INFINITY;
         double min_cap2 = INFINITY;
@@ -507,7 +526,8 @@ TEST two_path_flow(void) {
             min_cap2 = MIN(min_cap2, r);
         }
 
-        double max_flow = push_relabel_max_flow(&net, &max_flow_result);
+        double max_flow = push_relabel_max_flow(&net, source_vertex,
+                                                sink_vertex, &max_flow_result);
         ASSERT_IN_RANGE(min_cap1 + min_cap2, max_flow, 1e-4);
 
         flow_network_destroy(&net);
@@ -522,8 +542,8 @@ TEST random_networks(void) {
         for (int32_t try_it = 0; try_it < 2048; try_it++) {
             FlowNetwork network = flow_network_create(nnodes);
             MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
-            network.source_vertex = 0;
-            network.sink_vertex = nnodes - 1;
+            int32_t source_vertex = 0;
+            int32_t sink_vertex = nnodes - 1;
 
             for (int32_t i = 0; i < nnodes; i++) {
                 for (int32_t j = 0; j < nnodes; j++) {
@@ -533,10 +553,12 @@ TEST random_networks(void) {
                 }
             }
 
-            print_network(&network);
-            double max_flow = push_relabel_max_flow(&network, &max_flow_result);
+            print_network(&network, source_vertex, sink_vertex);
+            double max_flow = push_relabel_max_flow(
+                &network, source_vertex, sink_vertex, &max_flow_result);
             ASSERT_IN_RANGE(max_flow, max_flow_result.maxflow, 1e-5);
-            CHECK_CALL(validate_with_slow_max_flow(&network, &max_flow_result));
+            CHECK_CALL(validate_with_slow_max_flow(
+                &network, source_vertex, sink_vertex, &max_flow_result));
 
             flow_network_destroy(&network);
             max_flow_result_destroy(&max_flow_result);

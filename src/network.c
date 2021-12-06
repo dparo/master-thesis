@@ -161,7 +161,7 @@ static void relabel(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
         }
     }
 #endif
-    assert(u != net->source_vertex && u != net->sink_vertex);
+    assert(u != ctx->source_vertex && u != ctx->sink_vertex);
 
     int32_t min_height = INT32_MAX;
     for (int32_t v = 0; v < net->nnodes; v++) {
@@ -178,7 +178,7 @@ static void relabel(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
 }
 
 static void discharge(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
-    assert(u != net->source_vertex && u != net->sink_vertex);
+    assert(u != ctx->source_vertex && u != ctx->sink_vertex);
     while (fgt(ctx->excess_flow[u], 0.0, EPS)) {
         int32_t v = ctx->curr_neigh[u];
         if (v >= net->nnodes) {
@@ -193,7 +193,7 @@ static void discharge(FlowNetwork *net, PushRelabelCtx *ctx, int32_t u) {
 }
 
 static void greedy_preflow(FlowNetwork *net, PushRelabelCtx *ctx) {
-    int32_t s = net->source_vertex;
+    int32_t s = ctx->source_vertex;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
         ctx->excess_flow[i] = 0.0;
@@ -244,8 +244,8 @@ static void compute_bipartition_from_height(FlowNetwork *net,
     }
 }
 
-static double get_flow_from_s_node(FlowNetwork *net) {
-    int32_t s = net->source_vertex;
+static double get_flow_from_source_node(FlowNetwork *net, PushRelabelCtx *ctx) {
+    int32_t s = ctx->source_vertex;
     double max_flow = 0.0;
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i == s) {
@@ -266,8 +266,8 @@ static double get_flow_from_s_node(FlowNetwork *net) {
 static void validate_flow(FlowNetwork *net, PushRelabelCtx *ctx,
                           double max_flow) {
 #ifndef NDEBUG
-    int32_t s = net->source_vertex;
-    int32_t t = net->sink_vertex;
+    int32_t s = ctx->source_vertex;
+    int32_t t = ctx->sink_vertex;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
         double fenter = flow_entering(net, i);
@@ -336,15 +336,19 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
 #endif
 }
 
-double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
+double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
+                              int32_t sink_vertex, MaxFlowResult *result,
                               PushRelabelCtx *ctx) {
     assert(net->cap);
     assert(net->flow);
     assert(net->nnodes >= 2);
-    assert(net->sink_vertex != net->source_vertex);
+    assert(source_vertex != sink_vertex);
 
-    int32_t s = net->source_vertex;
-    int32_t t = net->sink_vertex;
+    ctx->source_vertex = source_vertex;
+    ctx->sink_vertex = sink_vertex;
+
+    int32_t s = source_vertex;
+    int32_t t = sink_vertex;
 
 #ifndef NDEBUG
     for (int32_t i = 0; i < net->nnodes; i++) {
@@ -388,7 +392,7 @@ double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
     }
 
     // COMPUTE maxflow: Sum the flow of outgoing edges from s
-    double max_flow = get_flow_from_s_node(net);
+    double max_flow = get_flow_from_source_node(net, ctx);
 
     validate_flow(net, ctx, max_flow);
 
@@ -443,10 +447,12 @@ void push_relabel_ctx_destroy(PushRelabelCtx *ctx) {
 // 1. https://en.wikipedia.org/wiki/Push%E2%80%93relabel_maximum_flow_algorithm
 // 2. Goldberg, A.V., 1997. An efficient implementation of a scaling
 //    minimum-cost flow algorithm. Journal of algorithms, 22(1), pp.1-29.
-double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result) {
+double push_relabel_max_flow(FlowNetwork *net, int32_t source_vertex,
+                             int32_t sink_vertex, MaxFlowResult *result) {
 
     PushRelabelCtx ctx = push_relabel_ctx_create(net->nnodes);
-    double max_flow = push_relabel_max_flow2(net, result, &ctx);
+    double max_flow =
+        push_relabel_max_flow2(net, source_vertex, sink_vertex, result, &ctx);
     push_relabel_ctx_destroy(&ctx);
     return max_flow;
 }
@@ -467,7 +473,11 @@ static double compute_flow_from_labels(FlowNetwork *net, int32_t *labels) {
     return flow;
 }
 
-BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
+BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
+                                            int32_t source_vertex,
+                                            int32_t sink_vertex) {
+    int32_t s = source_vertex;
+    int32_t t = sink_vertex;
     assert(net->nnodes >= 2 && net->nnodes <= 10);
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
 
@@ -478,12 +488,12 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
         for (int32_t k = 0; k < net->nnodes; k++) {
             labels[k] = (label_it & (1 << k)) >> k;
         }
-        if (labels[net->source_vertex] != 1 || labels[net->sink_vertex] != 0) {
+        if (labels[s] != 1 || labels[t] != 0) {
             continue;
         }
 
-        labels[net->source_vertex] = 1;
-        labels[net->sink_vertex] = 0;
+        labels[s] = 1;
+        labels[t] = 0;
 
         double flow = compute_flow_from_labels(net, labels);
         if (flte(flow, max_flow, EPS)) {
@@ -512,12 +522,12 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net) {
         for (int32_t k = 0; k < net->nnodes; k++) {
             labels[k] = (label_it & (1 << k)) >> k;
         }
-        if (labels[net->source_vertex] != 1 || labels[net->sink_vertex] != 0) {
+        if (labels[s] != 1 || labels[t] != 0) {
             continue;
         }
 
-        labels[net->source_vertex] = 1;
-        labels[net->sink_vertex] = 0;
+        labels[s] = 1;
+        labels[t] = 0;
 
         double flow = compute_flow_from_labels(net, labels);
 

@@ -36,8 +36,6 @@ typedef struct {
 
 typedef struct {
     int32_t nnodes;
-    int32_t source_vertex;
-    int32_t sink_vertex;
     double *flow;
     double *cap;
 } FlowNetwork;
@@ -60,6 +58,8 @@ typedef struct BruteforceMaxFlowResult {
 } BruteforceMaxFlowResult;
 
 typedef struct PushRelabelCtx {
+    int32_t source_vertex;
+    int32_t sink_vertex;
     int32_t *height;
     double *excess_flow;
     int32_t *curr_neigh;
@@ -83,11 +83,15 @@ void max_flow_result_destroy(MaxFlowResult *m);
 PushRelabelCtx push_relabel_ctx_create(int32_t nnodes);
 void push_relabel_ctx_destroy(PushRelabelCtx *ctx);
 
-double push_relabel_max_flow(FlowNetwork *net, MaxFlowResult *result);
-double push_relabel_max_flow2(FlowNetwork *net, MaxFlowResult *result,
+double push_relabel_max_flow(FlowNetwork *net, int32_t source_vertex,
+                             int32_t sink_vertex, MaxFlowResult *result);
+double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
+                              int32_t sink_vertex, MaxFlowResult *result,
                               PushRelabelCtx *ctx);
 
-BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net);
+BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
+                                            int32_t source_vertex,
+                                            int32_t sink_vertex);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);

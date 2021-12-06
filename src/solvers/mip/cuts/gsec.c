@@ -118,25 +118,24 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     //
     // Heuristic separation. Pick random source and sink vertex
     //
-    ctx->network.source_vertex = rand() % n;
+    int32_t source_vertex = rand() % n;
+    int32_t sink_vertex;
     do {
-        ctx->network.sink_vertex = rand() % (instance->num_customers + 1);
-    } while (ctx->network.sink_vertex == ctx->network.source_vertex);
+        sink_vertex = rand() % n;
+    } while (sink_vertex == source_vertex);
 
     // Solve the max flow and create the violated cuts
     {
         double max_flow = push_relabel_max_flow2(
-            &ctx->network, &ctx->max_flow_result, &ctx->push_relabel_ctx);
+            &ctx->network, source_vertex, sink_vertex, &ctx->max_flow_result,
+            &ctx->push_relabel_ctx);
 
         log_trace("%s :: max_flow = %g\n", __func__, max_flow);
 
         int32_t bp_depot = ctx->max_flow_result.bipartition.data[0];
 
-        assert(
-            1 ==
-            ctx->max_flow_result.bipartition.data[ctx->network.source_vertex]);
-        assert(0 ==
-               ctx->max_flow_result.bipartition.data[ctx->network.sink_vertex]);
+        assert(1 == ctx->max_flow_result.bipartition.data[source_vertex]);
+        assert(0 == ctx->max_flow_result.bipartition.data[sink_vertex]);
 
         int32_t set_s_size = 0;
 
