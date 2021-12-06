@@ -32,7 +32,6 @@ struct CutSeparationPrivCtx {
     int32_t *cnnodes;
 
     PushRelabelCtx push_relabel_ctx;
-    FlowNetwork network;
     MaxFlowResult max_flow_result;
 };
 
@@ -61,7 +60,6 @@ static inline bool is_violated_cut(double flow, double y_i) {
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
-    flow_network_destroy(&ctx->network);
     max_flow_result_destroy(&ctx->max_flow_result);
     push_relabel_ctx_destroy(&ctx->push_relabel_ctx);
     free(ctx->index);
@@ -79,12 +77,11 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
     ctx->cnnodes = malloc(n * sizeof(*ctx->cnnodes));
-    ctx->network = flow_network_create(n);
     ctx->max_flow_result = max_flow_result_create(n);
     ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->cnnodes || !ctx->network.cap ||
-        !ctx->network.flow || !ctx->max_flow_result.bipartition.data ||
+    if (!ctx->index || !ctx->value || !ctx->cnnodes ||
+        !ctx->max_flow_result.bipartition.data ||
         !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
         deactivate(ctx);
         return NULL;
@@ -94,26 +91,10 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar) {
+                           const double *vstar, FlowNetwork *network) {
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
-
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            double cap =
-                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
-            assert(fgte(cap, 0.0, 1e-8));
-            // NOTE: Fix floating point rounding errors. In fact cap may be
-            // slightly negative...
-            cap = MAX(0.0, cap);
-            if (feq(cap, 0.0, 1e-6)) {
-                cap = 0.0;
-            }
-            assert(cap >= 0.0);
-            *network_cap(&ctx->network, i, j) = cap;
-        }
-    }
 
     //
     // Heuristic separation. Pick random source and sink vertex
@@ -127,7 +108,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     // Solve the max flow and create the violated cuts
     {
         double max_flow = push_relabel_max_flow2(
-            &ctx->network, source_vertex, sink_vertex, &ctx->max_flow_result,
+            network, source_vertex, sink_vertex, &ctx->max_flow_result,
             &ctx->push_relabel_ctx);
 
         log_trace("%s :: max_flow = %g\n", __func__, max_flow);

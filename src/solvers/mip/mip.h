@@ -29,6 +29,7 @@ extern "C" {
 #include "types.h"
 #include "core.h"
 #include "core-utils.h"
+#include "network.h"
 
 // NOTE:
 //       cplexx is the 64 bit version of the API, while cplex (one x) is the 32
@@ -74,7 +75,7 @@ typedef struct {
     void (*deactivate)(CutSeparationPrivCtx *ctx);
 
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar);
+                           const double *vstar, FlowNetwork *network);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour);
 } CutSeparationIface;

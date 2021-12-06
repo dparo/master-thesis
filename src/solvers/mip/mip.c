@@ -66,6 +66,7 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 
 typedef struct {
     double *vstar;
+    FlowNetwork network;
     Tour tour;
     CutSeparationFunctor gsec_functor;
 } CallbackThreadLocalData;
@@ -84,6 +85,8 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
                                   const Instance *instance, Solver *solver) {
     memset(thread_local_data, 0, sizeof(*thread_local_data));
 
+    thread_local_data->network =
+        flow_network_create(instance->num_customers + 1);
     thread_local_data->tour = tour_create(instance);
 
     thread_local_data->vstar =
@@ -98,6 +101,8 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     functor->solver = solver;
 
     bool success = functor->ctx && thread_local_data->vstar &&
+                   thread_local_data->network.flow &&
+                   thread_local_data->network.cap &&
                    tour_is_valid(&thread_local_data->tour);
     return success;
 }
@@ -111,6 +116,7 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     }
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
+    flow_network_destroy(&thread_local_data->network);
 }
 
 static void validate_mip_vars_packing(const Instance *instance) {
@@ -459,13 +465,32 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         printf("\n");
 #endif
 
+    FlowNetwork *net = &tld->network;
+    const int32_t n = instance->num_customers + 1;
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            double cap =
+                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
+            assert(fgte(cap, 0.0, 1e-8));
+            // NOTE: Fix floating point rounding errors. In fact cap may be
+            // slightly negative...
+            cap = MAX(0.0, cap);
+            if (feq(cap, 0.0, 1e-6)) {
+                cap = 0.0;
+            }
+            assert(cap >= 0.0);
+            *network_cap(net, i, j) = cap;
+        }
+    }
+
     const int64_t begin_time = os_get_usecs();
     // NOTE: We need to reset the cplex_cb_ctx since it might change during
     // the execution. The same threadid id, is not guaranteed to have the
     // same cplex_cb_ctx for the entire duration of the thread
     functor->internal.cplex_cb_ctx = cplex_cb_ctx;
     bool separation_success =
-        CUT_GSEC_IFACE.fractional_sep(functor, obj_p, vstar);
+        CUT_GSEC_IFACE.fractional_sep(functor, obj_p, vstar, net);
     functor->internal.fractional_stats.accum_usecs +=
         os_get_usecs() - begin_time;
 
