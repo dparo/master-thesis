@@ -22,9 +22,8 @@
 
 #include "../mip.h"
 #include "../cuts.h"
-#include "network.h"
 
-const double EPS = 1e-6;
+static const double EPS = 1e-6;
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
