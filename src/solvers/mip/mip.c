@@ -64,11 +64,17 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 
 #define MAX_NUM_CORES 256
 
+#define NUM_CUTS (ARRAY_LEN(CUT_DESCRS))
+static const CutDescriptor *CUT_DESCRS[] = {
+    &CUT_GSEC_DESCRIPTOR,
+    // &CUT_GLM_DESCRIPTOR,
+};
+
 typedef struct {
     double *vstar;
     FlowNetwork network;
     Tour tour;
-    CutSeparationFunctor gsec_functor;
+    CutSeparationFunctor functors[NUM_CUTS];
 } CallbackThreadLocalData;
 
 /// Struct that is used as a userhandle to be passed to the cplex generic
@@ -92,27 +98,35 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     thread_local_data->vstar =
         malloc(sizeof(*thread_local_data->vstar) * solver->data->num_mip_vars);
 
-    const CutSeparationIface *iface = CUT_GSEC_DESCRIPTOR.iface;
-    CutSeparationFunctor *functor = &thread_local_data->gsec_functor;
+    bool success = true;
 
-    functor->ctx = iface->activate(instance, solver);
-    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-    functor->instance = instance;
-    functor->solver = solver;
+    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
+        const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
+        CutSeparationFunctor *functor = &thread_local_data->functors[i];
 
-    bool success = functor->ctx && thread_local_data->vstar &&
+        functor->ctx = iface->activate(instance, solver);
+        functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+        functor->instance = instance;
+        functor->solver = solver;
+
+        success &= functor->ctx && thread_local_data->vstar &&
                    thread_local_data->network.flow &&
                    thread_local_data->network.cap &&
                    tour_is_valid(&thread_local_data->tour);
+    }
+
     return success;
 }
 
 static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
-    if (thread_local_data->gsec_functor.ctx) {
-        CUT_GSEC_IFACE.deactivate(thread_local_data->gsec_functor.ctx);
-        memset(&thread_local_data->gsec_functor, 0,
-               sizeof(thread_local_data->gsec_functor));
+
+    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
+        if (thread_local_data->functors[i].ctx) {
+            CUT_GSEC_IFACE.deactivate(thread_local_data->functors[i].ctx);
+            memset(&thread_local_data->functors[i], 0,
+                   sizeof(thread_local_data->functors[i]));
+        }
     }
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
@@ -472,7 +486,8 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         }
     }
 
-    CutSeparationFunctor *functor = &tld->gsec_functor;
+    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
+        CutSeparationFunctor *functor = &tld->functors[i];
 #if 0
         printf("  threadid = %d, cplex_cb_ctx = %p\n", threadid, cplex_cb_ctx);
         printf("  threadid = %d, tld = %p\n", threadid, tld);
@@ -484,21 +499,22 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         printf("\n");
 #endif
 
-    const CutSeparationIface *iface = &CUT_GSEC_IFACE;
-    if (iface->fractional_sep) {
-        const int64_t begin_time = os_get_usecs();
-        // NOTE: We need to reset the cplex_cb_ctx since it might change during
-        // the execution. The same threadid id, is not guaranteed to have the
-        // same cplex_cb_ctx for the entire duration of the thread
-        functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-        bool separation_success =
-            iface->fractional_sep(functor, obj_p, vstar, net);
-        functor->internal.fractional_stats.accum_usecs +=
-            os_get_usecs() - begin_time;
+        const CutSeparationIface *iface = &CUT_GSEC_IFACE;
+        if (iface->fractional_sep) {
+            const int64_t begin_time = os_get_usecs();
+            // NOTE: We need to reset the cplex_cb_ctx since it might change
+            // during the execution. The same threadid id, is not guaranteed to
+            // have the same cplex_cb_ctx for the entire duration of the thread
+            functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+            bool separation_success =
+                iface->fractional_sep(functor, obj_p, vstar, net);
+            functor->internal.fractional_stats.accum_usecs +=
+                os_get_usecs() - begin_time;
 
-        if (!separation_success) {
-            log_fatal("Separation of integral `%s` cuts failed", "GSEC");
-            goto terminate;
+            if (!separation_success) {
+                log_fatal("Separation of integral `%s` cuts failed", "GSEC");
+                goto terminate;
+            }
         }
     }
 
@@ -547,23 +563,27 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                   "candidate point...",
                   __func__, tour->num_comps);
 
-        CutSeparationFunctor *functor = &tld->gsec_functor;
+        for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
+            CutSeparationFunctor *functor = &tld->functors[i];
 
-        const CutSeparationIface *iface = &CUT_GSEC_IFACE;
-        if (iface->fractional_sep) {
-            const int64_t begin_time = os_get_usecs();
-            // NOTE: We need to reset the cplex_cb_ctx since it might change
-            // during the execution. The same threadid id, is not guaranteed to
-            // have the same cplex_cb_ctx for the entire duration of the thread
-            functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-            bool separation_success =
-                iface->integral_sep(functor, obj_p, vstar, tour);
-            functor->internal.integral_stats.accum_usecs +=
-                os_get_usecs() - begin_time;
+            const CutSeparationIface *iface = &CUT_GSEC_IFACE;
+            if (iface->fractional_sep) {
+                const int64_t begin_time = os_get_usecs();
+                // NOTE: We need to reset the cplex_cb_ctx since it might change
+                // during the execution. The same threadid id, is not guaranteed
+                // to have the same cplex_cb_ctx for the entire duration of the
+                // thread
+                functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+                bool separation_success =
+                    iface->integral_sep(functor, obj_p, vstar, tour);
+                functor->internal.integral_stats.accum_usecs +=
+                    os_get_usecs() - begin_time;
 
-            if (!separation_success) {
-                log_trace("Separation of integral `%s` cuts failed", "GSEC");
-                goto terminate;
+                if (!separation_success) {
+                    log_trace("Separation of integral `%s` cuts failed",
+                              "GSEC");
+                    goto terminate;
+                }
             }
         }
 
