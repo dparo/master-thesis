@@ -36,10 +36,12 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    return 1 + (n * n) / 4;
+    int32_t set_s_max_size = (1 + n) / 2;
+    return set_s_max_size * (n - set_s_max_size) + set_s_max_size;
 }
 
 static inline bool is_violated_cut(double flow, double y_i) {
+    assert(!"TODO");
     return flt(flow, 2.0 * y_i, EPS);
 }
 
