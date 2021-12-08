@@ -36,13 +36,7 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    int32_t set_s_max_size = (1 + n) / 2;
-    return set_s_max_size * (n - set_s_max_size) + set_s_max_size;
-}
-
-static inline bool is_violated_cut(double flow, double y_i) {
-    assert(!"TODO");
-    return flt(flow, 2.0 * y_i, EPS);
+    return 4 * n * n * n / 27;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
@@ -78,14 +72,82 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, FlowNetwork *network) {}
+                           const double *vstar, FlowNetwork *network) {
+    assert(!"TODO");
+    return false;
+}
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
-                         const double *vstar, Tour *tour) {}
+                         const double *vstar, Tour *tour) {
+    if (tour->num_comps == 1) {
+        return true;
+    }
+
+    CutSeparationPrivCtx *ctx = self->ctx;
+    const Instance *instance = self->instance;
+    const int32_t n = instance->num_customers + 1;
+
+    const double Q = instance->vehicle_cap;
+    const double rhs = 0.0;
+    const char sense = 'G';
+
+    int32_t added_cuts = 0;
+
+    // NOTE:
+    // Start from c = 1. GLM cuts that include the depot node are NOT valid.
+    for (int32_t c = 1; c < tour->num_comps; c++) {
+        CPXNNZ pos = 0;
+        for (int32_t i = 0; i < n; i++) {
+            if (tour->comp[i] == c)
+                continue;
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j)
+                    continue;
+                if (tour->comp[j] != c)
+                    continue;
+
+                if (i == 0)
+                    assert(demand(instance, i) == 0.0);
+
+                assert(tour->comp[i] != c && tour->comp[j] == c);
+
+                double d = demand(instance, i);
+                ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
+                ctx->value[pos] = 1 - 2.0 / Q * d;
+                ++pos;
+            }
+        }
+
+        for (int32_t j = 0; j < n; j++) {
+            if (tour->comp[j] != c)
+                continue;
+            double d = demand(instance, j);
+            ctx->index[pos] = get_y_mip_var_idx(instance, j);
+            ctx->value[pos] = -2.0 / Q * d;
+            ++pos;
+        }
+
+        CPXNNZ nnz = pos;
+        log_trace("%s :: Adding GLM constraint", __func__);
+
+        if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
+                                  ctx->value)) {
+            log_fatal("%s :: Failed cut of integral solution", __func__);
+            goto failure;
+        }
+        added_cuts += 1;
+    }
+
+    log_info("%s :: Created %d GLM cuts", __func__, added_cuts);
+
+    return true;
+failure:
+    return false;
+}
 
 const CutSeparationIface CUT_GLM_IFACE = {
     .activate = activate,
     .deactivate = deactivate,
-    .fractional_sep = fractional_sep,
+    .fractional_sep = NULL,
     .integral_sep = integral_sep,
 };
