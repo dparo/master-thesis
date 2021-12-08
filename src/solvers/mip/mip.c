@@ -123,7 +123,8 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
 
     for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
         if (thread_local_data->functors[i].ctx) {
-            CUT_GSEC_IFACE.deactivate(thread_local_data->functors[i].ctx);
+            const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
+            iface->deactivate(thread_local_data->functors[i].ctx);
             memset(&thread_local_data->functors[i], 0,
                    sizeof(thread_local_data->functors[i]));
         }
@@ -474,7 +475,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         for (int32_t j = 0; j < n; j++) {
             double cap =
                 i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
-            assert(fgte(cap, 0.0, 1e-8));
+            assert(fgte(cap, 0.0, 1e-5));
             // NOTE: Fix floating point rounding errors. In fact cap may be
             // slightly negative...
             cap = MAX(0.0, cap);
@@ -499,7 +500,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         printf("\n");
 #endif
 
-        const CutSeparationIface *iface = &CUT_GSEC_IFACE;
+        const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
         if (iface->fractional_sep) {
             const int64_t begin_time = os_get_usecs();
             // NOTE: We need to reset the cplex_cb_ctx since it might change
@@ -565,9 +566,8 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
 
         for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
             CutSeparationFunctor *functor = &tld->functors[i];
-
-            const CutSeparationIface *iface = &CUT_GSEC_IFACE;
-            if (iface->fractional_sep) {
+            const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
+            if (iface->integral_sep) {
                 const int64_t begin_time = os_get_usecs();
                 // NOTE: We need to reset the cplex_cb_ctx since it might change
                 // during the execution. The same threadid id, is not guaranteed
@@ -580,7 +580,7 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                     os_get_usecs() - begin_time;
 
                 if (!separation_success) {
-                    log_trace("Separation of integral `%s` cuts failed",
+                    log_fatal("Separation of integral `%s` cuts failed",
                               "GSEC");
                     goto terminate;
                 }
@@ -631,10 +631,10 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
         incumbent = INFINITY;
     }
 
-    log_info("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
-             "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f\n",
-             __func__, num_processed_nodes, simplex_iterations, lower_bound,
-             incumbent, upper_bound);
+    log_trace("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
+              "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f\n",
+              __func__, num_processed_nodes, simplex_iterations, lower_bound,
+              incumbent, upper_bound);
     return 0;
 }
 

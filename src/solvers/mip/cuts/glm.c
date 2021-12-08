@@ -36,7 +36,7 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    return 1 + (n * n) / 4;
+    return 4 * n * n * n / 27;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
@@ -91,12 +91,12 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     const double rhs = 0.0;
     const char sense = 'G';
 
-    CPXNNZ pos = 0;
     int32_t added_cuts = 0;
 
     // NOTE:
     // Start from c = 1. GLM cuts that include the depot node are NOT valid.
     for (int32_t c = 1; c < tour->num_comps; c++) {
+        CPXNNZ pos = 0;
         for (int32_t i = 0; i < n; i++) {
             if (tour->comp[i] == c)
                 continue;
@@ -137,6 +137,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         }
         added_cuts += 1;
     }
+
+    log_info("%s :: Created %d GLM cuts", __func__, added_cuts);
 
     return true;
 failure:

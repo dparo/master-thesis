@@ -23,7 +23,7 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-static const double EPS = 1e-6;
+static const double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
@@ -151,7 +151,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                 }
             }
 
-            assert(feq(flow, max_flow, 1e-6));
+            assert(feq(flow, max_flow, EPS));
             validate_index_array(ctx, nnz - 1);
 
             int32_t added_cuts = 0;
@@ -233,6 +233,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     assert(*comp(tour, 0) == 0);
 
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
+    int32_t total_num_added_cuts = 0;
 
     // NOTE:
     // Start from c = 1. GSECS that include the depot node are NOT valid.
@@ -300,7 +301,10 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
         }
         assert(added_cuts == ctx->cnnodes[c]);
+        total_num_added_cuts += added_cuts;
     }
+
+    log_info("%s :: Created %d GSEC cuts", __func__, total_num_added_cuts);
 
     return true;
 
