@@ -155,6 +155,12 @@ static inline bool is_valid_instance(Instance *instance) {
     return !invalid;
 }
 
+static inline bool is_solve_status_aborted(SolveStatus status) {
+    return status == SOLVE_STATUS_ABORTED_FEASIBLE ||
+           status == SOLVE_STATUS_ABORTED_INVALID ||
+           status == SOLVE_STATUS_ABORTED_ERR;
+}
+
 static inline bool is_valid_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
