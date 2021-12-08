@@ -563,6 +563,7 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     args[argidx++] = killafter;
     args[argidx++] = timelimit_extended;
     args[argidx++] = CPTP_EXE;
+    args[argidx++] = "--treat-abort-as-failure";
     args[argidx++] = "-t";
     args[argidx++] = timelimit;
     args[argidx++] = "--seed";
