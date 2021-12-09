@@ -75,6 +75,7 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
 }
 
 typedef struct {
+    bool treat_abort_as_failure;
     const char *instance_filepath;
     const char *solver;
     double timelimit;
@@ -225,7 +226,7 @@ static int main2(AppCtx *ctx) {
             make_solver_params_from_cmdline(ctx->defines, ctx->num_defines);
         Solution solution = solution_create(&instance);
 
-        bool success = false;
+        bool success = true;
 
         // Solve, timing and printing of final solution
         {
@@ -240,14 +241,22 @@ static int main2(AppCtx *ctx) {
             timing.ended = time(NULL);
             timing.took_usecs = os_get_usecs() - begin_solve_time;
 
-            success = is_valid_solve_status(status);
+            if (is_solve_status_aborted(status) &&
+                ctx->treat_abort_as_failure) {
+                success = false;
+            }
+
+            success &= is_valid_solve_status(status);
 
             printf("\n\n###\n###\n###\n\n");
             writeout_results(stdout, ctx, &instance, &solution, status, timing);
-            writeout_json_report(ctx, &instance, &solution, status, timing);
+            printf("SUCCESS: %s\n", success ? "TRUE" : "FALSE");
+            if (success) {
+                writeout_json_report(ctx, &instance, &solution, status, timing);
 
-            if (ctx->vis_path) {
-                tour_plot(ctx->vis_path, &instance, &solution.tour, NULL);
+                if (ctx->vis_path) {
+                    tour_plot(ctx->vis_path, &instance, &solution.tour, NULL);
+                }
             }
         }
 
@@ -284,14 +293,22 @@ int main(int argc, char **argv) {
         arg_int0("s", "seed", NULL,
                  "define the random seed to use (default is 0, eg compute it "
                  "from the current time)");
+    struct arg_lit *treat_abort_as_failure =
+        arg_lit0("a", "treat-abort-as-failure",
+                 "treat abortion, eg a SIGTERM (CTRL-C), as failure and exit "
+                 "with non zero exit status. The JSON report output file will "
+                 "not be generated");
     struct arg_str *defines =
         arg_strn("D", "define", "KEY=VALUE", 0, argc + 2, "define parameters");
     struct arg_str *solver =
         arg_str0("S", "solver", "SOLVER", "solver to use (default \"mip\")");
-    struct arg_lit *verbose = arg_lit0("v", "verbose", "verbose messages");
+    struct arg_int *loglvl =
+        arg_int0(NULL, "loglvl", NULL,
+                 "control the log level (0: fatal&warning logs, 1: info logs, "
+                 "2: trace logs, 3: debug logs (only in debug builds)");
     struct arg_file *logfile =
         arg_file0("l", "log", NULL,
-                  "specify an additional file where log informations would be "
+                  "specify an additional file where logs would be "
                   "stored (default none)");
     struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
     struct arg_lit *version =
@@ -306,9 +323,19 @@ int main(int argc, char **argv) {
 
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help,      version,          verbose, logfile,
-                        timelimit, randomseed,       defines, instance,
-                        vis_path,  json_report_path, solver,  end};
+    void *argtable[] = {help,
+                        version,
+                        loglvl,
+                        logfile,
+                        treat_abort_as_failure,
+                        timelimit,
+                        randomseed,
+                        defines,
+                        instance,
+                        vis_path,
+                        json_report_path,
+                        solver,
+                        end};
 
     int nerrors;
     int exitcode = 0;
@@ -332,6 +359,8 @@ int main(int argc, char **argv) {
     vis_path->filename[0] = NULL;
     // No JSON report output file by default
     json_report_path->filename[0] = NULL;
+    // Contain only fatal&warning log messages by default
+    loglvl->ival[0] = 0;
 
     nerrors = arg_parse(argc, argv, argtable);
 
@@ -361,10 +390,14 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    if (verbose->count > 0) {
-        log_set_level(LOG_INFO);
-    } else {
+    if (loglvl->ival[0] <= 0) {
         log_set_level(LOG_WARN);
+    } else if (loglvl->ival[0] == 1) {
+        log_set_level(LOG_INFO);
+    } else if (loglvl->ival[0] == 2) {
+        log_set_level(LOG_TRACE);
+    } else {
+        log_set_level(LOG_DEBUG);
     }
 
     if (logfile->count > 0) {
@@ -378,6 +411,7 @@ int main(int argc, char **argv) {
     }
 
     AppCtx ctx = {.instance_filepath = instance->filename[0],
+                  .treat_abort_as_failure = treat_abort_as_failure->count > 0,
                   .solver = solver->sval[0],
                   .timelimit = timelimit->dval[0],
                   .randomseed = randomseed->ival[0],
