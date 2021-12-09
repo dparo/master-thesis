@@ -110,8 +110,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             network, source_vertex, sink_vertex, &ctx->max_flow_result,
             &ctx->push_relabel_ctx);
 
-        log_trace("%s :: max_flow = %g\n", __func__, max_flow);
-
         int32_t bp_depot = ctx->max_flow_result.bipartition.data[0];
 
         assert(1 == ctx->max_flow_result.bipartition.data[source_vertex]);

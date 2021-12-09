@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
                  "define the random seed to use (default is 0, eg compute it "
                  "from the current time)");
     struct arg_lit *treat_abort_as_failure =
-        arg_lit0(NULL, "treat-abort-as-failure",
+        arg_lit0("a", "treat-abort-as-failure",
                  "treat abortion, eg a SIGTERM (CTRL-C), as failure and exit "
                  "with non zero exit status. The JSON report output file will "
                  "not be generated");
@@ -304,10 +304,13 @@ int main(int argc, char **argv) {
         arg_strn("D", "define", "KEY=VALUE", 0, argc + 2, "define parameters");
     struct arg_str *solver =
         arg_str0("S", "solver", "SOLVER", "solver to use (default \"mip\")");
-    struct arg_lit *verbose = arg_lit0("v", "verbose", "verbose messages");
+    struct arg_int *loglvl =
+        arg_int0(NULL, "loglvl", NULL,
+                 "control the log level (0: fatal&warning logs, 1: info logs, "
+                 "2: trace logs, 3: debug logs (only in debug builds)");
     struct arg_file *logfile =
         arg_file0("l", "log", NULL,
-                  "specify an additional file where log informations would be "
+                  "specify an additional file where logs would be "
                   "stored (default none)");
     struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
     struct arg_lit *version =
@@ -324,7 +327,7 @@ int main(int argc, char **argv) {
 
     void *argtable[] = {help,
                         version,
-                        verbose,
+                        loglvl,
                         logfile,
                         treat_abort_as_failure,
                         timelimit,
@@ -358,6 +361,8 @@ int main(int argc, char **argv) {
     vis_path->filename[0] = NULL;
     // No JSON report output file by default
     json_report_path->filename[0] = NULL;
+    // Contain only fatal&warning log messages by default
+    loglvl->ival[0] = 0;
 
     nerrors = arg_parse(argc, argv, argtable);
 
@@ -387,10 +392,14 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    if (verbose->count > 0) {
-        log_set_level(LOG_INFO);
-    } else {
+    if (loglvl->ival[0] <= 0) {
         log_set_level(LOG_WARN);
+    } else if (loglvl->ival[0] == 1) {
+        log_set_level(LOG_INFO);
+    } else if (loglvl->ival[0] == 2) {
+        log_set_level(LOG_TRACE);
+    } else {
+        log_set_level(LOG_DEBUG);
     }
 
     if (logfile->count > 0) {
