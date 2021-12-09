@@ -29,6 +29,11 @@ extern "C" {
 #include "core.h"
 #include <math.h>
 
+bool solver_params_contains(SolverTypedParams *params, char *key);
+bool solver_params_get_bool(SolverTypedParams *params, char *key);
+int32_t solver_params_get_int32(SolverTypedParams *params, char *key);
+double solver_params_get_double(SolverTypedParams *params, char *key);
+
 static inline int64_t hm_nentries(int32_t n) { return ((n * n) - n) / 2; }
 
 // Number of entries in a full matrix of size `N x N`

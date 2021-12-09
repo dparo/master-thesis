@@ -923,7 +923,8 @@ terminate:
     return result;
 }
 
-bool cplex_setup(Solver *solver, const Instance *instance) {
+bool cplex_setup(Solver *solver, const Instance *instance,
+                 SolverTypedParams *tparams) {
     int status_p = 0;
 
     solver->data->env = CPXXopenCPLEX(&status_p);
@@ -944,10 +945,10 @@ bool cplex_setup(Solver *solver, const Instance *instance) {
         goto fail;
     }
 
-#ifndef NDEBUG
-    CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
-    CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 3);
-#endif
+    if (solver_params_get_bool(tparams, "SCRIND_ENABLED")) {
+        CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
+        CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 3);
+    }
 
     // Clamp the number of available cores to MAX_NUM_CORES
     {
@@ -1009,7 +1010,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         goto fail;
     }
 
-    if (!cplex_setup(&solver, instance)) {
+    if (!cplex_setup(&solver, instance, tparams)) {
         log_fatal("%s : Failed to initialize cplex", __func__);
         goto fail;
     }
