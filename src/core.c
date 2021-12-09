@@ -255,9 +255,30 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
                 continue;
             }
             const char *name2 = descriptor->params[j].name;
-            log_fatal("%s :: Solver desciptor lists duplicate param `%s`",
+            log_fatal("%s :: Solver descriptor lists duplicate param `%s`",
                       __func__, name1);
+            result = false;
             assert(strcmp(name1, name2) != 0);
+        }
+    }
+
+    // Validate that the solver descriptor lists param default values (if any)
+    // which
+    //   their string representation can be correctly parsed
+    for (int32_t i = 0; descriptor->params[i].name != NULL; i++) {
+        const char *def = descriptor->params[i].default_value;
+        TypedParam t = {0};
+        t.type = descriptor->params[i].type;
+        if (def && def[0] != 0) {
+            bool parse_success =
+                parse_solver_param_val(&t, def, descriptor->params[i].type);
+            if (!parse_success) {
+                log_fatal("%s :: Solver descriptor specifies an invalid "
+                          "default value `%s` for parameter `%s`",
+                          __func__, def, descriptor->params[i].name);
+                result = false;
+            }
+            assert(parse_success);
         }
     }
 #endif
@@ -281,23 +302,12 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
         }
     }
 
-    // FIXME:
-    // Should we bother about this? Or is it overengineering/complication for
-    // little value?
-    //   - Check that the descriptor default value (if any) can be parsed.
-    // Note that the default value is constantly and statically known and
-    // determined, and cannot change... So shall we bother...? This would allows
-    // to achieve: mistakes are catched earliar in one centrailzed place and
-    // across all params, a wrong default value is catched here, even if is
-    // unused. Otherwise we would catch the error later, and only if we try to
-    // unpack the default value (lazy evaluation)
-
     return result;
 }
 
 void solver_typed_params_destroy(SolverTypedParams *params) {
-    if (params->__sm) {
-        shfree(params->__sm);
+    if (params->entries) {
+        shfree(params->entries);
     }
     memset(params, 0, sizeof(*params));
 }
@@ -355,7 +365,7 @@ bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
             }
         }
 
-        shput(out->__sm, desc->params[di].name, t);
+        shput(out->entries, desc->params[di].name, t);
     }
 
 terminate:
@@ -463,7 +473,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     }
 
     if (!verify_solver_params(lookup->descriptor, params)) {
-        fprintf(stderr, "ERROR: %s :: Failed to verify params", __func__);
+        fprintf(stderr, "ERROR: %s :: Failed to verify params\n", __func__);
         goto fail;
     }
 
@@ -517,4 +527,34 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 fail:
     solution_invalidate(solution);
     return status;
+}
+
+bool solver_params_contains(SolverTypedParams *params, char *key) {
+    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
+    assert(entry);
+    return entry->value.count > 0;
+}
+
+bool solver_params_get_bool(SolverTypedParams *params, char *key) {
+    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
+    assert(entry);
+    assert(entry->value.count == 1);
+    assert(entry->value.type == TYPED_PARAM_BOOL);
+    return entry->value.bval;
+}
+
+int32_t solver_params_get_int32(SolverTypedParams *params, char *key) {
+    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
+    assert(entry);
+    assert(entry->value.count == 1);
+    assert(entry->value.type == TYPED_PARAM_INT32);
+    return entry->value.ival;
+}
+
+double solver_params_get_double(SolverTypedParams *params, char *key) {
+    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
+    assert(entry);
+    assert(entry->value.count == 1);
+    assert(entry->value.type == TYPED_PARAM_DOUBLE);
+    return entry->value.dval;
 }

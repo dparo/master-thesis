@@ -83,12 +83,14 @@ typedef struct {
     } params[MAX_NUM_SOLVER_PARAMS];
 } SolverParams;
 
+typedef struct {
+    char *key;
+    TypedParam value;
+} SolverTypedParamsEntry;
+
 typedef struct SolverTypedParams {
     // NOTE: Hashtable use <stb_ds.h> : shput(), shget() and alike
-    struct {
-        char *key;
-        TypedParam value;
-    } * __sm;
+    SolverTypedParamsEntry *entries;
 } SolverTypedParams;
 
 typedef struct SolverDescriptor {
@@ -155,7 +157,7 @@ static inline bool is_valid_instance(Instance *instance) {
     return !invalid;
 }
 
-static inline bool is_solve_status_aborted(SolveStatus status) {
+static inline bool is_aborted_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_INVALID ||
            status == SOLVE_STATUS_ABORTED_ERR;

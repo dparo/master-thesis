@@ -93,17 +93,17 @@ typedef struct {
     int64_t took_usecs;
 } Timing;
 
-static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
-                             Solution *solution, SolveStatus status,
-                             Timing timing) {
-    bool success = is_valid_solve_status(status);
+static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
+                             Instance *instance, Solution *solution,
+                             SolveStatus status, Timing timing) {
+    bool valid = is_valid_solve_status(status);
 
     fprintf(fh, "%-16s %s\n", "SOLVER:", ctx->solver);
     fprintf(fh, "%-16s %f\n", "TIMELIM:", ctx->timelimit);
     fprintf(fh, "%-16s %d\n", "SEED:", ctx->randomseed);
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
 
-    if (success) {
+    if (valid) {
         printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
                solution->upper_bound);
         print_tour(&solution->tour);
@@ -127,6 +127,8 @@ static void writeout_results(FILE *fh, AppCtx *ctx, Instance *instance,
     TimeRepr solve_time_repr = timerepr_from_usecs(timing.took_usecs);
     print_timerepr(stdout, &solve_time_repr);
     printf("\n");
+
+    printf("%-16s %s\n", "SUCCESS", success ? "TRUE" : "FALSE");
 }
 
 static void writeout_json_report(AppCtx *ctx, Instance *instance,
@@ -242,16 +244,16 @@ static int main2(AppCtx *ctx) {
             timing.ended = time(NULL);
             timing.took_usecs = os_get_usecs() - begin_solve_time;
 
-            if (is_solve_status_aborted(status) &&
-                ctx->treat_abort_as_failure) {
-                success = false;
+            const bool valid = is_valid_solve_status(status);
+            const bool aborted = is_aborted_solve_status(status);
+            success = ctx->treat_abort_as_failure ? valid && !aborted : valid;
+
+            if (valid) {
+                printf("\n\n###\n###\n###\n\n");
+                writeout_results(stdout, ctx, success, &instance, &solution,
+                                 status, timing);
             }
 
-            success &= is_valid_solve_status(status);
-
-            printf("\n\n###\n###\n###\n\n");
-            writeout_results(stdout, ctx, &instance, &solution, status, timing);
-            printf("SUCCESS: %s\n", success ? "TRUE" : "FALSE");
             if (success) {
                 writeout_json_report(ctx, &instance, &solution, status, timing);
 
