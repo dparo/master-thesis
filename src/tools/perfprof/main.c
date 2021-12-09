@@ -768,37 +768,21 @@ static void init(void) {
 static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
-    PerfProfBatch batches[] = {
-        {1,
-         "F-n45-k4-last-10",
-         120.0,
-         1,
-         // "./data/ESPPRC - Test Instances/vrps",
-         "data/BaPCod generated - Test instances/F-n45-k4-last-10",
-         (Filter){NULL, {0, 72}, {0, 0}},
-         {
-             {"My CPTP MIP solver",
-              {
-                  "--solver",
-                  "mip",
-              }},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "F-n45-k4-first-10",
-         120.0,
-         1,
-         // "./data/ESPPRC - Test Instances/vrps",
-         "data/BaPCod generated - Test instances/F-n45-k4-first-10",
-         (Filter){NULL, {0, 72}, {0, 0}},
-         {
-             {"My CPTP MIP solver",
-              {
-                  "--solver",
-                  "mip",
-              }},
-             BAPCOD_SOLVER,
-         }}};
+    PerfProfBatch batches[] = {{1,
+                                "A-family-last-10",
+                                120.0,
+                                1,
+                                // "./data/ESPPRC - Test Instances/vrps",
+                                "data/BAP_Instances/A-last-10",
+                                DEFAULT_FILTER,
+                                {
+                                    {"My CPTP MIP solver",
+                                     {
+                                         "--solver",
+                                         "mip",
+                                     }},
+                                    BAPCOD_SOLVER,
+                                }}};
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {

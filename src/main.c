@@ -179,14 +179,12 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     double cost = tour_eval(instance, &solution->tour);
     s &= cJSON_AddItemToObject(root, "cost", cJSON_CreateNumber(cost));
 
-    if (instance->zero_reduced_cost_threshold != 0) {
-        s &= cJSON_AddItemToObject(
-            root, "zeroReducedCostThreshold",
-            cJSON_CreateNumber(instance->zero_reduced_cost_threshold));
-        s &= cJSON_AddItemToObject(
-            root, "relativeCost",
-            cJSON_CreateNumber(cost - instance->zero_reduced_cost_threshold));
-    }
+    s &= cJSON_AddItemToObject(
+        root, "zeroReducedCostThreshold",
+        cJSON_CreateNumber(instance->zero_reduced_cost_threshold));
+    s &= cJSON_AddItemToObject(
+        root, "relativeCost",
+        cJSON_CreateNumber(cost - instance->zero_reduced_cost_threshold));
 
     char *time = ctime(&timing.started);
     // Remove newline introduced from ctime
