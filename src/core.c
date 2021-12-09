@@ -529,32 +529,57 @@ fail:
     return status;
 }
 
-bool solver_params_contains(SolverTypedParams *params, char *key) {
+static inline TypedParam *solver_params_get_key(SolverTypedParams *params,
+                                                char *key) {
     SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
-    assert(entry);
-    return entry->value.count > 0;
+    if (!entry) {
+        log_fatal("%s :: Internal error. Key `%s` is invalid. Make sure that "
+                  "the SolverDescriptor listed parameters match with the key "
+                  "you are trying to unpack.",
+                  __func__, key);
+        abort();
+    }
+    return &entry->value;
+}
+
+static inline TypedParam *solver_params_get_val(SolverTypedParams *params,
+                                                char *key, ParamType type) {
+    TypedParam *p = solver_params_get_key(params, key);
+    if (p) {
+        if (p->count <= 0) {
+            log_fatal(
+                "Internal error. Tryed to unpack key `%s`, but its count is <= "
+                "0     (%d).",
+                key, p->count);
+
+            abort();
+        } else if (p->type != type) {
+            log_fatal("Internal error. Tryed to unpack key `%s` as type `%s`, "
+                      "but the actual type is `%s`.",
+                      key, param_type_as_str(type), param_type_as_str(p->type));
+
+            abort();
+        }
+    }
+    return p;
+}
+
+bool solver_params_contains(SolverTypedParams *params, char *key) {
+    TypedParam *p = solver_params_get_key(params, key);
+    return p->count > 0;
 }
 
 bool solver_params_get_bool(SolverTypedParams *params, char *key) {
-    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
-    assert(entry);
-    assert(entry->value.count == 1);
-    assert(entry->value.type == TYPED_PARAM_BOOL);
-    return entry->value.bval;
+    TypedParam *p = solver_params_get_val(params, key, TYPED_PARAM_BOOL);
+    return p->bval;
 }
 
 int32_t solver_params_get_int32(SolverTypedParams *params, char *key) {
-    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
-    assert(entry);
-    assert(entry->value.count == 1);
-    assert(entry->value.type == TYPED_PARAM_INT32);
-    return entry->value.ival;
+    TypedParam *p = solver_params_get_val(params, key, TYPED_PARAM_INT32);
+    return p->ival;
 }
 
 double solver_params_get_double(SolverTypedParams *params, char *key) {
-    SolverTypedParamsEntry *entry = shgetp_null(params->entries, key);
-    assert(entry);
-    assert(entry->value.count == 1);
-    assert(entry->value.type == TYPED_PARAM_DOUBLE);
-    return entry->value.dval;
+    TypedParam *p = solver_params_get_val(params, key, TYPED_PARAM_DOUBLE);
+    return p->dval;
 }

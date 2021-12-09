@@ -31,8 +31,8 @@ extern "C" {
 static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
     "mip",
     {
-        {"SCRIND_ENABLED", TYPED_PARAM_BOOL, "false",
-         "Enable/Disable CPLEX SCRIND and MIPDISPLAY parameters"},
+        {"SCRIND", TYPED_PARAM_BOOL, "false",
+         "Enable or disable (default) CPLEX SCRIND and MIPDISPLAY parameters"},
         {0},
     }};
 
