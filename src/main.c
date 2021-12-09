@@ -75,6 +75,7 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
 }
 
 typedef struct {
+    int32_t loglvl;
     bool treat_abort_as_failure;
     const char *instance_filepath;
     const char *solver;
@@ -392,16 +393,6 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    if (loglvl->ival[0] <= 0) {
-        log_set_level(LOG_WARN);
-    } else if (loglvl->ival[0] == 1) {
-        log_set_level(LOG_INFO);
-    } else if (loglvl->ival[0] == 2) {
-        log_set_level(LOG_TRACE);
-    } else {
-        log_set_level(LOG_DEBUG);
-    }
-
     if (logfile->count > 0) {
         log_file_handle = fopen(logfile->filename[0], "w");
         if (log_file_handle) {
@@ -412,7 +403,21 @@ int main(int argc, char **argv) {
         }
     }
 
-    AppCtx ctx = {.instance_filepath = instance->filename[0],
+    int32_t iloglvl = LOG_WARN;
+    if (loglvl->ival[0] <= 0) {
+        iloglvl = LOG_WARN;
+    } else if (loglvl->ival[0] == 1) {
+        iloglvl = LOG_INFO;
+    } else if (loglvl->ival[0] == 2) {
+        iloglvl = LOG_TRACE;
+    } else {
+        iloglvl = LOG_DEBUG;
+    }
+
+    log_set_level(iloglvl);
+
+    AppCtx ctx = {.loglvl = iloglvl,
+                  .instance_filepath = instance->filename[0],
                   .treat_abort_as_failure = treat_abort_as_failure->count > 0,
                   .solver = solver->sval[0],
                   .timelimit = timelimit->dval[0],

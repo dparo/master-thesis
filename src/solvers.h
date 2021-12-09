@@ -28,10 +28,13 @@ extern "C" {
 
 #include "core.h"
 
-static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {"mip",
-                                                       {
-                                                           {0},
-                                                       }};
+static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
+    "mip",
+    {
+        {"SCRIND_ENABLED", TYPED_PARAM_BOOL, "false",
+         "Enable/Disable CPLEX SCRIND and MIPDISPLAY parameters"},
+        {0},
+    }};
 
 static const SolverDescriptor STUB_SOLVER_DESCRIPTOR = {"stub",
                                                         {
