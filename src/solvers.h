@@ -33,6 +33,8 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
     {
         {"SCRIND", TYPED_PARAM_BOOL, "false",
          "Enable or disable (default) CPLEX SCRIND and MIPDISPLAY parameters"},
+        {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut generation"},
+        {"GLM_CUTS", TYPED_PARAM_BOOL, "false", "Enable GLM cuts generation"},
         {0},
     }};
 

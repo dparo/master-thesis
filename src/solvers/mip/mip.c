@@ -64,10 +64,18 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 
 #define MAX_NUM_CORES 256
 
-#define NUM_CUTS (ARRAY_LEN(CUT_DESCRS))
-static const CutDescriptor *CUT_DESCRS[] = {
-    &CUT_GSEC_DESCRIPTOR,
-    // &CUT_GLM_DESCRIPTOR,
+typedef enum {
+    GSEC_CUT_ID,
+    GLM_CUT_ID,
+    NUM_CUTS,
+} CutId;
+
+struct {
+    const CutDescriptor *descr;
+    bool enabled;
+} static G_cuts[] = {
+    [GSEC_CUT_ID] = {&CUT_GSEC_DESCRIPTOR, true},
+    [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false},
 };
 
 typedef struct {
@@ -101,18 +109,21 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     bool success = true;
 
     for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-        const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
-        CutSeparationFunctor *functor = &thread_local_data->functors[i];
+        bool enabled = G_cuts[i].enabled;
+        if (enabled) {
+            const CutSeparationIface *iface = G_cuts[i].descr->iface;
+            CutSeparationFunctor *functor = &thread_local_data->functors[i];
 
-        functor->ctx = iface->activate(instance, solver);
-        functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-        functor->instance = instance;
-        functor->solver = solver;
+            functor->ctx = iface->activate(instance, solver);
+            functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+            functor->instance = instance;
+            functor->solver = solver;
 
-        success &= functor->ctx && thread_local_data->vstar &&
-                   thread_local_data->network.flow &&
-                   thread_local_data->network.cap &&
-                   tour_is_valid(&thread_local_data->tour);
+            success &= functor->ctx && thread_local_data->vstar &&
+                       thread_local_data->network.flow &&
+                       thread_local_data->network.cap &&
+                       tour_is_valid(&thread_local_data->tour);
+        }
     }
 
     return success;
@@ -122,11 +133,14 @@ static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
 
     for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-        if (thread_local_data->functors[i].ctx) {
-            const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
-            iface->deactivate(thread_local_data->functors[i].ctx);
-            memset(&thread_local_data->functors[i], 0,
-                   sizeof(thread_local_data->functors[i]));
+        bool enabled = G_cuts[i].enabled;
+        if (enabled) {
+            if (thread_local_data->functors[i].ctx) {
+                const CutSeparationIface *iface = G_cuts[i].descr->iface;
+                iface->deactivate(thread_local_data->functors[i].ctx);
+                memset(&thread_local_data->functors[i], 0,
+                       sizeof(thread_local_data->functors[i]));
+            }
         }
     }
     free(thread_local_data->vstar);
@@ -499,22 +513,27 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                threadid, functor->internal.cplex_cb_ctx);
         printf("\n");
 #endif
+        bool enabled = G_cuts[i].enabled;
 
-        const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
-        if (iface->fractional_sep) {
-            const int64_t begin_time = os_get_usecs();
-            // NOTE: We need to reset the cplex_cb_ctx since it might change
-            // during the execution. The same threadid id, is not guaranteed to
-            // have the same cplex_cb_ctx for the entire duration of the thread
-            functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-            bool separation_success =
-                iface->fractional_sep(functor, obj_p, vstar, net);
-            functor->internal.fractional_stats.accum_usecs +=
-                os_get_usecs() - begin_time;
+        if (enabled) {
+            const CutSeparationIface *iface = G_cuts[i].descr->iface;
+            if (iface->fractional_sep) {
+                const int64_t begin_time = os_get_usecs();
+                // NOTE: We need to reset the cplex_cb_ctx since it might change
+                // during the execution. The same threadid id, is not guaranteed
+                // to have the same cplex_cb_ctx for the entire duration of the
+                // thread
+                functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+                bool separation_success =
+                    iface->fractional_sep(functor, obj_p, vstar, net);
+                functor->internal.fractional_stats.accum_usecs +=
+                    os_get_usecs() - begin_time;
 
-            if (!separation_success) {
-                log_fatal("Separation of integral `%s` cuts failed", "GSEC");
-                goto terminate;
+                if (!separation_success) {
+                    log_fatal("Separation of integral `%s` cuts failed",
+                              "GSEC");
+                    goto terminate;
+                }
             }
         }
     }
@@ -565,24 +584,27 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                   __func__, tour->num_comps);
 
         for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-            CutSeparationFunctor *functor = &tld->functors[i];
-            const CutSeparationIface *iface = CUT_DESCRS[i]->iface;
-            if (iface->integral_sep) {
-                const int64_t begin_time = os_get_usecs();
-                // NOTE: We need to reset the cplex_cb_ctx since it might change
-                // during the execution. The same threadid id, is not guaranteed
-                // to have the same cplex_cb_ctx for the entire duration of the
-                // thread
-                functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-                bool separation_success =
-                    iface->integral_sep(functor, obj_p, vstar, tour);
-                functor->internal.integral_stats.accum_usecs +=
-                    os_get_usecs() - begin_time;
+            bool enabled = G_cuts[i].enabled;
+            if (enabled) {
+                CutSeparationFunctor *functor = &tld->functors[i];
+                const CutSeparationIface *iface = G_cuts[i].descr->iface;
+                if (iface->integral_sep) {
+                    const int64_t begin_time = os_get_usecs();
+                    // NOTE: We need to reset the cplex_cb_ctx since it might
+                    // change during the execution. The same threadid id, is not
+                    // guaranteed to have the same cplex_cb_ctx for the entire
+                    // duration of the thread
+                    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+                    bool separation_success =
+                        iface->integral_sep(functor, obj_p, vstar, tour);
+                    functor->internal.integral_stats.accum_usecs +=
+                        os_get_usecs() - begin_time;
 
-                if (!separation_success) {
-                    log_fatal("Separation of integral `%s` cuts failed",
-                              "GSEC");
-                    goto terminate;
+                    if (!separation_success) {
+                        log_fatal("Separation of integral `%s` cuts failed",
+                                  "GSEC");
+                        goto terminate;
+                    }
                 }
             }
         }
@@ -997,6 +1019,11 @@ static void mip_solver_destroy(Solver *self) {
     self->destroy = mip_solver_destroy;
 }
 
+static void enable_cuts(SolverTypedParams *tparams) {
+    G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
+    G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
+}
+
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                          double timelimit, int32_t randomseed) {
     UNUSED_PARAM(tparams);
@@ -1042,6 +1069,8 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                   "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
                   __func__, randomseed);
     }
+
+    enable_cuts(tparams);
 
     return solver;
 fail:

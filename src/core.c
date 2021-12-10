@@ -168,22 +168,17 @@ void cptp_print_list_of_solvers_and_params(void) {
             printf("  - %s:\n", d->name);
             int32_t j;
             for (j = 0; d->params[j].name != NULL; j++) {
-                if (d->params[j].default_value != NULL &&
-                    *d->params[j].default_value != '\0') {
-                    printf("      - %-20s  (%s, default: %s)",
-                           d->params[j].name,
-                           param_type_as_str(d->params[j].type),
-                           d->params->default_value);
-                } else {
-                    printf("      - %-20s  (%s)", d->params[j].name,
-                           param_type_as_str(d->params[j].type));
-                }
+                const char *name = d->params[j].name;
+                const char *type = param_type_as_str(d->params[j].type);
+                const char *glossary =
+                    d->params[j].glossary ? d->params[j].glossary : "";
+                const char *default_val = d->params[j].default_value;
 
-                if (d->params[j].glossary != NULL &&
-                    *d->params[j].glossary != '\0') {
-                    printf("  %s\n", d->params[j].glossary);
+                if (default_val != NULL && default_val[0] != '\0') {
+                    printf("      - %-20s  (%s, default: %s) %-32s\n", name,
+                           type, default_val, glossary);
                 } else {
-                    printf("\n");
+                    printf("      - %-20s  (%s) %-64s", name, type, glossary);
                 }
             }
             if (j == 0) {
@@ -255,10 +250,14 @@ static bool verify_solver_params(const SolverDescriptor *descriptor,
                 continue;
             }
             const char *name2 = descriptor->params[j].name;
-            log_fatal("%s :: Solver descriptor lists duplicate param `%s`",
-                      __func__, name1);
-            result = false;
-            assert(strcmp(name1, name2) != 0);
+            if (0 == strcmp(name1, name2)) {
+                log_fatal(
+                    "%s :: INTERNAL ERROR! Solver descriptor lists duplicate "
+                    "param `%s` (error index i: %d, j: %d",
+                    __func__, name1, i, j);
+                result = false;
+                assert(!"Internal error");
+            }
         }
     }
 
@@ -561,6 +560,9 @@ static inline TypedParam *solver_params_get_val(SolverTypedParams *params,
             abort();
         }
     }
+
+    log_info("Getting parameter `%s` as type `%s`", key,
+             param_type_as_str(type));
     return p;
 }
 
