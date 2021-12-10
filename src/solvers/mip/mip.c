@@ -65,7 +65,11 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 #define MAX_NUM_CORES 256
 
 typedef enum {
-    GSEC_CUT_ID,
+    // NOTE:
+    //         This enum should remain packed. Enum fields should maintain a
+    //         monotonically increasing
+    //         value without any holes
+    GSEC_CUT_ID = 0,
     GLM_CUT_ID,
     NUM_CUTS,
 } CutId;
