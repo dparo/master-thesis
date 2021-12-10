@@ -74,10 +74,10 @@ typedef enum {
     NUM_CUTS,
 } CutId;
 
-struct {
+static struct {
     const CutDescriptor *descr;
     bool enabled;
-} static G_cuts[] = {
+} G_cuts[] = {
     [GSEC_CUT_ID] = {&CUT_GSEC_DESCRIPTOR, true},
     [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false},
 };
