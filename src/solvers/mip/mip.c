@@ -82,6 +82,11 @@ struct {
     [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false},
 };
 
+static inline bool is_active_cut(CutId id) {
+    return G_cuts[id].enabled && G_cuts[id].descr->name &&
+           G_cuts[id].descr->iface;
+}
+
 typedef struct {
     double *vstar;
     FlowNetwork network;
@@ -112,11 +117,11 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
 
     bool success = true;
 
-    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-        bool enabled = G_cuts[i].enabled;
-        if (enabled) {
-            const CutSeparationIface *iface = G_cuts[i].descr->iface;
-            CutSeparationFunctor *functor = &thread_local_data->functors[i];
+    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+        if (is_active_cut(cut_id)) {
+            const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
+            CutSeparationFunctor *functor =
+                &thread_local_data->functors[cut_id];
 
             functor->ctx = iface->activate(instance, solver);
             functor->internal.cplex_cb_ctx = cplex_cb_ctx;
@@ -136,14 +141,13 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
 static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
 
-    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-        bool enabled = G_cuts[i].enabled;
-        if (enabled) {
-            if (thread_local_data->functors[i].ctx) {
-                const CutSeparationIface *iface = G_cuts[i].descr->iface;
-                iface->deactivate(thread_local_data->functors[i].ctx);
-                memset(&thread_local_data->functors[i], 0,
-                       sizeof(thread_local_data->functors[i]));
+    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+        if (is_active_cut(cut_id)) {
+            if (thread_local_data->functors[cut_id].ctx) {
+                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
+                iface->deactivate(thread_local_data->functors[cut_id].ctx);
+                memset(&thread_local_data->functors[cut_id], 0,
+                       sizeof(thread_local_data->functors[cut_id]));
             }
         }
     }
@@ -505,22 +509,10 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         }
     }
 
-    for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-        CutSeparationFunctor *functor = &tld->functors[i];
-#if 0
-        printf("  threadid = %d, cplex_cb_ctx = %p\n", threadid, cplex_cb_ctx);
-        printf("  threadid = %d, tld = %p\n", threadid, tld);
-        printf("  threadid = %d, vstar = %p\n", threadid, vstar);
-        printf("  threadid = %d, tour = %p\n", threadid, tour);
-        printf("  threadid = %d, functor.ctx = %p\n", threadid, functor->ctx);
-        printf("  threadid = %d, functor.internal.cplex_cb_ctx = %p\n",
-               threadid, functor->internal.cplex_cb_ctx);
-        printf("\n");
-#endif
-        bool enabled = G_cuts[i].enabled;
-
-        if (enabled) {
-            const CutSeparationIface *iface = G_cuts[i].descr->iface;
+    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+        if (is_active_cut(cut_id)) {
+            CutSeparationFunctor *functor = &tld->functors[cut_id];
+            const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
             if (iface->fractional_sep) {
                 const int64_t begin_time = os_get_usecs();
                 // NOTE: We need to reset the cplex_cb_ctx since it might change
@@ -587,11 +579,10 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                   "candidate point...",
                   __func__, tour->num_comps);
 
-        for (int32_t i = 0; i < (int32_t)NUM_CUTS; i++) {
-            bool enabled = G_cuts[i].enabled;
-            if (enabled) {
-                CutSeparationFunctor *functor = &tld->functors[i];
-                const CutSeparationIface *iface = G_cuts[i].descr->iface;
+        for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+            if (is_active_cut(cut_id)) {
+                CutSeparationFunctor *functor = &tld->functors[cut_id];
+                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
                 if (iface->integral_sep) {
                     const int64_t begin_time = os_get_usecs();
                     // NOTE: We need to reset the cplex_cb_ctx since it might
