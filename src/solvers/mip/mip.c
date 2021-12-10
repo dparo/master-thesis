@@ -1014,6 +1014,7 @@ static void mip_solver_destroy(Solver *self) {
     self->destroy = mip_solver_destroy;
 }
 
+// NOTE: Not thread safe
 static void enable_cuts(SolverTypedParams *tparams) {
     G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
     G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");

@@ -36,7 +36,7 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    return 4 * n * n * n / 27;
+    return 4 * (n * n * n) / 27;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
@@ -113,7 +113,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
                 double d = demand(instance, i);
                 ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
-                ctx->value[pos] = 1 - 2.0 / Q * d;
+                ctx->value[pos] = 1.0 - 2.0 / Q * d;
                 ++pos;
             }
         }
