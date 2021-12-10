@@ -770,11 +770,41 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
     PerfProfBatch batches[] = {{1,
-                                "A-family-last-10",
+                                "E-family-last-10",
                                 120.0,
                                 1,
                                 // "./data/ESPPRC - Test Instances/vrps",
-                                "data/BAP_Instances/A-last-10",
+                                "data/BAP_Instances/E-last-10",
+                                DEFAULT_FILTER,
+                                {
+                                    {"My CPTP MIP solver",
+                                     {
+                                         "--solver",
+                                         "mip",
+                                     }},
+                                    BAPCOD_SOLVER,
+                                }},
+                               {1,
+                                "F-family-last-10",
+                                120.0,
+                                1,
+                                // "./data/ESPPRC - Test Instances/vrps",
+                                "data/BAP_Instances/F-last-10",
+                                DEFAULT_FILTER,
+                                {
+                                    {"My CPTP MIP solver",
+                                     {
+                                         "--solver",
+                                         "mip",
+                                     }},
+                                    BAPCOD_SOLVER,
+                                }},
+                               {1,
+                                "E-F-family-last-10",
+                                120.0,
+                                1,
+                                // "./data/ESPPRC - Test Instances/vrps",
+                                "data/BAP_Instances/E-F-last-10",
                                 DEFAULT_FILTER,
                                 {
                                     {"My CPTP MIP solver",
