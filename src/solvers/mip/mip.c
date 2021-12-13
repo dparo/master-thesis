@@ -77,14 +77,19 @@ typedef enum {
 static struct {
     const CutDescriptor *descr;
     bool enabled;
+    bool fractional_sep_enabled;
 } G_cuts[] = {
-    [GSEC_CUT_ID] = {&CUT_GSEC_DESCRIPTOR, true},
-    [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false},
+    [GSEC_CUT_ID] = {&CUT_GSEC_DESCRIPTOR, true, false},
+    [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false, false},
 };
 
 static inline bool is_active_cut(CutId id) {
     return G_cuts[id].enabled && G_cuts[id].descr->name &&
            G_cuts[id].descr->iface;
+}
+
+static inline bool is_fractional_cut_active(CutId id) {
+    return is_active_cut(id) && G_cuts[id].fractional_sep_enabled;
 }
 
 typedef struct {
@@ -510,7 +515,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     }
 
     for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
-        if (is_active_cut(cut_id)) {
+        if (is_fractional_cut_active(cut_id)) {
             CutSeparationFunctor *functor = &tld->functors[cut_id];
             const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
             if (iface->fractional_sep) {
@@ -1018,6 +1023,9 @@ static void mip_solver_destroy(Solver *self) {
 static void enable_cuts(SolverTypedParams *tparams) {
     G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
     G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
+
+    G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
+        solver_params_get_bool(tparams, "GSEC_FRAC_CUTS");
 }
 
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,

@@ -35,6 +35,10 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
          "Enable or disable (default) CPLEX SCRIND and MIPDISPLAY parameters"},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "false", "Enable GLM cuts separation"},
+
+        {"GSEC_FRAC_CUTS", TYPED_PARAM_BOOL, "false",
+         "Enable GSEC cut separation for fractional solutions. Param "
+         "`GSEC_CUTS` must also be enabled for this to take effect."},
         {0},
     }};
 

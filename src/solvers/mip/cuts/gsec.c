@@ -95,6 +95,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
 
+    int32_t added_cuts = 0;
+
     //
     // Heuristic separation. Pick random source and sink vertex
     //
@@ -152,8 +154,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             assert(feq(flow, max_flow, EPS));
             validate_index_array(ctx, nnz - 1);
 
-            int32_t added_cuts = 0;
-
             for (int32_t h = 1; h < n; h++) {
                 double y_h = vstar[get_y_mip_var_idx(instance, h)];
                 int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
@@ -179,6 +179,10 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                 }
             }
         }
+    }
+
+    if (added_cuts > 0) {
+        log_info("%s :: Created %d GSEC cuts", __func__, added_cuts);
     }
 
     return true;

@@ -23,7 +23,7 @@
 #include "network.h"
 #include <memory.h>
 
-#define EPS ((double)1e-7)
+#define EPS ((double)1e-6)
 
 MaxFlowResult max_flow_result_create(int32_t nnodes) {
     MaxFlowResult result = {0};
