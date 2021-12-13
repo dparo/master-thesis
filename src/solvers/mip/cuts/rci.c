@@ -35,6 +35,10 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
+
+    assert(!"TODO");
+    abort();
+
     return 4 * (n * n * n) / 27;
 }
 
@@ -47,7 +51,85 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
 }
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
-                         const double *vstar, Tour *tour) {}
+                         const double *vstar, Tour *tour) {
+    if (tour->num_comps == 1) {
+        return true;
+    }
+
+    CutSeparationPrivCtx *ctx = self->ctx;
+    const Instance *instance = self->instance;
+    const int32_t n = instance->num_customers + 1;
+
+    const double Q = instance->vehicle_cap;
+    const char sense = 'G';
+
+    int32_t added_cuts = 0;
+
+    for (int32_t c = 0; c < tour->num_comps; c++) {
+        CPXNNZ pos = 0;
+        double demand_sum = 0.0;
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
+
+            if (i == 0)
+                assert(demand(instance, i) == 0.0);
+
+            if (!i_in_s)
+                continue;
+
+            double d = demand(instance, i);
+            demand_sum += d;
+        }
+
+        double r = fmod(demand_sum, Q);
+        double rhs = 2.0 * ceil(demand_sum / Q);
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
+
+            if (!i_in_s)
+                continue;
+
+            double d = demand(instance, i);
+            rhs += -2.0 * d / r;
+        }
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
+
+            if (i == 0)
+                assert(demand(instance, i) == 0.0);
+
+            if (!i_in_s)
+                continue;
+
+            double d = demand(instance, i);
+
+            ctx->index[pos] = get_y_mip_var_idx(instance, i);
+            ctx->value[pos] = -2.0 * d / r;
+            ++pos;
+
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j)
+                    continue;
+
+                bool j_is_customer = j > 0;
+                bool j_in_s = (tour->comp[j] == c) && j_is_customer;
+
+                if (j_in_s)
+                    continue;
+
+                ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
+                ctx->value[pos] = 1.0;
+                ++pos;
+            }
+        }
+    }
+}
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
                                       Solver *solver) {
