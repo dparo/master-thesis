@@ -1005,6 +1005,13 @@ bool cplex_setup(Solver *solver, const Instance *instance,
                  solver->data->numcores);
 
         int32_t num_threads = MIN(MAX_NUM_CORES, solver->data->numcores);
+        int32_t user_requested_num_threads =
+            solver_params_get_int32(tparams, "NUM_THREADS");
+
+        if (user_requested_num_threads > 0) {
+            num_threads = MIN(num_threads, user_requested_num_threads);
+        }
+
         log_info("%s :: Setting the maximum number of threads that CPLEX can "
                  "use to %d",
                  __func__, num_threads);

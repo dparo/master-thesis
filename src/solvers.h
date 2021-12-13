@@ -33,6 +33,9 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
     {
         {"SCRIND", TYPED_PARAM_BOOL, "false",
          "Enable or disable (default) CPLEX SCRIND and MIPDISPLAY parameters"},
+        {"NUM_THREADS", TYPED_PARAM_INT32, "0",
+         "Set the number of threads to use. Default 0, means autodetect based "
+         "on the number of cores available"},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "false", "Enable GLM cuts separation"},
 

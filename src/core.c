@@ -178,7 +178,7 @@ void cptp_print_list_of_solvers_and_params(void) {
                     printf("      - %-20s  (%s, default: %s) %-32s\n", name,
                            type, default_val, glossary);
                 } else {
-                    printf("      - %-20s  (%s) %-64s", name, type, glossary);
+                    printf("      - %-20s  (%s) %-64s\n", name, type, glossary);
                 }
             }
             if (j == 0) {
