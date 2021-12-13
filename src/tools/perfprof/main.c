@@ -112,6 +112,7 @@ typedef struct {
 } PerfProfRun;
 
 #define MAX_NUM_SOLVERS_PER_BATCH 8
+#define BATCH_MAX_NUM_DIRS 64
 
 typedef struct {
     int32_t num_runs;
@@ -132,7 +133,7 @@ typedef struct {
     char *name;
     double timelimit;
     int32_t nseeds;
-    const char *scan_root_dir;
+    const char *dirs[BATCH_MAX_NUM_DIRS];
     Filter filter;
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_BATCH];
 } PerfProfBatch;
@@ -568,8 +569,6 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     args[argidx++] = timelimit;
     args[argidx++] = "--seed";
     args[argidx++] = seed_str;
-    args[argidx++] = "-i";
-    args[argidx++] = (char *)input->filepath;
 
     for (int32_t i = 0; solver->args[i] != NULL; i++) {
         args[argidx++] = solver->args[i];
@@ -591,6 +590,8 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
         init_handle_json_output_path(handle, input);
     }
 
+    args[argidx++] = "-i";
+    args[argidx++] = (char *)input->filepath;
     args[argidx++] = "-w";
     args[argidx++] = (char *)handle->json_output_path;
     args[argidx++] = NULL;
@@ -701,6 +702,10 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
 }
 
 void scan_dir_and_solve(const char *dirpath) {
+    if (!dirpath || dirpath[0] == 0) {
+        return;
+    }
+
     int result = nftw(dirpath, file_walk_cb, 8, 0);
     if (result == FTW_STOP) {
         proc_pool_join(&G_pool);
@@ -746,7 +751,11 @@ static void do_batch(PerfProfBatch *bgroup) {
 
     if (bgroup->nseeds > 0) {
         if (!G_should_terminate) {
-            scan_dir_and_solve(bgroup->scan_root_dir);
+            for (int32_t dir_idx = 0;
+                 dir_idx < BATCH_MAX_NUM_DIRS && bgroup->dirs[dir_idx];
+                 dir_idx++) {
+                scan_dir_and_solve(bgroup->dirs[dir_idx]);
+            }
         }
     }
 }
@@ -769,51 +778,49 @@ static void init(void) {
 static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
-    PerfProfBatch batches[] = {{1,
-                                "E-family-last-10",
-                                120.0,
-                                1,
-                                // "./data/ESPPRC - Test Instances/vrps",
-                                "data/BAP_Instances/E-last-10",
-                                DEFAULT_FILTER,
-                                {
-                                    {"My CPTP MIP solver",
-                                     {
-                                         "--solver",
-                                         "mip",
-                                     }},
-                                    BAPCOD_SOLVER,
-                                }},
-                               {1,
-                                "F-family-last-10",
-                                120.0,
-                                1,
-                                // "./data/ESPPRC - Test Instances/vrps",
-                                "data/BAP_Instances/F-last-10",
-                                DEFAULT_FILTER,
-                                {
-                                    {"My CPTP MIP solver",
-                                     {
-                                         "--solver",
-                                         "mip",
-                                     }},
-                                    BAPCOD_SOLVER,
-                                }},
-                               {1,
-                                "E-F-family-last-10",
-                                120.0,
-                                1,
-                                // "./data/ESPPRC - Test Instances/vrps",
-                                "data/BAP_Instances/E-F-last-10",
-                                DEFAULT_FILTER,
-                                {
-                                    {"My CPTP MIP solver",
-                                     {
-                                         "--solver",
-                                         "mip",
-                                     }},
-                                    BAPCOD_SOLVER,
-                                }}};
+    PerfProfBatch batches[] = {
+        {1,
+         "E-family-last-10",
+         120.0,
+         1,
+         {"data/BAP_Instances/E-last-10"},
+         DEFAULT_FILTER,
+         {
+             {"My CPTP MIP solver",
+              {
+                  "--solver",
+                  "mip",
+              }},
+             BAPCOD_SOLVER,
+         }},
+        {1,
+         "F-family-last-10",
+         120.0,
+         1,
+         {"data/BAP_Instances/F-last-10"},
+         DEFAULT_FILTER,
+         {
+             {"My CPTP MIP solver",
+              {
+                  "--solver",
+                  "mip",
+              }},
+             BAPCOD_SOLVER,
+         }},
+        {1,
+         "E-F-family-last-10",
+         120.0,
+         1,
+         {"data/BAP_Instances/E-last-10", "data/BAP_Instances/F-last-10"},
+         DEFAULT_FILTER,
+         {
+             {"My CPTP MIP solver",
+              {
+                  "--solver",
+                  "mip",
+              }},
+             BAPCOD_SOLVER,
+         }}};
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {
@@ -848,8 +855,13 @@ static void main_loop(void) {
         printf("            Batch name: %s\n", batches[i].name);
         printf("            Batch timelimit: %g\n", batches[i].timelimit);
         printf("            Batch num seeds: %d\n", batches[i].nseeds);
-        printf("            Batch scan_root_dir: %s\n",
-               batches[i].scan_root_dir);
+        printf("            Batch dirs: [");
+        for (int32_t dir_idx = 0;
+             dir_idx < BATCH_MAX_NUM_DIRS && batches[i].dirs[dir_idx];
+             dir_idx++) {
+            printf("%s, ", batches[i].dirs[dir_idx]);
+        }
+        printf("]\n");
         printf("###########################################################"
                "\n");
         printf("###########################################################"

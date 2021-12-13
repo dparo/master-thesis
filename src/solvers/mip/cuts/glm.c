@@ -23,12 +23,11 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-static const double EPS = 1e-6;
+ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
-    int32_t *cnnodes;
 
     PushRelabelCtx push_relabel_ctx;
     MaxFlowResult max_flow_result;
@@ -44,7 +43,6 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
     push_relabel_ctx_destroy(&ctx->push_relabel_ctx);
     free(ctx->index);
     free(ctx->value);
-    free(ctx->cnnodes);
     free(ctx);
 }
 
@@ -57,12 +55,10 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     int32_t n = instance->num_customers + 1;
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
-    ctx->cnnodes = malloc(n * sizeof(*ctx->cnnodes));
     ctx->max_flow_result = max_flow_result_create(n);
     ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->cnnodes ||
-        !ctx->max_flow_result.bipartition.data ||
+    if (!ctx->index || !ctx->value || !ctx->max_flow_result.bipartition.data ||
         !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
         deactivate(ctx);
         return NULL;
@@ -74,6 +70,7 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar, FlowNetwork *network) {
     assert(!"TODO");
+    abort();
     return false;
 }
 
@@ -95,35 +92,45 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     // NOTE:
     // Start from c = 1. GLM cuts that include the depot node are NOT valid.
-    for (int32_t c = 1; c < tour->num_comps; c++) {
+    for (int32_t c = 0; c < tour->num_comps; c++) {
         CPXNNZ pos = 0;
         for (int32_t i = 0; i < n; i++) {
-            if (tour->comp[i] == c)
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
+
+            if (i == 0)
+                assert(demand(instance, i) == 0.0);
+
+            if (!i_in_s)
                 continue;
+
             for (int32_t j = 0; j < n; j++) {
                 if (i == j)
                     continue;
-                if (tour->comp[j] != c)
+
+                bool j_is_customer = j > 0;
+                bool j_in_s = (tour->comp[j] == c) && j_is_customer;
+
+                if (j_in_s)
                     continue;
 
-                if (i == 0)
-                    assert(demand(instance, i) == 0.0);
-
-                assert(tour->comp[i] != c && tour->comp[j] == c);
-
-                double d = demand(instance, i);
+                assert(i_in_s && !j_in_s);
+                double d = demand(instance, j);
                 ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
-                ctx->value[pos] = 1.0 - 2.0 / Q * d;
+                ctx->value[pos] = 1.0 - 2.0 * d / Q;
                 ++pos;
             }
         }
 
-        for (int32_t j = 0; j < n; j++) {
-            if (tour->comp[j] != c)
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
+            if (!i_in_s)
                 continue;
-            double d = demand(instance, j);
-            ctx->index[pos] = get_y_mip_var_idx(instance, j);
-            ctx->value[pos] = -2.0 / Q * d;
+
+            double d = demand(instance, i);
+            ctx->index[pos] = get_y_mip_var_idx(instance, i);
+            ctx->value[pos] = -2.0 * d / Q;
             ++pos;
         }
 
