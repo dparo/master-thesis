@@ -466,10 +466,11 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     }
 
     if (randomseed == 0) {
-        srand(time(NULL));
-    } else {
-        srand(randomseed);
+        randomseed = time(NULL);
     }
+
+    printf("%s :: Setting seed = %d\n", __func__, randomseed);
+    srand(time(NULL));
 
     if (!verify_solver_params(lookup->descriptor, params)) {
         fprintf(stderr, "ERROR: %s :: Failed to verify params\n", __func__);

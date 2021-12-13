@@ -1069,7 +1069,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
              randomseed);
     if (CPXXsetintparam(solver.data->env, CPX_PARAM_RANDOMSEED, randomseed) !=
         0) {
-        log_fatal("%s :: CPXXsetintparam -- Faield to setup "
+        log_fatal("%s :: CPXXsetintparam -- Failed to setup "
                   "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
                   __func__, randomseed);
     }
