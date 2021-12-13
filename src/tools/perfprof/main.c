@@ -790,6 +790,7 @@ static void main_loop(void) {
               {
                   "--solver",
                   "mip",
+                  "-DGSEC_FRAC_CUTS=0",
               }},
              BAPCOD_SOLVER,
          }},
@@ -804,6 +805,7 @@ static void main_loop(void) {
               {
                   "--solver",
                   "mip",
+                  "-DGSEC_FRAC_CUTS=0",
               }},
              BAPCOD_SOLVER,
          }},
@@ -818,6 +820,7 @@ static void main_loop(void) {
               {
                   "--solver",
                   "mip",
+                  "-DGSEC_FRAC_CUTS=0",
               }},
              BAPCOD_SOLVER,
          }}};
