@@ -107,6 +107,24 @@ typedef struct {
     CallbackThreadLocalData thread_local_data[MAX_NUM_CORES];
 } CplexCallbackCtx;
 
+static void
+destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
+
+    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+        if (is_active_cut(cut_id)) {
+            if (thread_local_data->functors[cut_id].ctx) {
+                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
+                iface->deactivate(thread_local_data->functors[cut_id].ctx);
+                memset(&thread_local_data->functors[cut_id], 0,
+                       sizeof(thread_local_data->functors[cut_id]));
+            }
+        }
+    }
+    free(thread_local_data->vstar);
+    tour_destroy(&thread_local_data->tour);
+    flow_network_destroy(&thread_local_data->network);
+}
+
 static bool
 create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
                                   CPXCALLBACKCONTEXTptr cplex_cb_ctx,
@@ -141,24 +159,6 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     }
 
     return success;
-}
-
-static void
-destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
-
-    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
-        if (is_active_cut(cut_id)) {
-            if (thread_local_data->functors[cut_id].ctx) {
-                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
-                iface->deactivate(thread_local_data->functors[cut_id].ctx);
-                memset(&thread_local_data->functors[cut_id], 0,
-                       sizeof(thread_local_data->functors[cut_id]));
-            }
-        }
-    }
-    free(thread_local_data->vstar);
-    tour_destroy(&thread_local_data->tour);
-    flow_network_destroy(&thread_local_data->network);
 }
 
 static void validate_mip_vars_packing(const Instance *instance) {
@@ -468,6 +468,41 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
+static void init_flow_network(FlowNetwork *net, const Instance *instance,
+                              const double *vstar) {
+
+    const int32_t n = instance->num_customers + 1;
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            double cap =
+                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
+            assert(fgte(cap, 0.0, 1e-5));
+            // NOTE: Fix floating point rounding errors. In fact cap may be
+            // slightly negative...
+            cap = MAX(0.0, cap);
+            if (feq(cap, 0.0, 1e-6)) {
+                cap = 0.0;
+            }
+            assert(cap >= 0.0);
+            *network_cap(net, i, j) = cap;
+        }
+    }
+}
+
+static inline bool
+is_any_fractional_cut_enabled(const CallbackThreadLocalData *tld) {
+    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+        if (is_fractional_cut_active(cut_id)) {
+            const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
+            if (iface->fractional_sep) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                    CplexCallbackCtx *ctx, int32_t threadid,
                                    int32_t numthreads) {
@@ -495,45 +530,32 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         goto terminate;
     }
 
-    FlowNetwork *net = &tld->network;
-    const int32_t n = instance->num_customers + 1;
+    bool any_fractional = is_any_fractional_cut_enabled(tld);
+    if (any_fractional) {
+        FlowNetwork *net = &tld->network;
+        init_flow_network(net, instance, vstar);
 
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            double cap =
-                i == j ? 0.0 : vstar[get_x_mip_var_idx(instance, i, j)];
-            assert(fgte(cap, 0.0, 1e-5));
-            // NOTE: Fix floating point rounding errors. In fact cap may be
-            // slightly negative...
-            cap = MAX(0.0, cap);
-            if (feq(cap, 0.0, 1e-6)) {
-                cap = 0.0;
-            }
-            assert(cap >= 0.0);
-            *network_cap(net, i, j) = cap;
-        }
-    }
+        for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+            if (is_fractional_cut_active(cut_id)) {
+                CutSeparationFunctor *functor = &tld->functors[cut_id];
+                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
+                if (iface->fractional_sep) {
+                    const int64_t begin_time = os_get_usecs();
+                    // NOTE: We need to reset the cplex_cb_ctx since it might
+                    // change during the execution. The same threadid id, is not
+                    // guaranteed to have the same cplex_cb_ctx for the entire
+                    // duration of the thread
+                    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+                    bool separation_success =
+                        iface->fractional_sep(functor, obj_p, vstar, net);
+                    functor->internal.fractional_stats.accum_usecs +=
+                        os_get_usecs() - begin_time;
 
-    for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
-        if (is_fractional_cut_active(cut_id)) {
-            CutSeparationFunctor *functor = &tld->functors[cut_id];
-            const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
-            if (iface->fractional_sep) {
-                const int64_t begin_time = os_get_usecs();
-                // NOTE: We need to reset the cplex_cb_ctx since it might change
-                // during the execution. The same threadid id, is not guaranteed
-                // to have the same cplex_cb_ctx for the entire duration of the
-                // thread
-                functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-                bool separation_success =
-                    iface->fractional_sep(functor, obj_p, vstar, net);
-                functor->internal.fractional_stats.accum_usecs +=
-                    os_get_usecs() - begin_time;
-
-                if (!separation_success) {
-                    log_fatal("Separation of integral `%s` cuts failed",
-                              "GSEC");
-                    goto terminate;
+                    if (!separation_success) {
+                        log_fatal("Separation of integral `%s` cuts failed",
+                                  "GSEC");
+                        goto terminate;
+                    }
                 }
             }
         }
