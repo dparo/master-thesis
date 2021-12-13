@@ -119,11 +119,12 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
         int32_t set_s_size = 0;
 
-        for (int32_t i = 1; i < n; i++) {
+        for (int32_t i = 0; i < n; i++) {
             int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
-            if (bp_i != bp_depot) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+            if (i_in_s)
                 ++set_s_size;
-            }
         }
 
         if (set_s_size >= 2) {
@@ -135,36 +136,54 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             const int local_validity = 0; // (Globally valid)
 
             double flow = 0.0;
-            for (int32_t i = 1; i < n; i++) {
+            for (int32_t i = 0; i < n; i++) {
                 int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
-                if (bp_i != bp_depot) {
-                    for (int32_t j = 0; j < n; j++) {
-                        int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
-                        if (bp_j == bp_depot) {
-                            ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
-                            ctx->value[nnz] = +1.0;
-                            double x = vstar[get_x_mip_var_idx(instance, i, j)];
-                            flow += x;
-                            ++nnz;
-                        }
-                    }
+                bool i_is_customer = i > 0;
+                bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+
+                if (!i_in_s)
+                    continue;
+
+                for (int32_t j = 0; j < n; j++) {
+                    if (i == j)
+                        continue;
+
+                    int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
+                    bool j_is_customer = j > 0;
+                    bool j_in_s = (bp_j == bp_depot) && j_is_customer;
+
+                    if (j_in_s)
+                        continue;
+
+                    ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
+                    ctx->value[nnz] = +1.0;
+                    double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                    flow += x;
+                    ++nnz;
                 }
             }
 
             assert(feq(flow, max_flow, EPS));
             validate_index_array(ctx, nnz - 1);
 
-            for (int32_t h = 1; h < n; h++) {
-                double y_h = vstar[get_y_mip_var_idx(instance, h)];
-                int32_t bp_h = ctx->max_flow_result.bipartition.data[h];
-                if (bp_h != bp_depot && is_violated_cut(max_flow, y_h)) {
-                    ctx->index[nnz] = get_y_mip_var_idx(instance, h);
+            for (int32_t i = 0; i < n; i++) {
+                double y_i = vstar[get_y_mip_var_idx(instance, i)];
+                int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+
+                bool i_is_customer = i > 0;
+                bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+
+                if (!i_in_s)
+                    continue;
+
+                if (is_violated_cut(max_flow, y_i)) {
+                    ctx->index[nnz] = get_y_mip_var_idx(instance, i);
                     ctx->value[nnz] = -2.0;
 
                     log_trace("%s :: Adding GSEC fractional constraint (%g >= "
                               "2.0 * %g)"
                               " (nnz = %lld)",
-                              __func__, max_flow, y_h, nnz);
+                              __func__, max_flow, y_i, nnz);
 
                     if (!mip_cut_fractional_sol(self, nnz, rhs, sense,
                                                 ctx->index, ctx->value,
@@ -237,10 +256,10 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
     int32_t total_num_added_cuts = 0;
 
-    // NOTE:
-    // Start from c = 1. GSECS that include the depot node are NOT valid.
+    // NOTE: The set S cannot cointain the depot. Component index 0 always
+    // contains the depot, and always induces a non violated cut for integral
+    // solutions
     for (int32_t c = 1; c < tour->num_comps; c++) {
-
         assert(ctx->cnnodes[c] >= 2);
 
         double flow = 0.0;
@@ -249,24 +268,28 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
         assert(nnz <= nnz_upper_bound);
 
-        // Again, skip the depot (start from i = 1)
-        for (int32_t i = 1; i < n; i++) {
-            if (*comp(tour, i) == c) {
-                for (int32_t j = 0; j < n; j++) {
-                    if (i == j) {
-                        continue;
-                    }
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
 
-                    // If node i belongs to S and node j does NOT belong to S
-                    if (*comp(tour, j) != c) {
-                        ctx->index[pos] =
-                            (CPXDIM)get_x_mip_var_idx(instance, i, j);
-                        ctx->value[pos] = +1.0;
-                        double x = vstar[get_x_mip_var_idx(instance, i, j)];
-                        flow += x;
-                        ++pos;
-                    }
-                }
+            if (!i_in_s)
+                continue;
+
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j)
+                    continue;
+
+                bool j_is_customer = j > 0;
+                bool j_in_s = (tour->comp[j] == c) && j_is_customer;
+
+                if (j_in_s)
+                    continue;
+
+                ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
+                ctx->value[pos] = +1.0;
+                double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                flow += x;
+                ++pos;
             }
         }
 
@@ -275,32 +298,35 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
         validate_index_array(ctx, nnz - 1);
 
-        assert(*comp(tour, 0) != c);
         int32_t added_cuts = 0;
 
-        for (int32_t i = 1; i < n; i++) {
-            if (*comp(tour, i) == c) {
-                double y_i = vstar[get_y_mip_var_idx(instance, i)];
-                assert(is_violated_cut(flow, y_i));
-                assert(*comp(tour, i) >= 1);
+        for (int32_t i = 0; i < n; i++) {
+            bool i_is_customer = i > 0;
+            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
 
-                ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
-                ctx->value[nnz - 1] = -2.0;
+            if (!i_in_s)
+                continue;
 
-                log_trace("%s :: Adding GSEC constraint (%g >= 2.0 * %g) for "
-                          "component %d, vertex "
-                          "%d "
-                          "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                          __func__, flow, y_i, c, i, c, ctx->cnnodes[c], nnz);
+            double y_i = vstar[get_y_mip_var_idx(instance, i)];
+            assert(is_violated_cut(flow, y_i));
+            assert(*comp(tour, i) >= 1);
 
-                if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
-                                          ctx->value)) {
-                    log_fatal("%s :: Failed cut of integral solution",
-                              __func__);
-                    goto failure;
-                }
-                added_cuts += 1;
+            ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
+            ctx->value[nnz - 1] = -2.0;
+
+            log_trace("%s :: Adding GSEC constraint (%g >= 2.0 * %g) for "
+                      "component %d, vertex "
+                      "%d "
+                      "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
+                      __func__, flow, y_i, c, i, c, ctx->cnnodes[c], nnz);
+
+            if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
+                                      ctx->value)) {
+                log_fatal("%s :: Failed cut of integral solution", __func__);
+                goto failure;
             }
+
+            added_cuts += 1;
         }
         assert(added_cuts == ctx->cnnodes[c]);
         total_num_added_cuts += added_cuts;
