@@ -1096,11 +1096,20 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
 
     log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
              randomseed);
-    if (CPXXsetintparam(solver.data->env, CPX_PARAM_RANDOMSEED, randomseed) !=
-        0) {
+    if (0 !=
+        CPXXsetintparam(solver.data->env, CPX_PARAM_RANDOMSEED, randomseed)) {
         log_fatal("%s :: CPXXsetintparam -- Failed to setup "
                   "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
                   __func__, randomseed);
+        goto fail;
+    }
+
+    const double cutoff_value = instance->zero_reduced_cost_threshold - 1e-8;
+    if (0 != CPXXsetdblparam(solver.data->env, CPX_PARAM_CUTUP, cutoff_value)) {
+        log_fatal("%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
+                  "(upper cuttoff value) to value %f",
+                  __func__, cutoff_value);
+        goto fail;
     }
 
     enable_cuts(tparams);
