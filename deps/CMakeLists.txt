@@ -108,7 +108,7 @@ target_include_directories(logc PUBLIC "${DEPS_DIR}/log.c/src")
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_DEBUG")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Relase")
-    target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_INFO")
+    target_compile_definitions(logc PUBLIC "RXI_LOGC_DEFAULT_LEVEL=LOG_TRACE")
 endif()
 
 # Customize cJSON
