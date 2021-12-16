@@ -393,16 +393,6 @@ int main(int argc, char **argv) {
         goto exit;
     }
 
-    if (logfile->count > 0) {
-        log_file_handle = fopen(logfile->filename[0], "w");
-        if (log_file_handle) {
-            log_add_fp(log_file_handle, LOG_INFO);
-        } else {
-            fprintf(stderr, "%s: Failed to open for logging\n",
-                    logfile->filename[0]);
-        }
-    }
-
     int32_t iloglvl = LOG_WARN;
     if (loglvl->ival[0] <= 0) {
         iloglvl = LOG_WARN;
@@ -415,6 +405,16 @@ int main(int argc, char **argv) {
     }
 
     log_set_level(iloglvl);
+
+    if (logfile->count > 0) {
+        log_file_handle = fopen(logfile->filename[0], "w");
+        if (log_file_handle) {
+            log_add_fp(log_file_handle, iloglvl);
+        } else {
+            fprintf(stderr, "%s: Failed to open for logging\n",
+                    logfile->filename[0]);
+        }
+    }
 
     AppCtx ctx = {.loglvl = iloglvl,
                   .instance_filepath = instance->filename[0],
