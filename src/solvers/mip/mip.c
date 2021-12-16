@@ -567,6 +567,34 @@ terminate:
     return 1;
 }
 
+static int cplex_on_branching(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
+                              CplexCallbackCtx *ctx, int32_t threadid,
+                              int32_t numthreads) {
+
+    assert(threadid < numthreads);
+    assert(threadid <= MAX_NUM_CORES);
+
+    Solver *solver = ctx->solver;
+    const Instance *instance = ctx->instance;
+    CallbackThreadLocalData *tld = &ctx->thread_local_data[threadid];
+    double *vstar = tld->vstar;
+    double obj_p;
+
+    if (0 != CPXXcallbackgetrelaxationpoint(cplex_cb_ctx, vstar, 0,
+                                            solver->data->num_mip_vars - 1,
+                                            &obj_p)) {
+        log_fatal("CPXXcallbackgetrelaxationpoint() failed");
+        goto terminate;
+    }
+
+    log_trace("%s :: obj_p = %f", __func__, obj_p);
+
+    return 0;
+terminate:
+    log_fatal("%s :: Fatal termination error", __func__);
+    return 1;
+}
+
 static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                         CplexCallbackCtx *ctx, int32_t threadid,
                                         int32_t numthreads) {
@@ -735,6 +763,14 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     //      https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
     //      https://www.ibm.com/docs/en/icos/12.8.0.0?topic=c-cpxxcallbacksetfunc-cpxcallbacksetfunc
     switch (contextid) {
+    case CPX_CALLBACKCONTEXT_BRANCHING: {
+        int statind;
+        CPXXcallbackgetrelaxationstatus(cplex_cb_ctx, &statind, 0);
+        if (statind == CPX_STAT_OPTIMAL || statind == CPX_STAT_OPTIMAL_INFEAS) {
+            result =
+                cplex_on_branching(cplex_cb_ctx, ctx, threadid, numthreads);
+        }
+    } break;
     case CPX_CALLBACKCONTEXT_CANDIDATE: {
         int is_point = false;
         if (CPXXcallbackcandidateispoint(cplex_cb_ctx, &is_point) != 0) {
@@ -796,9 +832,9 @@ static bool on_solve_start(Solver *self, const Instance *instance,
     UNUSED_PARAM(instance);
 
     CPXLONG contextmask =
-        CPX_CALLBACKCONTEXT_CANDIDATE | CPX_CALLBACKCONTEXT_RELAXATION |
-        CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS | CPX_CALLBACKCONTEXT_THREAD_UP |
-        CPX_CALLBACKCONTEXT_THREAD_DOWN;
+        CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
+        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS |
+        CPX_CALLBACKCONTEXT_THREAD_UP | CPX_CALLBACKCONTEXT_THREAD_DOWN;
 
     if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
                             cplex_callback, (void *)callback_ctx) != 0) {
