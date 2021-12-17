@@ -672,21 +672,31 @@ terminate:
     return 1;
 }
 
-static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
-                                    Solver *solver, const Instance *instance) {
+static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
+                             Solver *solver, const Instance *instance) {
+
     UNUSED_PARAM(solver);
     UNUSED_PARAM(instance);
 
     // NOTE: Global progress is inherently thread safe
     //            See:
     //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
-    double upper_bound = INFINITY, lower_bound = -INFINITY;
+    double upper_bound = INFINITY;
+    double lower_bound = -INFINITY;
 
-    CPXLONG num_processed_nodes = 0, simplex_iterations = 0;
+    CPXINT num_restarts = 0;
+
+    CPXLONG num_processed_nodes = 0;
+    CPXLONG num_nodes_left = 0;
+    CPXLONG simplex_iterations = 0;
+
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &lower_bound);
     CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &upper_bound);
+    CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_RESTARTS, &num_restarts);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODECOUNT,
                             &num_processed_nodes);
+    CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODESLEFT,
+                            &num_nodes_left);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
                             &simplex_iterations);
 
@@ -703,11 +713,36 @@ static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
         incumbent = INFINITY;
     }
 
-    log_trace("%s :: num_processed_nodes = %lld, simplex_iterations = %lld, "
+    log_trace("%s :: num_restarts = %d, num_processed_nodes = %lld, "
+              "num_nodes_left = %lld, "
+              "simplex_iterations = %lld, "
               "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f\n",
-              __func__, num_processed_nodes, simplex_iterations, lower_bound,
-              incumbent, upper_bound);
+              progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
+              simplex_iterations, lower_bound, incumbent, upper_bound);
     return 0;
+}
+
+static int cplex_on_global_progress(CPXCALLBACKCONTEXTptr context,
+                                    Solver *solver, const Instance *instance) {
+    // NOTE:
+    // CPLEX invokes the generic callback in this context when it has made
+    // global progress, that is, when new information has been committed to the
+    // global solution structures.
+    return cplex_on_progress("Global progress", context, solver, instance);
+}
+
+static int cplex_on_local_progress(CPXCALLBACKCONTEXTptr context,
+                                   Solver *solver, const Instance *instance,
+                                   CPXLONG threadid) {
+    // NOTE:
+    // PLEX invokes the generic callback in this context when it has made
+    // thread-local progress. Thread-local progress is progress that happened on
+    // one of the threads used by CPLEX but has not yet been committed to global
+    // solution structures.
+    char kind[256];
+    snprintf_safe(kind, ARRAY_LEN(kind), "Local Progress[thread = %lld]",
+                  threadid);
+    return cplex_on_progress(kind, context, solver, instance);
 }
 
 static int cplex_on_thread_activation(int activation,
@@ -787,6 +822,10 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         result =
             cplex_on_new_relaxation(cplex_cb_ctx, ctx, threadid, numthreads);
         break;
+    case CPX_CALLBACKCONTEXT_LOCAL_PROGRESS: {
+        result = cplex_on_local_progress(cplex_cb_ctx, ctx->solver,
+                                         ctx->instance, threadid);
+    } break;
     case CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
         // NOTE: Global progress is inherently thread safe
         //            See:
@@ -833,8 +872,9 @@ static bool on_solve_start(Solver *self, const Instance *instance,
 
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
-        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS |
-        CPX_CALLBACKCONTEXT_THREAD_UP | CPX_CALLBACKCONTEXT_THREAD_DOWN;
+        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_LOCAL_PROGRESS |
+        CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS | CPX_CALLBACKCONTEXT_THREAD_UP |
+        CPX_CALLBACKCONTEXT_THREAD_DOWN;
 
     if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
                             cplex_callback, (void *)callback_ctx) != 0) {
