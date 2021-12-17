@@ -62,7 +62,16 @@ ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
 #endif
 }
 
-#define MAX_NUM_CORES 256
+// NOTE:
+// From: https://www.ibm.com/docs/en/icos/12.10.0?topic=threads-parameter
+
+// You manage the number of threads that CPLEX uses with the global thread count
+// parameter (Threads, CPX_PARAM_THREADS) documented in the CPLEX Parameters
+// Reference Manual. At its default setting 0 (zero), the number of threads that
+// CPLEX actually uses during a parallel optimization is no more than 32 or the
+// number of CPU cores available on the computer where CPLEX is running
+// (whichever is smaller).
+#define MAX_NUM_CORES 32
 
 typedef enum {
     // NOTE:
@@ -583,7 +592,7 @@ static int cplex_on_branching(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     if (0 != CPXXcallbackgetrelaxationpoint(cplex_cb_ctx, vstar, 0,
                                             solver->data->num_mip_vars - 1,
                                             &obj_p)) {
-        log_fatal("CPXXcallbackgetrelaxationpoint() failed");
+        log_fatal("%s :: CPXXcallbackgetrelaxationpoint() failed", __func__);
         goto terminate;
     }
 
@@ -716,7 +725,7 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
     log_trace("%s :: num_restarts = %d, num_processed_nodes = %lld, "
               "num_nodes_left = %lld, "
               "simplex_iterations = %lld, "
-              "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f\n",
+              "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f",
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
               simplex_iterations, lower_bound, incumbent, upper_bound);
     return 0;
@@ -740,7 +749,7 @@ static int cplex_on_local_progress(CPXCALLBACKCONTEXTptr context,
     // one of the threads used by CPLEX but has not yet been committed to global
     // solution structures.
     char kind[256];
-    snprintf_safe(kind, ARRAY_LEN(kind), "Local Progress[thread = %lld]",
+    snprintf_safe(kind, ARRAY_LEN(kind), "Local Progress[thread=%lld]",
                   threadid);
     return cplex_on_progress(kind, context, solver, instance);
 }
