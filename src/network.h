@@ -51,13 +51,13 @@ typedef struct {
 } MaxFlowResult;
 
 /// For debug only
-typedef struct BruteforceMaxFlowResult {
+typedef struct {
     double maxflow;
     int32_t num_sections;
     MaxFlowResult *sections;
 } BruteforceMaxFlowResult;
 
-typedef struct PushRelabelCtx {
+typedef struct {
     int32_t source_vertex;
     int32_t sink_vertex;
     int32_t *height;
@@ -66,6 +66,14 @@ typedef struct PushRelabelCtx {
     int32_t list_len;
     int32_t *list;
 } PushRelabelCtx;
+
+typedef struct {
+
+} GomoryHuTree;
+
+typedef struct {
+    PushRelabelCtx pr_ctx;
+} GomoryHuTreeCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {
     bool result =

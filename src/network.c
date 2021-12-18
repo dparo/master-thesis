@@ -545,3 +545,6 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
 
     return result;
 }
+
+void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
+                    GomoryHuTreeCtx *ctx) {}
