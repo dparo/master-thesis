@@ -72,7 +72,11 @@ typedef struct {
 } GomoryHuTree;
 
 typedef struct {
+    MaxFlowResult max_flow_result;
     PushRelabelCtx pr_ctx;
+    int32_t num_comps;
+    int32_t *comp;
+    int32_t *comp_size;
 } GomoryHuTreeCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {

@@ -546,5 +546,48 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
     return result;
 }
 
+void gomory_hu_tree_contract(FlowNetwork *net, GomoryHuTree *output,
+                             GomoryHuTreeCtx *ctx) {}
+
 void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
-                    GomoryHuTreeCtx *ctx) {}
+                    GomoryHuTreeCtx *ctx) {
+    memset(ctx, 0, sizeof(*ctx));
+
+    int32_t n = net->nnodes;
+
+    ctx->num_comps = 0;
+    ctx->comp_size[0] = n;
+
+    for (int32_t i = 0; i < n; i++) {
+        ctx->comp[i] = 0;
+    }
+
+    while (true) {
+        int32_t candidate_comp = -1;
+        for (int32_t c = 0; c < ctx->num_comps; c++) {
+            if (ctx->comp_size[c] >= 2) {
+                candidate_comp = c;
+                break;
+            }
+        }
+        if (candidate_comp < 0) {
+            // break: We are done!
+            break;
+        }
+
+        const bool apply_contraction = ctx->num_comps > 1;
+        if (apply_contraction) {
+            gomory_hu_tree_contract(net, output, ctx);
+        }
+
+        //
+        // Choose two vertices s, t ∈ X and find a minimum s-t cut (A',B') in G'
+        //
+        // TODO: Pick two random source and sink vertices that belong to the set
+        int32_t s = -123123;
+        int32_t t = -123123;
+
+        double max_flow = push_relabel_max_flow2(
+            net, s, t, &ctx->max_flow_result, &ctx->pr_ctx);
+    }
+}
