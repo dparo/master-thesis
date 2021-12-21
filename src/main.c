@@ -18,23 +18,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
+#include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "misc.h"
-#include "version.h"
-#include "types.h"
-#include "core.h"
-#include "parser.h"
-#include "os.h"
 #include "core-utils.h"
+#include "core.h"
+#include "os.h"
+#include "parser.h"
+#include "types.h"
+#include "version.h"
 #include "visualization.h"
 
-#include <log.h>
 #include <argtable3.h>
 #include <cJSON.h>
+#include <log.h>
 #include <sha256.h>
 
 #define DEFAULT_TIME_LIMIT ((double)600.0) // 10 minutes
@@ -57,7 +57,7 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
 
     for (int32_t i = 0; i < MIN(MAX_NUM_SOLVER_PARAMS, num_defines); i++) {
         const char *name = defines[i];
-        const char *value;
+        const char *value = NULL;
         char *equal = strchr(defines[i], '=');
         if (equal) {
             *equal = 0;
@@ -201,7 +201,11 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     time[strlen(time) - 1] = 0;
     s &= cJSON_AddItemToObject(root, "ended", cJSON_CreateString(time));
 
-    char timerepr_str[4096];
+    enum {
+        TIMEREPR_LEN = 4096,
+    };
+
+    char timerepr_str[TIMEREPR_LEN];
     TimeRepr timerepr = timerepr_from_usecs(timing.took_usecs);
     timerepr_to_string(&timerepr, timerepr_str, ARRAY_LEN(timerepr_str));
 

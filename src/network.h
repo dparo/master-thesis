@@ -68,15 +68,23 @@ typedef struct {
 } PushRelabelCtx;
 
 typedef struct {
+    int32_t u, v;
+} GomoryHuEdge;
 
+typedef struct {
+    int32_t nedges;
+    GomoryHuEdge *edges;
 } GomoryHuTree;
 
 typedef struct {
+    FlowNetwork contracted_network;
     MaxFlowResult max_flow_result;
     PushRelabelCtx pr_ctx;
-    int32_t num_comps;
-    int32_t *comp;
-    int32_t *comp_size;
+    int32_t num_sets;
+    int32_t *sets;
+    int32_t *sets_size;
+    int32_t num_edges;
+    GomoryHuEdge *edges;
 } GomoryHuTreeCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {

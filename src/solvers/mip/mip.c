@@ -197,8 +197,10 @@ static void unpack_mip_solution(const Instance *instance, Tour *t,
 
     tour_clear(t);
     for (int32_t start = 0; start < n; start++) {
-        if (*comp(t, start) >= 0)
-            continue; // node "start" was already visited, just skip it
+        if (*comp(t, start) >= 0) {
+            // node "start" was already visited, just skip it
+            continue;
+        }
 
         // a new component is found
         t->num_comps += 1;

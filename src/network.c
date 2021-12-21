@@ -549,33 +549,55 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
 void gomory_hu_tree_contract(FlowNetwork *net, GomoryHuTree *output,
                              GomoryHuTreeCtx *ctx) {}
 
+void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
+                          GomoryHuTreeCtx *ctx, int32_t s, int32_t t) {
+    double max_flow =
+        push_relabel_max_flow2(net, s, t, &ctx->max_flow_result, &ctx->pr_ctx);
+}
+
 void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
                     GomoryHuTreeCtx *ctx) {
-    memset(ctx, 0, sizeof(*ctx));
-
     int32_t n = net->nnodes;
 
-    ctx->num_comps = 0;
-    ctx->comp_size[0] = n;
+#ifndef NDEBUG
+
+    // IMPORTANT:
+    //     This implementation only works with undirected graphs.
+    //     Since the FlowNetwork allows representations of directed graphs
+    //     We are going to assert that the network is undirected here
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i != j) {
+                assert(*network_cap(net, i, j) == *network_cap(net, j, i));
+            }
+        }
+    }
+
+#endif
+
+    ctx->num_edges = 0;
+    ctx->num_sets = 1;
+    ctx->sets_size[0] = n;
 
     for (int32_t i = 0; i < n; i++) {
-        ctx->comp[i] = 0;
+        ctx->sets[i] = 0;
     }
 
     while (true) {
-        int32_t candidate_comp = -1;
-        for (int32_t c = 0; c < ctx->num_comps; c++) {
-            if (ctx->comp_size[c] >= 2) {
-                candidate_comp = c;
+        int32_t set = -1;
+        for (int32_t c = 0; c < ctx->num_sets; c++) {
+            if (ctx->sets_size[c] >= 2) {
+                set = c;
                 break;
             }
         }
-        if (candidate_comp < 0) {
+
+        if (set < 0) {
             // break: We are done!
             break;
         }
 
-        const bool apply_contraction = ctx->num_comps > 1;
+        const bool apply_contraction = ctx->num_sets > 1;
         if (apply_contraction) {
             gomory_hu_tree_contract(net, output, ctx);
         }
@@ -583,11 +605,73 @@ void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
         //
         // Choose two vertices s, t ∈ X and find a minimum s-t cut (A',B') in G'
         //
-        // TODO: Pick two random source and sink vertices that belong to the set
-        int32_t s = -123123;
-        int32_t t = -123123;
+        // TODO: Pick two random source and sink indices in the candidate set
+        int32_t s_idx = -1;
+        int32_t t_idx = -1;
 
-        double max_flow = push_relabel_max_flow2(
-            net, s, t, &ctx->max_flow_result, &ctx->pr_ctx);
+        s_idx = rand() % ctx->sets_size[set];
+
+        do {
+            t_idx = rand() % ctx->sets_size[set];
+        } while (t_idx == s_idx);
+
+        // Convert the s_idx, t_idx, to their corresponding node in the original
+        // flow formulation
+        int32_t s = -1;
+        int32_t t = -1;
+        {
+            int32_t cnt = 0;
+            for (int32_t i = 0; i < n; i++) {
+                if (ctx->sets[i] == set) {
+                    if (cnt == s_idx) {
+                        s = cnt;
+                    } else if (cnt == t_idx) {
+                        t = cnt;
+                    }
+                    ++cnt;
+                }
+            }
+            assert(cnt == ctx->sets_size[set]);
+        }
+
+        assert(s >= 0 && s < n);
+        assert(t >= 0 && t < n);
+        assert(s != t);
+
+        gomory_hu_tree_split(net, output, ctx, s, t);
     }
+
+    // Output the final tree
+    assert(ctx->num_edges == n - 1);
+    assert(ctx->num_sets == n);
+
+    output->nedges = 0;
+
+    for (int32_t edge_idx = 0; edge_idx < ctx->num_edges; edge_idx++) {
+        int32_t set1 = ctx->edges[edge_idx].u;
+        int32_t set2 = ctx->edges[edge_idx].v;
+        assert(set1 >= 0 && set1 < ctx->num_sets);
+        assert(set2 >= 0 && set2 < ctx->num_sets);
+        assert(set1 != set2);
+
+        int32_t u = -1;
+        int32_t v = -1;
+
+        // Convert the sets to their corresponding unique node
+        for (int32_t i = 0; i < n; i++) {
+            if (ctx->sets[i] == set1) {
+                u = i;
+            } else if (ctx->sets[i] == set2) {
+                v = i;
+            }
+        }
+
+        assert(u >= 0 && u < n);
+        assert(v >= 0 && v < n);
+        assert(u != v);
+
+        output->edges[output->nedges++] = (GomoryHuEdge){u, v};
+    }
+
+    assert(output->nedges == n - 1);
 }
