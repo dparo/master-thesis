@@ -77,8 +77,8 @@ typedef struct {
 } GomoryHuTree;
 
 typedef struct {
-    FlowNetwork contracted_network;
-    MaxFlowResult max_flow_result;
+    FlowNetwork contracted_net;
+    MaxFlowResult mfr;
     PushRelabelCtx pr_ctx;
     int32_t num_sets;
     int32_t *sets;
@@ -112,6 +112,13 @@ double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
 BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
                                             int32_t source_vertex,
                                             int32_t sink_vertex);
+
+bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx);
+void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx);
+void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
+                     GomoryHuTreeCtx *ctx);
+
+bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);

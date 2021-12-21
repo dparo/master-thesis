@@ -552,11 +552,11 @@ void gomory_hu_tree_contract(FlowNetwork *net, GomoryHuTree *output,
 void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
                           GomoryHuTreeCtx *ctx, int32_t s, int32_t t) {
     double max_flow =
-        push_relabel_max_flow2(net, s, t, &ctx->max_flow_result, &ctx->pr_ctx);
+        push_relabel_max_flow2(net, s, t, &ctx->mfr, &ctx->pr_ctx);
 }
 
-void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
-                    GomoryHuTreeCtx *ctx) {
+void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
+                     GomoryHuTreeCtx *ctx) {
     int32_t n = net->nnodes;
 
 #ifndef NDEBUG
@@ -674,4 +674,20 @@ void gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output,
     }
 
     assert(output->nedges == n - 1);
+}
+
+bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx) { return true; }
+
+void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {}
+
+bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {
+    GomoryHuTreeCtx ctx = {0};
+
+    bool create_success = gomory_hu_tree_ctx_create(&ctx);
+    if (create_success) {
+        gomory_hu_tree2(net, output, &ctx);
+    }
+
+    gomory_hu_tree_ctx_destroy(&ctx);
+    return create_success;
 }
