@@ -83,6 +83,7 @@ typedef enum {
     NUM_CUTS,
 } CutId;
 
+// TODO: This struct is not thread safe
 static struct {
     const CutDescriptor *descr;
     bool enabled;
@@ -102,6 +103,7 @@ static inline bool is_fractional_cut_active(CutId id) {
 }
 
 typedef struct {
+    bool valid;
     double *vstar;
     FlowNetwork network;
     Tour tour;
@@ -118,6 +120,9 @@ typedef struct {
 
 static void
 destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
+    if (!thread_local_data->valid) {
+        return;
+    }
 
     for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
         if (is_active_cut(cut_id)) {
@@ -132,6 +137,15 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
     flow_network_destroy(&thread_local_data->network);
+    thread_local_data->valid = false;
+}
+
+static void destroy_all_callback_thread_local_data(CplexCallbackCtx *ctx) {
+    for (int32_t i = 0; i < MAX_NUM_CORES; i++) {
+        if (ctx->thread_local_data[i].valid) {
+            destroy_callback_thread_local_data(&ctx->thread_local_data[i]);
+        }
+    }
 }
 
 static bool
@@ -165,6 +179,10 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
                        thread_local_data->network.cap &&
                        tour_is_valid(&thread_local_data->tour);
         }
+    }
+
+    if (success) {
+        thread_local_data->valid = true;
     }
 
     return success;
@@ -961,6 +979,8 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         return SOLVE_STATUS_ERR;
     }
 
+    destroy_all_callback_thread_local_data(&callback_ctx);
+
     assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
 
     int lpstat = 0;
@@ -1078,7 +1098,7 @@ bool cplex_setup(Solver *solver, const Instance *instance,
 
     if (solver_params_get_bool(tparams, "SCRIND")) {
         CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
-        CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 3);
+        CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 4);
     }
 
     // Clamp the number of available cores to MAX_NUM_CORES
