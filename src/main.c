@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
                   .json_report_path = json_report_path->filename[0]};
 
     if (ctx.randomseed == 0) {
-        ctx.randomseed = time(NULL);
+        ctx.randomseed = (int32_t)(time(NULL) % INT32_MAX);
     }
 
     exitcode = main2(&ctx);
