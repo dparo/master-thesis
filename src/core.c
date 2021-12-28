@@ -41,6 +41,7 @@ void instance_destroy(Instance *instance) {
     if (instance->name) {
         free(instance->name);
     }
+
     if (instance->comment) {
         free(instance->comment);
     }

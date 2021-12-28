@@ -252,11 +252,9 @@ static int main2(AppCtx *ctx) {
             const bool aborted = is_aborted_solve_status(status);
             success = ctx->treat_abort_as_failure ? valid && !aborted : valid;
 
-            if (valid) {
-                printf("\n\n###\n###\n###\n\n");
-                writeout_results(stdout, ctx, success, &instance, &solution,
-                                 status, timing);
-            }
+            printf("\n\n###\n###\n###\n\n");
+            writeout_results(stdout, ctx, success, &instance, &solution, status,
+                             timing);
 
             if (success) {
                 writeout_json_report(ctx, &instance, &solution, status, timing);

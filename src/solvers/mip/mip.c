@@ -983,18 +983,31 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
 
     assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
 
-    int lpstat = 0;
     double *vstar = malloc(sizeof(*vstar) * self->data->num_mip_vars);
 
-    if (CPXXsolution(self->data->env, self->data->lp, &lpstat,
-                     &solution->upper_bound, vstar, NULL, NULL, NULL) != 0) {
-        log_fatal("%s :: CPXXsolution failed [lpstat = %d]", __func__, lpstat);
+    char lpstat_string_buf[CPXMESSAGEBUFSIZE];
+    int lpstat = CPXXgetstat(self->data->env, self->data->lp);
+    if (lpstat == 0) {
+        log_fatal("%s :: CPXXgetstat failed", __func__);
         goto terminate;
     }
+    char *lpstat_str =
+        CPXXgetstatstring(self->data->env, lpstat, lpstat_string_buf);
 
-    if (!process_cplex_output(self, solution, lpstat)) {
-        log_fatal("%s :: process_cplex_output failed", __func__);
-        goto terminate;
+    log_info("%s :: CPXmipopt terminated with lpstat = \"%s\" [%d]", __func__,
+             lpstat_str, lpstat);
+
+    if (0 == CPXXgetobjval(self->data->env, self->data->lp,
+                           &solution->upper_bound)) {
+        if (0 == CPXXgetx(self->data->env, self->data->lp, vstar, 0,
+                          self->data->num_mip_vars - 1)) {
+            if (!process_cplex_output(self, solution, lpstat)) {
+                log_fatal("%s :: process_cplex_output failed    ####    lpstat "
+                          "= [%d] %s",
+                          __func__, lpstat, lpstat_str);
+                goto terminate;
+            }
+        }
     }
 
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetstat-cpxgetstat
@@ -1020,21 +1033,17 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
     case CPXMIP_NODE_LIM_INFEAS:
     case CPXMIP_ABORT_INFEAS:
         result = SOLVE_STATUS_INFEASIBLE;
+        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
+                 lpstat_str, lpstat);
         break;
 
-    case CPXERR_CALLBACK:
-        result = SOLVE_STATUS_ERR;
-        break;
-
+    case CPX_STAT_NUM_BEST: // could not converge due to number difficulties
     case CPX_STAT_UNBOUNDED:
     case CPXMIP_UNBOUNDED:
-        log_fatal("%s :: CPXXsolution lpstat -- Solution to problem has "
-                  "an unbounded ray",
-                  __func__);
-        break;
-    case CPX_STAT_NUM_BEST:
-        // Could not converge due to number difficulties
+    case CPXERR_CALLBACK:
         result = SOLVE_STATUS_ERR;
+        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
+                 lpstat_str, lpstat);
         break;
 
     default:
