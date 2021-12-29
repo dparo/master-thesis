@@ -1150,30 +1150,6 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         }
     }
 
-    // WARM start
-    if (solver_params_get_bool(tparams, "INS_HEUR_WARM_START")) {
-        int64_t begin_time = os_get_usecs();
-        if (!mip_ins_heur_warm_start(solver, instance)) {
-            log_fatal("%s :: WARM start failed", __func__);
-            goto fail;
-        }
-        double diff_secs =
-            (double)(os_get_usecs() - begin_time) * USECS_TO_SECS;
-        log_info("%s :: mip_ins_heur_warm_start took %f secs", __func__,
-                 diff_secs);
-
-        timelimit = timelimit - diff_secs;
-    }
-
-    log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,
-             timelimit);
-    if (CPXXsetdblparam(solver->data->env, CPX_PARAM_TILIM, timelimit) != 0) {
-        log_fatal("%s :: CPXXsetdbparam -- Failed to setup CPX_PARAM_TILIM "
-                  "(timelimit) to value %f",
-                  __func__, timelimit);
-        goto fail;
-    }
-
     log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
              randomseed);
     if (0 !=
@@ -1258,6 +1234,30 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         CPXXgetnumcols(solver.data->env, solver.data->lp);
     solver.data->num_mip_constraints =
         CPXXgetnumrows(solver.data->env, solver.data->lp);
+
+    // WARM start
+    if (solver_params_get_bool(tparams, "INS_HEUR_WARM_START")) {
+        int64_t begin_time = os_get_usecs();
+        if (!mip_ins_heur_warm_start(&solver, instance)) {
+            log_fatal("%s :: WARM start failed", __func__);
+            goto fail;
+        }
+        double diff_secs =
+            (double)(os_get_usecs() - begin_time) * USECS_TO_SECS;
+        log_info("%s :: mip_ins_heur_warm_start took %f secs", __func__,
+                 diff_secs);
+
+        timelimit = timelimit - diff_secs;
+    }
+
+    log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,
+             timelimit);
+    if (CPXXsetdblparam(solver.data->env, CPX_PARAM_TILIM, timelimit) != 0) {
+        log_fatal("%s :: CPXXsetdbparam -- Failed to setup CPX_PARAM_TILIM "
+                  "(timelimit) to value %f",
+                  __func__, timelimit);
+        goto fail;
+    }
 
     return solver;
 fail:
