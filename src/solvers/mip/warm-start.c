@@ -40,6 +40,10 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
     }
 
 #ifndef NDEBUG
+    for (CPXDIM i = 0; i < solver->data->num_mip_vars; i++) {
+        assert(vstar[i] == 0.0 || vstar[i] == 1.0);
+    }
+
     {
         Tour t = tour_create(instance);
         unpack_mip_solution(instance, &t, vstar);
@@ -52,22 +56,6 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
         }
         tour_destroy(&t);
     }
-
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            if (i == j) {
-                continue;
-            }
-
-            double x = vstar[get_x_mip_var_idx(instance, i, j)];
-            assert(x == 0.0 || x == 1.0);
-        }
-    }
-
-    for (CPXDIM i = 0; i < solver->data->num_mip_vars; i++) {
-        assert(vstar[i] == 0.0 || vstar[i] == 1.0);
-    }
-
 #endif
 
     for (CPXDIM i = 0; i < solver->data->num_mip_vars; i++) {
