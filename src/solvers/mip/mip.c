@@ -1227,7 +1227,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
     //        In this case i'm removing a 1e-8, implying that the
     //        Zeros_reduced_cost_threshold that bapcod produces is tight
 
-    if (solver_params_get_bool(tparams, "APPY_CUTOFF")) {
+    if (solver_params_get_bool(tparams, "APPLY_CUTOFF")) {
         const double cutoff_value =
             instance->zero_reduced_cost_threshold - 1e-8;
 
