@@ -63,6 +63,7 @@ add_library(libcptp
 
     # MIP solver
     solvers/mip/mip.c
+    solvers/mip/warm-start.c
     solvers/mip/cuts/gsec.c
     solvers/mip/cuts/glm.c
     solvers/mip/cuts/rci.c

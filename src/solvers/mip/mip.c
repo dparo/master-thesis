@@ -27,6 +27,7 @@
 #include "network.h"
 #include "validation.h"
 #include "cuts.h"
+#include "warm-start.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -1083,8 +1084,18 @@ terminate:
     return result;
 }
 
+// NOTE: Not thread safe
+static void enable_cuts(SolverTypedParams *tparams) {
+    G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
+    G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
+
+    G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
+        solver_params_get_bool(tparams, "GSEC_FRAC_CUTS");
+}
+
 bool cplex_setup(Solver *solver, const Instance *instance,
-                 SolverTypedParams *tparams) {
+                 SolverTypedParams *tparams, double timelimit,
+                 int32_t randomseed) {
     int status_p = 0;
 
     solver->data->env = CPXXopenCPLEX(&status_p);
@@ -1139,6 +1150,62 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         }
     }
 
+    // WARM start
+    if (solver_params_get_bool(tparams, "INS_HEUR_WARM_START")) {
+        int64_t begin_time = os_get_usecs();
+        if (!mip_ins_heur_warm_start(solver, instance)) {
+            log_fatal("%s :: WARM start failed", __func__);
+            goto fail;
+        }
+        double diff_secs =
+            (double)(os_get_usecs() - begin_time) * USECS_TO_SECS;
+        log_info("%s :: mip_ins_heur_warm_start took %f secs", __func__,
+                 diff_secs);
+
+        timelimit = timelimit - diff_secs;
+    }
+
+    log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,
+             timelimit);
+    if (CPXXsetdblparam(solver->data->env, CPX_PARAM_TILIM, timelimit) != 0) {
+        log_fatal("%s :: CPXXsetdbparam -- Failed to setup CPX_PARAM_TILIM "
+                  "(timelimit) to value %f",
+                  __func__, timelimit);
+        goto fail;
+    }
+
+    log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
+             randomseed);
+    if (0 !=
+        CPXXsetintparam(solver->data->env, CPX_PARAM_RANDOMSEED, randomseed)) {
+        log_fatal("%s :: CPXXsetintparam -- Failed to setup "
+                  "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
+                  __func__, randomseed);
+        goto fail;
+    }
+
+    // TODO:
+    //     Verificare se il valore di `zero_reduced_cost_threshold` ritornato
+    //     da BapCod già include un EPSILON o meno. Se non lo include dobbiamo
+    //     togliere un EPSILON noi.
+    //        In this case i'm removing a 1e-8, implying that the
+    //        zero_reduced_cost_threshold that bapcod produces is tight
+
+    if (solver_params_get_bool(tparams, "APPLY_CUTOFF")) {
+        const double cutoff_value =
+            instance->zero_reduced_cost_threshold - 1e-8;
+
+        if (0 !=
+            CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTUP, cutoff_value)) {
+            log_fatal(
+                "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
+                "(upper cuttoff value) to value %f",
+                __func__, cutoff_value);
+            goto fail;
+        }
+    }
+
+    enable_cuts(tparams);
     return true;
 
 fail:
@@ -1164,15 +1231,6 @@ static void mip_solver_destroy(Solver *self) {
     self->destroy = mip_solver_destroy;
 }
 
-// NOTE: Not thread safe
-static void enable_cuts(SolverTypedParams *tparams) {
-    G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
-    G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
-
-    G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
-        solver_params_get_bool(tparams, "GSEC_FRAC_CUTS");
-}
-
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                          double timelimit, int32_t randomseed) {
     UNUSED_PARAM(tparams);
@@ -1186,7 +1244,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         goto fail;
     }
 
-    if (!cplex_setup(&solver, instance, tparams)) {
+    if (!cplex_setup(&solver, instance, tparams, timelimit, randomseed)) {
         log_fatal("%s : Failed to initialize cplex", __func__);
         goto fail;
     }
@@ -1200,48 +1258,6 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         CPXXgetnumcols(solver.data->env, solver.data->lp);
     solver.data->num_mip_constraints =
         CPXXgetnumrows(solver.data->env, solver.data->lp);
-
-    log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,
-             timelimit);
-    if (CPXXsetdblparam(solver.data->env, CPX_PARAM_TILIM, timelimit) != 0) {
-        log_fatal("%s :: CPXXsetdbparam -- Failed to setup CPX_PARAM_TILIM "
-                  "(timelimit) to value %f",
-                  __func__, timelimit);
-        goto fail;
-    }
-
-    log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
-             randomseed);
-    if (0 !=
-        CPXXsetintparam(solver.data->env, CPX_PARAM_RANDOMSEED, randomseed)) {
-        log_fatal("%s :: CPXXsetintparam -- Failed to setup "
-                  "CPX_PARAM_RANDOMSEED (randomseed) to value %d",
-                  __func__, randomseed);
-        goto fail;
-    }
-
-    // TODO:
-    //     Verificare se il valore di `zero_reduced_cost_threshold` ritornato
-    //     da BapCod già include un EPSILON o meno. Se non lo include dobbiamo
-    //     togliere un EPSILON noi.
-    //        In this case i'm removing a 1e-8, implying that the
-    //        Zeros_reduced_cost_threshold that bapcod produces is tight
-
-    if (solver_params_get_bool(tparams, "APPLY_CUTOFF")) {
-        const double cutoff_value =
-            instance->zero_reduced_cost_threshold - 1e-8;
-
-        if (0 !=
-            CPXXsetdblparam(solver.data->env, CPX_PARAM_CUTUP, cutoff_value)) {
-            log_fatal(
-                "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
-                "(upper cuttoff value) to value %f",
-                __func__, cutoff_value);
-            goto fail;
-        }
-    }
-
-    enable_cuts(tparams);
 
     return solver;
 fail:

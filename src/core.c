@@ -96,7 +96,7 @@ Solution solution_create(const Instance *instance) {
     return solution;
 }
 
-void solution_invalidate(Solution *solution) {
+void solution_clear(Solution *solution) {
     solution->lower_bound = INFINITY;
     solution->upper_bound = -INFINITY;
     tour_clear(&solution->tour);
@@ -399,7 +399,7 @@ static void postprocess_solver_solution(const Instance *instance,
     case SOLVE_STATUS_ABORTED_ERR:
     case SOLVE_STATUS_INVALID:
     case SOLVE_STATUS_ABORTED_INVALID:
-        solution_invalidate(solution);
+        solution_clear(solution);
         if (status == SOLVE_STATUS_INFEASIBLE) {
             solution->upper_bound = INFINITY;
             solution->lower_bound = INFINITY;
@@ -407,7 +407,7 @@ static void postprocess_solver_solution(const Instance *instance,
         break;
 
     case SOLVE_STATUS_INFEASIBLE:
-        solution_invalidate(solution);
+        solution_clear(solution);
         solution->upper_bound = INFINITY;
         solution->lower_bound = INFINITY;
         break;
@@ -526,7 +526,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     return status;
 
 fail:
-    solution_invalidate(solution);
+    solution_clear(solution);
     return status;
 }
 
