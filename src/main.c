@@ -120,6 +120,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
         printf("%-16s %.17g\n",
                "RELATIVE COST:", cost - instance->zero_reduced_cost_threshold);
     }
+
     printf("%-16s %s", "STARTED:", ctime(&timing.started));
     printf("%-16s %s", "ENDED:", ctime(&timing.ended));
     printf("%-16s ", "TOOK:");

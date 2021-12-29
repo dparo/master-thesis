@@ -36,6 +36,9 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"NUM_THREADS", TYPED_PARAM_INT32, "0",
          "Set the number of threads to use. Default 0, means autodetect based "
          "on the number of cores available"},
+        {"APPLY_CUTOFF", TYPED_PARAM_BOOL, "true",
+         "Appy cutoff value (CPX_PARAM_CUTUP) by using the "
+         "zero_reduced_cost_threshold"},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "false", "Enable GLM cuts separation"},
 

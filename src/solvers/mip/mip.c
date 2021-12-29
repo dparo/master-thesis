@@ -1220,12 +1220,25 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         goto fail;
     }
 
-    const double cutoff_value = instance->zero_reduced_cost_threshold - 1e-8;
-    if (0 != CPXXsetdblparam(solver.data->env, CPX_PARAM_CUTUP, cutoff_value)) {
-        log_fatal("%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
-                  "(upper cuttoff value) to value %f",
-                  __func__, cutoff_value);
-        goto fail;
+    // TODO:
+    //     Verificare se il valore di `zero_reduced_cost_threshold` ritornato
+    //     da BapCod già include un EPSILON o meno. Se non lo include dobbiamo
+    //     togliere un EPSILON noi.
+    //        In this case i'm removing a 1e-8, implying that the
+    //        Zeros_reduced_cost_threshold that bapcod produces is tight
+
+    if (solver_params_get_bool(tparams, "APPY_CUTOFF")) {
+        const double cutoff_value =
+            instance->zero_reduced_cost_threshold - 1e-8;
+
+        if (0 !=
+            CPXXsetdblparam(solver.data->env, CPX_PARAM_CUTUP, cutoff_value)) {
+            log_fatal(
+                "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
+                "(upper cuttoff value) to value %f",
+                __func__, cutoff_value);
+            goto fail;
+        }
     }
 
     enable_cuts(tparams);
