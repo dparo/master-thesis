@@ -171,6 +171,8 @@ static inline bool mip_cut_fractional_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
     return true;
 }
 
+void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar);
+
 #if __cplusplus
 }
 #endif

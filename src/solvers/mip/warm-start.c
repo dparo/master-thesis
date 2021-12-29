@@ -16,9 +16,6 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
         malloc(solver->data->num_mip_vars * sizeof(*varindices));
 
     double *vstar = malloc(solver->data->num_mip_vars * sizeof(*vstar));
-#ifndef NDEBUG
-    memset(vstar, 0xCD, solver->data->num_mip_vars * sizeof(*vstar));
-#endif
 
     for (int32_t i = 0; i < n; i++) {
         bool i_is_visited = solution->tour.comp[i] == 0;
@@ -33,7 +30,8 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
 
             int32_t succ_i = solution->tour.succ[i];
 
-            if (succ_i == j) {
+            if (succ_i == j && solution->tour.comp[i] == 0 &&
+                solution->tour.comp[j] == 0) {
                 vstar[get_x_mip_var_idx(instance, i, j)] = 1.0;
             } else {
                 vstar[get_x_mip_var_idx(instance, i, j)] = 0.0;
@@ -42,6 +40,19 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
     }
 
 #ifndef NDEBUG
+    {
+        Tour t = tour_create(instance);
+        unpack_mip_solution(instance, &t, vstar);
+        validate_tour(instance, &t);
+        assert(t.num_comps == 1);
+        for (int32_t i = 0; i < n; i++) {
+            assert(t.comp[i] == solution->tour.comp[i]);
+            assert(t.succ[i] == solution->tour.succ[i]);
+            assert(t.succ[i] == solution->tour.succ[i]);
+        }
+        tour_destroy(&t);
+    }
+
     for (int32_t i = 0; i < n; i++) {
         for (int32_t j = 0; j < n; j++) {
             if (i == j) {

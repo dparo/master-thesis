@@ -209,8 +209,7 @@ static void validate_mip_vars_packing(const Instance *instance) {
 #endif
 }
 
-static void unpack_mip_solution(const Instance *instance, Tour *t,
-                                double *vstar) {
+void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
 
     int32_t n = t->num_customers + 1;
 
