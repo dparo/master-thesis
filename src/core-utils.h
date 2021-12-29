@@ -108,22 +108,29 @@ static inline double tour_eval(const Instance *instance, Tour *tour) {
 
     double cost = 0.0;
     double profit = 0.0;
+    double demands = 0.0;
 
     int32_t curr_vertex = 0;
-    int32_t next_vertex;
+    int32_t next_vertex = -1;
 
     profit += instance->duals[0];
+    demands += instance->demands[0];
 
     while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
         assert(next_vertex != curr_vertex);
         cost += cptp_dist(instance, curr_vertex, next_vertex);
         profit += instance->duals[next_vertex];
+        demands += instance->demands[next_vertex];
         curr_vertex = next_vertex;
     }
 
     cost += cptp_dist(instance, curr_vertex, 0);
 
-    return cost - profit;
+    if (demands > instance->vehicle_cap) {
+        return INFINITY;
+    } else {
+        return cost - profit;
+    }
 }
 
 static inline double solution_relgap(Solution *solution) {
