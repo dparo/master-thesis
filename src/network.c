@@ -555,17 +555,59 @@ void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
         push_relabel_max_flow2(net, s, t, &ctx->mfr, &ctx->pr_ctx);
 }
 
+static double ght_modified_max_flow(FlowNetwork *net, GomoryHuTree *output,
+                                    GomoryHuTreeCtx *ctx) {
+    assert(!"TODO");
+    return 0.0;
+}
+
+enum {
+    BLACK = 0,
+    GRAY = 1,
+    WHITE = 2,
+};
+
 static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
                                                 GomoryHuTree *output,
-                                                GomoryHuTreeCtx *ctx) {}
+                                                GomoryHuTreeCtx *ctx) {
+    ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
+    for (int32_t i = 0; i < n; i++) {
+        ctx->ff.p[i] = 0;
+        ctx->ff.flows[i] = 0.0;
+        for (int32_t j = 0; j < n; j++) {
+            *network_cap(&ctx->ff.reduced_net, i, j) = 0.0;
+        }
+    }
+
+    for (int32_t s = 1; s < n; s++) {
+        int32_t t = ctx->ff.p[s];
+
+        double max_flow = ght_modified_max_flow(net, output, ctx);
+        ctx->ff.flows[s] = max_flow;
+
+        for (int32_t i = 0; i < n; i++) {
+            if (i != s && ctx->ff.p[i] == t) {
+                if (ctx->ff.colors[i] == BLACK) {
+                    ctx->ff.p[i] = s;
+                }
+            }
+        }
+
+        if (s == n - 1) {
+            for (int32_t i = 1; i < s + 1; i++) {
+                // Produce the tree
+                double f = ctx->ff.flows[i];
+                int32_t u = ctx->ff.p[i];
+                *network_cap(&ctx->ff.reduced_net, i, u) = f;
+                *network_cap(&ctx->ff.reduced_net, u, i) = f;
+            }
+        }
+    }
+}
 
 void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
                      GomoryHuTreeCtx *ctx) {
-
-#if 1
-    gomory_hu_tree_using_ford_fulkerson(net, output, ctx);
-#else
-    int32_t n = net->nnodes;
+    ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
 
 #ifndef NDEBUG
 
@@ -582,6 +624,10 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
     }
 
 #endif
+
+#if 1
+    gomory_hu_tree_using_ford_fulkerson(net, output, ctx);
+#else
 
     ctx->num_edges = 0;
     ctx->num_sets = 1;
