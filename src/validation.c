@@ -67,6 +67,15 @@ void validate_tour(const Instance *instance, Tour *tour) {
             int32_t c = *tcomp(tour, i);
             assert(c == 0 || c < 0);
         }
+
+        // Check that each vertex if is part of a component index it has its
+        // succ populated
+        for (int32_t i = 0; i < n; i++) {
+            int32_t c = *tcomp(tour, i);
+            if (c >= 0) {
+                assert(*tsucc(tour, i) >= 0 && *tsucc(tour, i) < n);
+            }
+        }
     }
 
     //
