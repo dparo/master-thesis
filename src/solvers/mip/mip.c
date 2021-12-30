@@ -1273,6 +1273,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         }
         double diff_secs =
             (double)(os_get_usecs() - begin_time) * USECS_TO_SECS;
+        printf("WARM START took %f secs\n", diff_secs);
         log_info("%s :: mip_ins_heur_warm_start took %f secs", __func__,
                  diff_secs);
 

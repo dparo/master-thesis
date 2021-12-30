@@ -792,6 +792,13 @@ static void main_loop(void) {
                   "mip",
                   "-DGSEC_FRAC_CUTS=0",
               }},
+             {"My CPTP MIP pricer",
+              {
+                  "--solver",
+                  "mip",
+                  "-DGSEC_FRAC_CUTS=0",
+                  "-DPRICER_MODE=1",
+              }},
              BAPCOD_SOLVER,
          }},
         {1,
@@ -806,6 +813,14 @@ static void main_loop(void) {
                   "--solver",
                   "mip",
                   "-DGSEC_FRAC_CUTS=0",
+              }},
+             {"My CPTP MIP pricer",
+              {
+                  "--solver",
+                  "mip",
+                  "-DGSEC_FRAC_CUTS=0",
+                  "-DPRICER_MODE=1",
+
               }},
              BAPCOD_SOLVER,
          }},
@@ -822,6 +837,14 @@ static void main_loop(void) {
                   "mip",
                   "-DGSEC_FRAC_CUTS=0",
               }},
+             {"My CPTP MIP pricer",
+              {
+                  "--solver",
+                  "mip",
+                  "-DGSEC_FRAC_CUTS=0",
+                  "-DPRICER_MODE=1",
+              }},
+
              BAPCOD_SOLVER,
          }}};
 

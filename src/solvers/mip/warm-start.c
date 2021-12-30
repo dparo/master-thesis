@@ -253,7 +253,6 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
     InsHeurNodePair starting_pair;
     starting_pair.u = 0;
 
-
     for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
         if (starting_pair.v == starting_pair.u) {
             continue;
@@ -261,10 +260,9 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
         if (valid_starting_pair(instance, &starting_pair)) {
             ins_heur(solver, instance, &solution, starting_pair);
         }
-        printf("%s :: Warm starting with a solution of cost %f\n", __func__,
-               solution.upper_bound);
-        log_info("%s :: Found a solution of cost %f", __func__,
-                 solution.upper_bound);
+        log_info("%s :: Found a solution of cost %f (relative_cost = %f)",
+                 __func__, solution.upper_bound,
+                 solution.upper_bound - instance->zero_reduced_cost_threshold);
 
         if (!register_warm_solution(solver, instance, &solution)) {
             log_fatal("%s :: register_warm_solution_failed", __func__);
@@ -272,7 +270,6 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
             goto terminate;
         }
     }
-
 
 terminate:
     solution_destroy(&solution);

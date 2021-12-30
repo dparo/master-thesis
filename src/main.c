@@ -210,8 +210,9 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     TimeRepr timerepr = timerepr_from_usecs(timing.took_usecs);
     timerepr_to_string(&timerepr, timerepr_str, ARRAY_LEN(timerepr_str));
 
-    s &= cJSON_AddItemToObject(root, "took",
-                               cJSON_CreateNumber(timing.took_usecs / 1.0e6));
+    s &= cJSON_AddItemToObject(
+        root, "took",
+        cJSON_CreateNumber((double)timing.took_usecs * USECS_TO_SECS));
     s &= cJSON_AddItemToObject(root, "tookRepr",
                                cJSON_CreateString(timerepr_str));
 

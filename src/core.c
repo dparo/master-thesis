@@ -474,6 +474,8 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     printf("%s :: Setting seed = %d\n", __func__, randomseed);
     srand(randomseed);
 
+    printf("%s :: Setting timelimit = %f\n", __func__, timelimit);
+
     if (!verify_solver_params(lookup->descriptor, params)) {
         fprintf(stderr, "ERROR: %s :: Failed to verify params\n", __func__);
         goto fail;

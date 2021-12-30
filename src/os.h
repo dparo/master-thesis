@@ -29,7 +29,7 @@ extern "C" {
 #define OS_MAX_PATH 4096
 
 #define USECS_TO_SECS ((double)1e-6)
-#define SECS_TO_USECS ((double)1000000)
+#define SECS_TO_USECS (INT64_C(1000000))
 
 #include <stdint.h>
 #include <stddef.h>
