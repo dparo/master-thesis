@@ -274,7 +274,6 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
             assert(*succ(t, i) < 0);
         }
     }
-    validate_tour(instance, t);
 #endif
 }
 
