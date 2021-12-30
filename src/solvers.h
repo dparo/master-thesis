@@ -39,6 +39,10 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"APPLY_CUTOFF", TYPED_PARAM_BOOL, "false",
          "Apply cutoff value (CPX_PARAM_CUTUP) by using the "
          "zero_reduced_cost_threshold"},
+        {"PRICER_MODE", TYPED_PARAM_BOOL, "true",
+         "Behave as pricer. Terminate solution process as soon as a negative "
+         "value tour is found, without proving its optimality (there may exist "
+         "more optimal tours) "},
         {"INS_HEUR_WARM_START", TYPED_PARAM_BOOL, "true",
          "Warm start the MIP solver by using an insertion heuristic for "
          "finding an initial solution"},

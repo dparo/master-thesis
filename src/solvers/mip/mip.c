@@ -604,7 +604,7 @@ static int cplex_on_branching(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     assert(threadid <= MAX_NUM_CORES);
 
     Solver *solver = ctx->solver;
-    const Instance *instance = ctx->instance;
+    ATTRIB_MAYBE_UNUSED const Instance *instance = ctx->instance;
     CallbackThreadLocalData *tld = &ctx->thread_local_data[threadid];
     double *vstar = tld->vstar;
     double obj_p;
@@ -650,8 +650,9 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     }
 
     double obj_p;
-    if (CPXXcallbackgetcandidatepoint(cplex_cb_ctx, vstar, 0,
-                                      solver->data->num_mip_vars - 1, &obj_p)) {
+    if (0 != CPXXcallbackgetcandidatepoint(cplex_cb_ctx, vstar, 0,
+                                           solver->data->num_mip_vars - 1,
+                                           &obj_p)) {
         log_fatal("%s :: Failed `CPXcallbackgetcandidatepoint`", __func__);
         goto terminate;
     }
@@ -659,9 +660,10 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     unpack_mip_solution(instance, tour, vstar);
 
     if (tour->num_comps >= 2) {
-        log_trace("%s :: num_comps of unpacked tour is %d -- rejecting "
+        log_trace("%s :: obj_p = %f, num_comps of unpacked "
+                  "tour is %d -- rejecting "
                   "candidate point...",
-                  __func__, tour->num_comps);
+                  __func__, obj_p, tour->num_comps);
 
         for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
             if (is_active_cut(cut_id)) {
@@ -729,25 +731,25 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
                             &simplex_iterations);
 
-    double incumbent = INFINITY;
-    CPXXcallbackgetincumbent(context, NULL, 0, 0, &incumbent);
-
     if (lower_bound <= -CPX_INFBOUND) {
         lower_bound = -INFINITY;
     }
     if (upper_bound >= CPX_INFBOUND) {
         upper_bound = INFINITY;
     }
-    if (incumbent >= CPX_INFBOUND) {
-        incumbent = INFINITY;
-    }
 
     log_trace("%s :: num_restarts = %d, num_processed_nodes = %lld, "
               "num_nodes_left = %lld, "
               "simplex_iterations = %lld, "
-              "lower_bound = %.12f, upper_bound = %f, incumbent = %.12f",
+              "lower_bound = %.12f, upper_bound = %f",
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
-              simplex_iterations, lower_bound, incumbent, upper_bound);
+              simplex_iterations, lower_bound, upper_bound);
+
+    if (solver->data->pricer_mode &&
+        (upper_bound < instance->zero_reduced_cost_threshold)) {
+        CPXXcallbackabort(context);
+    }
+
     return 0;
 }
 
@@ -1149,6 +1151,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         }
     }
 
+    if (solver_params_get_bool(tparams, "PRICER_MODE")) {
+        solver->data->pricer_mode = true;
+    }
+
     log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
              randomseed);
     if (0 !=
@@ -1181,6 +1187,30 @@ bool cplex_setup(Solver *solver, const Instance *instance,
     }
 
     enable_cuts(tparams);
+
+    // NOTE:
+    // This routine enables applications to terminate CPLEX gracefully.
+    // Conventionally, your application should first call this routine to set a
+    // pointer to the termination signal. Then the application can set the
+    // termination signal to a nonzero value to tell CPLEX to abort. These
+    // conventions will terminate CPLEX even in a different thread. In other
+    // words, this routine makes it possible to handle signals such as control-C
+    // from a user interface. These conventions also enable termination within
+    // CPLEX callbacks.
+    //
+    // NOTE:  If this CPXXcallbackabort is called from a thread that currently
+    // executes speculative code, and the current context is not
+    // CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS, then the request to abort may be
+    // ignored. Use CPXXsetterminate and CPXsetterminate if you want to make
+    // sure CPLEX terminates even in that case.
+    //
+    // TODO: This unfortunately does not work as expected. I'm disabling this
+    if (0) {
+        if (0 != CPXXsetterminate(solver->data->env,
+                                  &solver->should_terminate_int)) {
+            log_warn("%s :: Failed CPXXsetterminate()", __func__);
+        }
+    }
     return true;
 
 fail:

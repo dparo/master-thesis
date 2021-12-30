@@ -431,7 +431,7 @@ static void postprocess_solver_solution(const Instance *instance,
 }
 
 typedef void (*sighandler_t)(int);
-static THREAD_LOCAL Solver *sighandler_ctx_solver_ptr;
+static THREAD_LOCAL volatile Solver *sighandler_ctx_solver_ptr;
 
 /// \brief Consumes the signal and does not propage it further
 static void cptp_sighandler(int signum) {
@@ -448,6 +448,7 @@ static void cptp_sighandler(int signum) {
     if (signum == SIGTERM || signum == SIGINT) {
         if (sighandler_ctx_solver_ptr) {
             sighandler_ctx_solver_ptr->should_terminate = true;
+            sighandler_ctx_solver_ptr->should_terminate_int = 1;
         }
     }
 }
@@ -467,7 +468,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
     }
 
     if (randomseed == 0) {
-        randomseed = time(NULL);
+        randomseed = (int32_t)(time(NULL) % INT32_MAX);
     }
 
     printf("%s :: Setting seed = %d\n", __func__, randomseed);
@@ -490,6 +491,9 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         lookup->create_fn(instance, &tparams, timelimit, randomseed);
 
     {
+        solver.should_terminate = false;
+        solver.should_terminate_int = 0;
+
         // Setup signals
         sighandler_ctx_solver_ptr = &solver;
         sighandler_t prev_sigterm_handler = signal(SIGTERM, cptp_sighandler);

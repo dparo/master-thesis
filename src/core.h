@@ -117,7 +117,8 @@ typedef enum SolveStatus {
 
 typedef struct Solver {
     SolverData *data;
-    bool should_terminate;
+    volatile bool should_terminate;
+    volatile int should_terminate_int;
 
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
