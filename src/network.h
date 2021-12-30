@@ -76,7 +76,16 @@ typedef struct {
     GomoryHuEdge *edges;
 } GomoryHuTree;
 
+typedef struct GomoryHuTreeFordFulkersonCtx {
+    int32_t *p;
+    double *flows;
+    int32_t *colors;
+    int32_t *bfs_queue;
+    FlowNetwork reduced_net;
+} GomoryHuTreeFordFulkersonCtx;
+
 typedef struct {
+    GomoryHuTreeFordFulkersonCtx ff;
     FlowNetwork contracted_net;
     MaxFlowResult mfr;
     PushRelabelCtx pr_ctx;
@@ -113,7 +122,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
                                             int32_t source_vertex,
                                             int32_t sink_vertex);
 
-bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx);
+bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes);
 void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx);
 void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
                      GomoryHuTreeCtx *ctx);

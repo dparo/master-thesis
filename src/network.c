@@ -555,8 +555,16 @@ void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
         push_relabel_max_flow2(net, s, t, &ctx->mfr, &ctx->pr_ctx);
 }
 
+static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
+                                                GomoryHuTree *output,
+                                                GomoryHuTreeCtx *ctx) {}
+
 void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
                      GomoryHuTreeCtx *ctx) {
+
+#if 1
+    gomory_hu_tree_using_ford_fulkerson(net, output, ctx);
+#else
     int32_t n = net->nnodes;
 
 #ifndef NDEBUG
@@ -674,16 +682,37 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
     }
 
     assert(output->nedges == n - 1);
+#endif
 }
 
-bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx) { return true; }
+bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {
+    ctx->ff.p = malloc(nnodes * sizeof(*ctx->ff.p));
+    ctx->ff.flows = malloc(nnodes * sizeof(*ctx->ff.flows));
+    ctx->ff.colors = malloc(nnodes * sizeof(*ctx->ff.colors));
+    ctx->ff.bfs_queue = malloc(nnodes * sizeof(*ctx->ff.bfs_queue));
 
-void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {}
+    ctx->ff.reduced_net = flow_network_create(nnodes);
+    if (ctx->ff.p && ctx->ff.flows && ctx->ff.colors && ctx->ff.bfs_queue &&
+        ctx->ff.reduced_net.flow && ctx->ff.reduced_net.cap) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
+    free(ctx->ff.p);
+    free(ctx->ff.flows);
+    free(ctx->ff.colors);
+    free(ctx->ff.bfs_queue);
+    flow_network_destroy(&ctx->ff.reduced_net);
+    memset(ctx, 0, sizeof(*ctx));
+}
 
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {
     GomoryHuTreeCtx ctx = {0};
 
-    bool create_success = gomory_hu_tree_ctx_create(&ctx);
+    bool create_success = gomory_hu_tree_ctx_create(&ctx, net->nnodes);
     if (create_success) {
         gomory_hu_tree2(net, output, &ctx);
     }
