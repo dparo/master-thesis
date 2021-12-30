@@ -10,7 +10,7 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
     bool result = true;
     const int32_t n = instance->num_customers + 1;
     CPXNNZ beg[] = {0};
-    int effortlevel[] = {CPX_MIPSTART_NOCHECK};
+    int effortlevel[] = {CPX_MIPSTART_CHECKFEAS};
     // int *effortlevel = NULL;
     CPXDIM *varindices =
         malloc(solver->data->num_mip_vars * sizeof(*varindices));
@@ -86,8 +86,22 @@ terminate:
     return result;
 }
 
-bool ins_heur_find_starting_pair(const Instance *instance,
-                                 InsHeurNodePair *start_pair) {
+static bool valid_starting_pair(const Instance *instance,
+                                InsHeurNodePair *pair) {
+    assert(pair->u != pair->v);
+    if (pair->u == pair->v) {
+        return false;
+    }
+    const double Q = instance->vehicle_cap;
+    if ((instance->demands[pair->u] + instance->demands[pair->v]) <= Q) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+static bool random_insheur_starting_pair(const Instance *instance,
+                                         InsHeurNodePair *start_pair) {
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
 
@@ -121,24 +135,16 @@ bool ins_heur_find_starting_pair(const Instance *instance,
 
     start_pair->u = s;
     start_pair->v = e;
+    assert(valid_starting_pair(instance, start_pair));
     return true;
 }
 
-bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
-    bool result = true;
+static void ins_heur(Solver *solver, const Instance *instance,
+                     Solution *solution, InsHeurNodePair starting_pair) {
+    Tour *const tour = &solution->tour;
+
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
-
-    Solution solution = solution_create(instance);
-    Tour *const tour = &solution.tour;
-    tour->num_comps = 1;
-
-    InsHeurNodePair starting_pair;
-    if (!ins_heur_find_starting_pair(instance, &starting_pair)) {
-        log_fatal("%s :: Unable to find starting pair", __func__);
-        result = false;
-        goto terminate;
-    }
 
     const int32_t start = starting_pair.u;
     const int32_t end = starting_pair.v;
@@ -147,6 +153,8 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
     assert(end >= 0 && end < n);
     assert(start != end);
 
+    tour_clear(tour);
+    tour->num_comps = 1;
     tour->comp[start] = 0;
     tour->comp[end] = 0;
     tour->succ[start] = end;
@@ -158,13 +166,13 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
     double sum_demands = instance->demands[start] + instance->demands[end];
 
     while (true) {
-        double best_delta_cost = INFINITY;
+        double best_delta_cost = 0.0;
         int32_t best_h = -1;
         int32_t best_a = -1;
         int32_t best_b = -1;
 
-        // Scan for node to be inserted
-        for (int32_t h = 1; h < n; h++) {
+        // Scan for nodes to be inserted
+        for (int32_t h = 0; h < n; h++) {
             bool h_is_visited = tour->comp[h] == 0;
             if (h_is_visited) {
                 continue;
@@ -190,7 +198,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
                     delta_cost = c_ah + c_hb - c_ab - instance->duals[h];
                 }
 
-                if (delta_cost < best_delta_cost) {
+                if (h == 0 || delta_cost < best_delta_cost) {
                     best_delta_cost = delta_cost;
                     best_h = h;
                     best_a = a;
@@ -199,7 +207,8 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
             }
         }
 
-        if (best_h < 0 || best_delta_cost > 0.0) {
+        if (best_h < 0) {
+            assert(tour->comp[0] == 0);
             break;
         }
 
@@ -208,32 +217,62 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
         assert(best_b >= 0 && best_b < n);
         assert(tour->succ[best_a] == best_b);
 
-        cost += best_delta_cost;
-        sum_demands += instance->demands[best_h];
+        if (best_delta_cost < 0.0) {
+            cost += best_delta_cost;
+            sum_demands += instance->demands[best_h];
 
-        tour->comp[best_h] = 0;
-        tour->succ[best_a] = best_h;
-        tour->succ[best_h] = best_b;
+            tour->comp[best_h] = 0;
+            tour->succ[best_a] = best_h;
+            tour->succ[best_h] = best_b;
+        } else {
+            assert(tour->comp[0] == 0);
+            break;
+        }
 
 #ifndef NDEBUG
-        validate_tour(instance, tour);
+        if (tour->comp[0] == 0) {
+            validate_tour(instance, tour);
+        }
 #endif
     }
 
-    solution.upper_bound = cost;
-    printf("%s :: Warm starting with a solution of cost %f\n", __func__, cost);
-    log_info("%s :: Found a solution of cost %f", __func__, cost);
+    solution->upper_bound = cost;
 
 #ifndef NDEBUG
     validate_tour(instance, tour);
-    validate_solution(instance, &solution);
+    validate_solution(instance, solution);
 #endif
+}
 
-    if (!register_warm_solution(solver, instance, &solution)) {
-        log_fatal("%s :: register_warm_solution_failed", __func__);
-        result = false;
-        goto terminate;
+bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
+    bool result = true;
+    const int32_t n = instance->num_customers + 1;
+    const double Q = instance->vehicle_cap;
+
+    Solution solution = solution_create(instance);
+    InsHeurNodePair starting_pair;
+    starting_pair.u = 0;
+
+
+    for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
+        if (starting_pair.v == starting_pair.u) {
+            continue;
+        }
+        if (valid_starting_pair(instance, &starting_pair)) {
+            ins_heur(solver, instance, &solution, starting_pair);
+        }
+        printf("%s :: Warm starting with a solution of cost %f\n", __func__,
+               solution.upper_bound);
+        log_info("%s :: Found a solution of cost %f", __func__,
+                 solution.upper_bound);
+
+        if (!register_warm_solution(solver, instance, &solution)) {
+            log_fatal("%s :: register_warm_solution_failed", __func__);
+            result = false;
+            goto terminate;
+        }
     }
+
 
 terminate:
     solution_destroy(&solution);
