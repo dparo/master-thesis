@@ -2,6 +2,7 @@
 /docs/
 .local
 .gdb_history
+gdb.txt
 .log
 .cache
 *.swp
