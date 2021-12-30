@@ -32,7 +32,7 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
             int32_t comp_i = solution->tour.comp[i];
             int32_t comp_j = solution->tour.comp[j];
 
-            if (comp_i && comp_j) {
+            if (comp_i == 0 && comp_j == 0) {
                 assert(succ_i >= 0 && succ_i < n);
                 assert(succ_j >= 0 && succ_j < n);
 
@@ -59,8 +59,10 @@ static bool register_warm_solution(Solver *solver, const Instance *instance,
         assert(t.num_comps == 1);
         for (int32_t i = 0; i < n; i++) {
             assert(t.comp[i] == solution->tour.comp[i]);
-            assert(t.succ[i] == solution->tour.succ[i]);
-            assert(t.succ[i] == solution->tour.succ[i]);
+            // NOTE: Cannot perform this comparison since two tours
+            //       may express the same route, but not be bit, by bit
+            //       compatible. Eg the same route taken in reversed order
+            // assert(t.succ[i] == solution->tour.succ[i]);
         }
         tour_destroy(&t);
     }
