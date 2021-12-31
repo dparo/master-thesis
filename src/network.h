@@ -79,7 +79,8 @@ typedef struct {
 typedef struct GomoryHuTreeFordFulkersonCtx {
     int32_t *p;
     double *flows;
-    int32_t *colors;
+    uint8_t *colors;
+    int32_t *pred;
     int32_t *bfs_queue;
     FlowNetwork reduced_net;
 } GomoryHuTreeFordFulkersonCtx;
