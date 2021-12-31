@@ -555,22 +555,23 @@ void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
         push_relabel_max_flow2(net, s, t, &ctx->mfr, &ctx->pr_ctx);
 }
 
-static double ght_modified_max_flow(FlowNetwork *net, GomoryHuTree *output,
-                                    GomoryHuTreeCtx *ctx) {
-    assert(!"TODO");
-    return 0.0;
-}
-
 enum {
     BLACK = 0,
     GRAY = 1,
     WHITE = 2,
 };
 
+static double ght_modified_max_flow(FlowNetwork *net, GomoryHuTree *output,
+                                    GomoryHuTreeCtx *ctx) {
+    assert(!"TODO");
+    return 0.0;
+}
+
 static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
                                                 GomoryHuTree *output,
                                                 GomoryHuTreeCtx *ctx) {
     ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
+
     for (int32_t i = 0; i < n; i++) {
         ctx->ff.p[i] = 0;
         ctx->ff.flows[i] = 0.0;
@@ -591,6 +592,13 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
                     ctx->ff.p[i] = s;
                 }
             }
+        }
+
+        if (ctx->ff.colors[ctx->ff.p[t]] == BLACK) {
+            ctx->ff.p[s] = ctx->ff.p[t];
+            ctx->ff.p[t] = s;
+            ctx->ff.flows[s] = ctx->ff.flows[t];
+            ctx->ff.flows[t] = max_flow;
         }
 
         if (s == n - 1) {
