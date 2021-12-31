@@ -578,12 +578,12 @@ static bool ff_bfs(FlowNetwork *net, GomoryHuTree *output, GomoryHuTreeCtx *ctx,
         ctx->ff.colors[u] = WHITE;
     }
 
-    int32_t head = 0;
-    int32_t tail = 0;
-
     int32_t *queue = ctx->ff.bfs_queue;
 
+    int32_t head = 0;
+    int32_t tail = 0;
     queue[tail++] = source;
+    ctx->ff.pred[source] = -1;
 
     // While queue is not empty
     while (head != tail) {
@@ -595,8 +595,7 @@ static bool ff_bfs(FlowNetwork *net, GomoryHuTree *output, GomoryHuTreeCtx *ctx,
             bool v_needs_processing =
                 ctx->ff.colors[v] == WHITE && residual_cap(net, u, v) > 0.0;
             if (v_needs_processing) {
-                // Setup v as a possible candidate for further processing in the
-                // bfs queue
+                // Queue v forfurther processing, and mark it as "visited"
                 queue[tail++] = v;
                 ctx->ff.colors[v] = GRAY;
                 ctx->ff.pred[v] = u;
@@ -611,6 +610,8 @@ static bool ff_bfs(FlowNetwork *net, GomoryHuTree *output, GomoryHuTreeCtx *ctx,
 static double ford_fulkerson(FlowNetwork *net, GomoryHuTree *output,
                              GomoryHuTreeCtx *ctx, int32_t source,
                              int32_t sink) {
+    const int32_t n = net->nnodes;
+
     double max_flow = 0.0;
 
     // Clear the network flows
@@ -620,20 +621,17 @@ static double ford_fulkerson(FlowNetwork *net, GomoryHuTree *output,
     // additional flow)
     while (ff_bfs(net, output, ctx, source, sink)) {
         double increment = INFINITY;
-        int32_t u = sink;
 
         // Walk the augmenting path backward, and find the minimum residual
         // capacity available in the path
-        while (ctx->ff.pred[u] != -1) {
+        for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
             int32_t pred_u = ctx->ff.pred[u];
             double res_cap = residual_cap(net, pred_u, u);
             increment = MIN(increment, res_cap);
-            u = pred_u;
         }
 
         // Update the path with the computed delta flow
-        u = sink;
-        while (ctx->ff.pred[u] != -1) {
+        for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
             int32_t pred_u = ctx->ff.pred[u];
             *flow(net, pred_u, u) += increment;
             *flow(net, u, pred_u) -= increment;
@@ -663,6 +661,18 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
 
         double max_flow = ford_fulkerson(net, output, ctx, s, t);
         ctx->ff.flows[s] = max_flow;
+
+        // NOTE:
+        //       As a side effect from running the ford_fulkerson and bfs,
+        //       ctx->ff.colors will mark
+        //       the bipartition induced from the minimum cut
+#ifndef NDEBUG
+        assert(ctx->ff.colors[s] == BLACK);
+        assert(ctx->ff.colors[t] == WHITE);
+        for (int32_t i = 0; i < n; i++) {
+            assert(ctx->ff.colors[i] == WHITE || ctx->ff.colors[i] == BLACK);
+        }
+#endif
 
         for (int32_t i = 0; i < n; i++) {
             if (i != s && ctx->ff.p[i] == t) {
