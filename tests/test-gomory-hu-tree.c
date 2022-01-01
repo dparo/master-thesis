@@ -43,22 +43,22 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
     BruteforceMaxFlowResult bf =
         max_flow_bruteforce(net, source_vertex, sink_vertex);
 
-    printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
-           bf.maxflow);
-    printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
+    // printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
+    //        bf.maxflow);
+    // printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
 
     for (int32_t i = 0; i < net->nnodes; i++) {
-        printf("computed_bipartition[%d] = %d\n", i,
-               result->bipartition.data[i]);
+        // printf("computed_bipartition[%d] = %d\n", i,
+        //        result->bipartition.data[i]);
     }
 
     for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
         for (int32_t i = 0; i < net->nnodes; i++) {
-            printf("section[%d][%d] = %d\n", secidx, i,
-                   bf.sections[secidx].bipartition.data[i]);
+            // printf("section[%d][%d] = %d\n", secidx, i,
+            //        bf.sections[secidx].bipartition.data[i]);
         }
     }
-    printf("\n");
+    // printf("\n");
 
     bool is_valid_section = false;
 
@@ -181,9 +181,10 @@ TEST random_gomory_hu(void) {
             GomoryHuTree tree = gomory_hu_tree_create(nnodes);
             GomoryHuTreeCtx gh_ctx;
 
-            double max_flow1, max_flow2;
+            double max_flow1 = INFINITY, max_flow2 = INFINITY;
 
             gomory_hu_tree_ctx_create(&gh_ctx, nnodes);
+            gomory_hu_tree2(&network, &tree, &gh_ctx);
             for (int32_t source = 0; source < nnodes; source++) {
                 for (int32_t sink = 0; sink < nnodes; sink++) {
                     if (source == sink) {
