@@ -186,6 +186,9 @@ TEST random_gomory_hu(void) {
             gomory_hu_tree_ctx_create(&gh_ctx, nnodes);
             for (int32_t source = 0; source < nnodes; source++) {
                 for (int32_t sink = 0; sink < nnodes; sink++) {
+                    if (source == sink) {
+                        continue;
+                    }
                     max_flow1 = push_relabel_max_flow(&network, source, sink,
                                                       &max_flow_result1);
                     max_flow2 =
@@ -203,6 +206,7 @@ TEST random_gomory_hu(void) {
             gomory_hu_tree_destroy(&tree);
         }
     }
+    PASS();
 }
 
 GREATEST_MAIN_DEFS();
@@ -210,5 +214,6 @@ GREATEST_MAIN_DEFS();
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
     RUN_TEST(random_symm_networks);
+    RUN_TEST(random_gomory_hu);
     GREATEST_MAIN_END(); /* display results */
 }
