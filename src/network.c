@@ -657,8 +657,8 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
     }
 
     for (int32_t s = 1; s < n; s++) {
-        int32_t t = ctx->ff.p[s];
 
+        int32_t t = ctx->ff.p[s];
         double max_flow = ford_fulkerson(net, output, ctx, s, t);
         ctx->ff.flows[s] = max_flow;
 
@@ -675,29 +675,26 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
 #endif
 
         for (int32_t i = 0; i < n; i++) {
-            if (i != s && ctx->ff.p[i] == t) {
-                if (ctx->ff.colors[i] == BLACK) {
-                    ctx->ff.p[i] = s;
-                }
+            if (i != s && ctx->ff.p[i] == t && ctx->ff.colors[i] == BLACK) {
+                ctx->ff.p[i] = s;
             }
         }
 
+        // Checking whether p[t] is in the nodes (colored black)
         if (ctx->ff.colors[ctx->ff.p[t]] == BLACK) {
             ctx->ff.p[s] = ctx->ff.p[t];
             ctx->ff.p[t] = s;
             ctx->ff.flows[s] = ctx->ff.flows[t];
             ctx->ff.flows[t] = max_flow;
         }
+    }
 
-        if (s == n - 1) {
-            for (int32_t i = 1; i < s + 1; i++) {
-                // Produce the tree
-                double f = ctx->ff.flows[i];
-                int32_t u = ctx->ff.p[i];
-                *network_cap(&ctx->ff.reduced_net, i, u) = f;
-                *network_cap(&ctx->ff.reduced_net, u, i) = f;
-            }
-        }
+    // Produce the tree
+    for (int32_t i = 1; i < n; i++) {
+        double f = ctx->ff.flows[i];
+        int32_t u = ctx->ff.p[i];
+        *network_cap(&ctx->ff.reduced_net, i, u) = f;
+        *network_cap(&ctx->ff.reduced_net, u, i) = f;
     }
 }
 
