@@ -674,18 +674,26 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
         }
 #endif
 
+        // Setup the next sink candidate for each vertex according to their
+        // bipartition (s, t) are setup in such a way that they share
+        // bipartition, are unique, and valid max_flow candidate
         for (int32_t i = 0; i < n; i++) {
             if (i != s && ctx->ff.p[i] == t && ctx->ff.colors[i] == BLACK) {
                 ctx->ff.p[i] = s;
+            } else if (i != t && ctx->ff.p[i] == s &&
+                       ctx->ff.colors[i] == WHITE) {
+                ctx->ff.p[i] = t;
             }
         }
 
-        // Checking whether p[t] is in the nodes (colored black)
+        // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
+        // s bipartition), fix the candidates, and swap the flows
         if (ctx->ff.colors[ctx->ff.p[t]] == BLACK) {
             ctx->ff.p[s] = ctx->ff.p[t];
             ctx->ff.p[t] = s;
+            double tmp_flow = ctx->ff.flows[s];
             ctx->ff.flows[s] = ctx->ff.flows[t];
-            ctx->ff.flows[t] = max_flow;
+            ctx->ff.flows[t] = tmp_flow;
         }
     }
 
