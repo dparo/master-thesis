@@ -747,6 +747,11 @@ void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
     memset(ctx, 0, sizeof(*ctx));
 }
 
+double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
+                       MaxFlowResult *result) {
+    return push_relabel_max_flow(&tree->reduced_net, source, sink, result);
+}
+
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {
     GomoryHuTreeCtx ctx = {0};
 

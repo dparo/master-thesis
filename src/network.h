@@ -124,6 +124,8 @@ bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output);
 
 GomoryHuTree gomory_hu_tree_create(int32_t nnodes);
 void gomory_hu_tree_destroy(GomoryHuTree *tree);
+double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
+                       MaxFlowResult *result);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);

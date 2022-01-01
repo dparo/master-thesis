@@ -108,7 +108,7 @@ static void init_symm_random_flownet(FlowNetwork *net) {
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = i + 1; j < net->nnodes; j++) {
             if (i != j) {
-                double r = (double)(rand() % 4);
+                double r = (double)(rand() % 6);
                 *network_cap(net, i, j) = r;
                 *network_cap(net, j, i) = r;
             }
@@ -167,6 +167,42 @@ TEST random_symm_networks(void) {
     }
 
     PASS();
+}
+
+TEST random_gomory_hu(void) {
+    for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
+        for (int32_t try_it = 0; try_it < 2048; try_it++) {
+            FlowNetwork network = flow_network_create(nnodes);
+            init_symm_random_flownet(&network);
+
+            MaxFlowResult max_flow_result1 = max_flow_result_create(nnodes);
+            MaxFlowResult max_flow_result2 = max_flow_result_create(nnodes);
+
+            GomoryHuTree tree = gomory_hu_tree_create(nnodes);
+            GomoryHuTreeCtx gh_ctx;
+
+            double max_flow1, max_flow2;
+
+            gomory_hu_tree_ctx_create(&gh_ctx, nnodes);
+            for (int32_t source = 0; source < nnodes; source++) {
+                for (int32_t sink = 0; sink < nnodes; sink++) {
+                    max_flow1 = push_relabel_max_flow(&network, source, sink,
+                                                      &max_flow_result1);
+                    max_flow2 =
+                        gomory_hu_query(&tree, source, sink, &max_flow_result2);
+                    ASSERT_IN_RANGE(max_flow1, max_flow_result1.maxflow, 1e-5);
+                    ASSERT_IN_RANGE(max_flow2, max_flow_result2.maxflow, 1e-5);
+                    ASSERT_IN_RANGE(max_flow1, max_flow2, 1e-5);
+                }
+            }
+
+            flow_network_destroy(&network);
+            max_flow_result_destroy(&max_flow_result1);
+            max_flow_result_destroy(&max_flow_result2);
+            gomory_hu_tree_ctx_destroy(&gh_ctx);
+            gomory_hu_tree_destroy(&tree);
+        }
+    }
 }
 
 GREATEST_MAIN_DEFS();
