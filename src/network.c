@@ -545,16 +545,6 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
 
     return result;
 }
-
-void gomory_hu_tree_contract(FlowNetwork *net, GomoryHuTree *output,
-                             GomoryHuTreeCtx *ctx) {}
-
-void gomory_hu_tree_split(FlowNetwork *net, GomoryHuTree *output,
-                          GomoryHuTreeCtx *ctx, int32_t s, int32_t t) {
-    double max_flow =
-        push_relabel_max_flow2(net, s, t, &ctx->mfr, &ctx->pr_ctx);
-}
-
 enum {
     BLACK = 0,
     GRAY = 1,
@@ -562,8 +552,8 @@ enum {
 };
 
 /// Ford Fulkerson Breadth first search
-static bool ff_bfs(FlowNetwork *net, GomoryHuTree *output, GomoryHuTreeCtx *ctx,
-                   int32_t source, int32_t sink) {
+static bool ff_bfs(FlowNetwork *net, FordFulkersonCtx *ctx, int32_t source,
+                   int32_t sink) {
     const int32_t n = net->nnodes;
 
     // NOTE:
@@ -575,41 +565,40 @@ static bool ff_bfs(FlowNetwork *net, GomoryHuTree *output, GomoryHuTreeCtx *ctx,
 
     // Reset color of vertices
     for (int32_t u = 0; u < n; u++) {
-        ctx->ff.colors[u] = WHITE;
+        ctx->colors[u] = WHITE;
     }
 
-    int32_t *queue = ctx->ff.bfs_queue;
+    int32_t *queue = ctx->bfs_queue;
 
     int32_t head = 0;
     int32_t tail = 0;
     queue[tail++] = source;
-    ctx->ff.pred[source] = -1;
+    ctx->pred[source] = -1;
 
     // While queue is not empty
     while (head != tail) {
         // Pop vertex
         int32_t u = queue[head++];
-        ctx->ff.colors[u] = BLACK;
+        ctx->colors[u] = BLACK;
 
         for (int32_t v = 0; v < n; v++) {
             bool v_needs_processing =
-                ctx->ff.colors[v] == WHITE && residual_cap(net, u, v) > 0.0;
+                ctx->colors[v] == WHITE && residual_cap(net, u, v) > 0.0;
             if (v_needs_processing) {
                 // Queue v forfurther processing, and mark it as "visited"
                 queue[tail++] = v;
-                ctx->ff.colors[v] = GRAY;
-                ctx->ff.pred[v] = u;
+                ctx->colors[v] = GRAY;
+                ctx->pred[v] = u;
             }
         }
     }
 
     // Sink vertex was reached, eg an augmenting path was found
-    return ctx->ff.colors[sink] == BLACK;
+    return ctx->colors[sink] == BLACK;
 }
 
-static double ford_fulkerson(FlowNetwork *net, GomoryHuTree *output,
-                             GomoryHuTreeCtx *ctx, int32_t source,
-                             int32_t sink) {
+static double ford_fulkerson(FlowNetwork *net, FordFulkersonCtx *ctx,
+                             int32_t source, int32_t sink) {
     const int32_t n = net->nnodes;
 
     double max_flow = 0.0;
@@ -619,20 +608,20 @@ static double ford_fulkerson(FlowNetwork *net, GomoryHuTree *output,
 
     // While there are augmenting paths (eg paths to which we can push
     // additional flow)
-    while (ff_bfs(net, output, ctx, source, sink)) {
+    while (ff_bfs(net, ctx, source, sink)) {
         double increment = INFINITY;
 
         // Walk the augmenting path backward, and find the minimum residual
         // capacity available in the path
-        for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
-            int32_t pred_u = ctx->ff.pred[u];
+        for (int32_t u = n - 1; ctx->pred[u] >= 0; u = ctx->pred[u]) {
+            int32_t pred_u = ctx->pred[u];
             double res_cap = residual_cap(net, pred_u, u);
             increment = MIN(increment, res_cap);
         }
 
         // Update the path with the computed delta flow
-        for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
-            int32_t pred_u = ctx->ff.pred[u];
+        for (int32_t u = n - 1; ctx->pred[u] >= 0; u = ctx->pred[u]) {
+            int32_t pred_u = ctx->pred[u];
             *flow(net, pred_u, u) += increment;
             *flow(net, u, pred_u) -= increment;
         }
@@ -649,18 +638,18 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
     ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
 
     for (int32_t i = 0; i < n; i++) {
-        ctx->ff.p[i] = 0;
-        ctx->ff.flows[i] = 0.0;
-        for (int32_t j = 0; j < n; j++) {
-            *network_cap(&ctx->ff.reduced_net, i, j) = 0.0;
-        }
+        ctx->p[i] = 0;
+        ctx->flows[i] = 0.0;
     }
+
+    memset(output->reduced_net.cap, 0,
+           n * n * sizeof(*output->reduced_net.cap));
 
     for (int32_t s = 1; s < n; s++) {
 
-        int32_t t = ctx->ff.p[s];
-        double max_flow = ford_fulkerson(net, output, ctx, s, t);
-        ctx->ff.flows[s] = max_flow;
+        int32_t t = ctx->p[s];
+        double max_flow = ford_fulkerson(net, &ctx->ff, s, t);
+        ctx->flows[s] = max_flow;
 
         // NOTE:
         //       As a side effect from running the ford_fulkerson and bfs,
@@ -678,31 +667,28 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
         // bipartition (s, t) are setup in such a way that they share
         // bipartition, are unique, and valid max_flow candidate
         for (int32_t i = 0; i < n; i++) {
-            if (i != s && ctx->ff.p[i] == t && ctx->ff.colors[i] == BLACK) {
-                ctx->ff.p[i] = s;
-            } else if (i != t && ctx->ff.p[i] == s &&
-                       ctx->ff.colors[i] == WHITE) {
-                ctx->ff.p[i] = t;
+            if (i != s && ctx->p[i] == t && ctx->ff.colors[i] == BLACK) {
+                ctx->p[i] = s;
+            } else if (i != t && ctx->p[i] == s && ctx->ff.colors[i] == WHITE) {
+                ctx->p[i] = t;
             }
         }
 
         // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
         // s bipartition), fix the candidates, and swap the flows
-        if (ctx->ff.colors[ctx->ff.p[t]] == BLACK) {
-            ctx->ff.p[s] = ctx->ff.p[t];
-            ctx->ff.p[t] = s;
-            double tmp_flow = ctx->ff.flows[s];
-            ctx->ff.flows[s] = ctx->ff.flows[t];
-            ctx->ff.flows[t] = tmp_flow;
+        if (ctx->ff.colors[ctx->p[t]] == BLACK) {
+            ctx->p[s] = ctx->p[t];
+            ctx->p[t] = s;
+            SWAP(double, ctx->flows[s], ctx->flows[t]);
         }
     }
 
     // Produce the tree
     for (int32_t i = 1; i < n; i++) {
-        double f = ctx->ff.flows[i];
-        int32_t u = ctx->ff.p[i];
-        *network_cap(&ctx->ff.reduced_net, i, u) = f;
-        *network_cap(&ctx->ff.reduced_net, u, i) = f;
+        double f = ctx->flows[i];
+        int32_t u = ctx->p[i];
+        *network_cap(&output->reduced_net, i, u) = f;
+        *network_cap(&output->reduced_net, u, i) = f;
     }
 }
 
@@ -726,134 +712,38 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
 
 #endif
 
-#if 1
     gomory_hu_tree_using_ford_fulkerson(net, output, ctx);
-#else
-
-    ctx->num_edges = 0;
-    ctx->num_sets = 1;
-    ctx->sets_size[0] = n;
-
-    for (int32_t i = 0; i < n; i++) {
-        ctx->sets[i] = 0;
-    }
-
-    while (true) {
-        int32_t set = -1;
-        for (int32_t c = 0; c < ctx->num_sets; c++) {
-            if (ctx->sets_size[c] >= 2) {
-                set = c;
-                break;
-            }
-        }
-
-        if (set < 0) {
-            // break: We are done!
-            break;
-        }
-
-        const bool apply_contraction = ctx->num_sets > 1;
-        if (apply_contraction) {
-            gomory_hu_tree_contract(net, output, ctx);
-        }
-
-        //
-        // Choose two vertices s, t ∈ X and find a minimum s-t cut (A',B') in G'
-        //
-        // TODO: Pick two random source and sink indices in the candidate set
-        int32_t s_idx = -1;
-        int32_t t_idx = -1;
-
-        s_idx = rand() % ctx->sets_size[set];
-
-        do {
-            t_idx = rand() % ctx->sets_size[set];
-        } while (t_idx == s_idx);
-
-        // Convert the s_idx, t_idx, to their corresponding node in the original
-        // flow formulation
-        int32_t s = -1;
-        int32_t t = -1;
-        {
-            int32_t cnt = 0;
-            for (int32_t i = 0; i < n; i++) {
-                if (ctx->sets[i] == set) {
-                    if (cnt == s_idx) {
-                        s = cnt;
-                    } else if (cnt == t_idx) {
-                        t = cnt;
-                    }
-                    ++cnt;
-                }
-            }
-            assert(cnt == ctx->sets_size[set]);
-        }
-
-        assert(s >= 0 && s < n);
-        assert(t >= 0 && t < n);
-        assert(s != t);
-
-        gomory_hu_tree_split(net, output, ctx, s, t);
-    }
-
-    // Output the final tree
-    assert(ctx->num_edges == n - 1);
-    assert(ctx->num_sets == n);
-
-    output->nedges = 0;
-
-    for (int32_t edge_idx = 0; edge_idx < ctx->num_edges; edge_idx++) {
-        int32_t set1 = ctx->edges[edge_idx].u;
-        int32_t set2 = ctx->edges[edge_idx].v;
-        assert(set1 >= 0 && set1 < ctx->num_sets);
-        assert(set2 >= 0 && set2 < ctx->num_sets);
-        assert(set1 != set2);
-
-        int32_t u = -1;
-        int32_t v = -1;
-
-        // Convert the sets to their corresponding unique node
-        for (int32_t i = 0; i < n; i++) {
-            if (ctx->sets[i] == set1) {
-                u = i;
-            } else if (ctx->sets[i] == set2) {
-                v = i;
-            }
-        }
-
-        assert(u >= 0 && u < n);
-        assert(v >= 0 && v < n);
-        assert(u != v);
-
-        output->edges[output->nedges++] = (GomoryHuEdge){u, v};
-    }
-
-    assert(output->nedges == n - 1);
-#endif
 }
 
 bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {
-    ctx->ff.p = malloc(nnodes * sizeof(*ctx->ff.p));
-    ctx->ff.flows = malloc(nnodes * sizeof(*ctx->ff.flows));
+    ctx->p = malloc(nnodes * sizeof(*ctx->p));
+    ctx->flows = malloc(nnodes * sizeof(*ctx->flows));
     ctx->ff.colors = malloc(nnodes * sizeof(*ctx->ff.colors));
     ctx->ff.pred = malloc(nnodes * sizeof(*ctx->ff.pred));
     ctx->ff.bfs_queue = malloc((nnodes + 2) * sizeof(*ctx->ff.bfs_queue));
 
-    ctx->ff.reduced_net = flow_network_create(nnodes);
-    if (ctx->ff.p && ctx->ff.flows && ctx->ff.colors && ctx->ff.bfs_queue &&
-        ctx->ff.reduced_net.flow && ctx->ff.reduced_net.cap) {
+    if (ctx->p && ctx->flows && ctx->ff.colors && ctx->ff.bfs_queue) {
         return true;
     } else {
         return false;
     }
 }
 
+GomoryHuTree gomory_hu_tree_create(int32_t nnodes) {
+    GomoryHuTree tree = {0};
+    tree.reduced_net = flow_network_create(nnodes);
+    return tree;
+}
+
+void gomory_hu_tree_destroy(GomoryHuTree *tree) {
+    flow_network_destroy(&tree->reduced_net);
+}
+
 void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
-    free(ctx->ff.p);
-    free(ctx->ff.flows);
+    free(ctx->p);
+    free(ctx->flows);
     free(ctx->ff.colors);
     free(ctx->ff.bfs_queue);
-    flow_network_destroy(&ctx->ff.reduced_net);
     memset(ctx, 0, sizeof(*ctx));
 }
 

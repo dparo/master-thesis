@@ -38,7 +38,7 @@ extern "C" {
 
 #define SWAP(TYPE, a, b)                                                       \
     do {                                                                       \
-        (TYPE) tmp;                                                            \
+        TYPE tmp;                                                              \
         tmp = (a);                                                             \
         (a) = (b);                                                             \
         (b) = tmp;                                                             \

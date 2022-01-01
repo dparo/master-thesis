@@ -74,27 +74,19 @@ typedef struct {
 typedef struct {
     int32_t nedges;
     GomoryHuEdge *edges;
+    FlowNetwork reduced_net;
 } GomoryHuTree;
 
-typedef struct GomoryHuTreeFordFulkersonCtx {
-    int32_t *p;
-    double *flows;
+typedef struct {
     uint8_t *colors;
     int32_t *pred;
     int32_t *bfs_queue;
-    FlowNetwork reduced_net;
-} GomoryHuTreeFordFulkersonCtx;
+} FordFulkersonCtx;
 
 typedef struct {
-    GomoryHuTreeFordFulkersonCtx ff;
-    FlowNetwork contracted_net;
-    MaxFlowResult mfr;
-    PushRelabelCtx pr_ctx;
-    int32_t num_sets;
-    int32_t *sets;
-    int32_t *sets_size;
-    int32_t num_edges;
-    GomoryHuEdge *edges;
+    int32_t *p;
+    double *flows;
+    FordFulkersonCtx ff;
 } GomoryHuTreeCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {
@@ -129,6 +121,9 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
                      GomoryHuTreeCtx *ctx);
 
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output);
+
+GomoryHuTree gomory_hu_tree_create(int32_t nnodes);
+void gomory_hu_tree_destroy(GomoryHuTree *tree);
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
