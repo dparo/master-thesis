@@ -29,9 +29,6 @@ struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
     int32_t *cnnodes;
-
-    PushRelabelCtx push_relabel_ctx;
-    MaxFlowResult max_flow_result;
 };
 
 static inline void validate_index_array(CutSeparationPrivCtx *ctx, CPXNNZ nnz) {
@@ -59,8 +56,6 @@ static inline bool is_violated_cut(double flow, double y_i) {
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
-    max_flow_result_destroy(&ctx->max_flow_result);
-    push_relabel_ctx_destroy(&ctx->push_relabel_ctx);
     free(ctx->index);
     free(ctx->value);
     free(ctx->cnnodes);
@@ -76,12 +71,8 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
     ctx->cnnodes = malloc(n * sizeof(*ctx->cnnodes));
-    ctx->max_flow_result = max_flow_result_create(n);
-    ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->cnnodes ||
-        !ctx->max_flow_result.colors ||
-        !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
+    if (!ctx->index || !ctx->value || !ctx->cnnodes) {
         deactivate(ctx);
         return NULL;
     }
@@ -90,112 +81,100 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, FlowNetwork *network) {
+                           const double *vstar, MaxFlowResult *mf) {
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
 
     int32_t added_cuts = 0;
 
-    //
-    // Heuristic separation. Pick random source and sink vertex
-    //
-    int32_t source_vertex = rand() % n;
-    int32_t sink_vertex;
-    do {
-        sink_vertex = rand() % n;
-    } while (sink_vertex == source_vertex);
+    int32_t depot_color = mf->colors[0];
 
-    // Solve the max flow and create the violated cuts
-    {
-        double max_flow = push_relabel_max_flow2(
-            network, source_vertex, sink_vertex, &ctx->max_flow_result,
-            &ctx->push_relabel_ctx);
+    const int32_t source_vertex = mf->source;
+    const int32_t sink_vertex = mf->sink;
 
-        int32_t depot_color = ctx->max_flow_result.colors[0];
+    assert(BLACK == mf->colors[source_vertex]);
+    assert(WHITE == mf->colors[sink_vertex]);
 
-        assert(BLACK == ctx->max_flow_result.colors[source_vertex]);
-        assert(WHITE == ctx->max_flow_result.colors[sink_vertex]);
+    int32_t set_s_size = 0;
 
-        int32_t set_s_size = 0;
+    for (int32_t i = 0; i < n; i++) {
+        int32_t i_color = mf->colors[i];
+        bool i_is_customer = i > 0;
+        bool i_in_s = (i_color == depot_color) && i_is_customer;
+        if (i_in_s)
+            ++set_s_size;
+    }
 
+    if (set_s_size >= 2) {
+        // Separate the cut
+        CPXNNZ nnz = 0;
+        const double rhs = 0;
+        const char sense = 'G';
+        const int purgeable = CPX_USECUT_FILTER;
+        const int local_validity = 0; // (Globally valid)
+
+        double flow = 0.0;
         for (int32_t i = 0; i < n; i++) {
-            int32_t i_color = ctx->max_flow_result.colors[i];
+            int32_t i_color = mf->colors[i];
             bool i_is_customer = i > 0;
             bool i_in_s = (i_color == depot_color) && i_is_customer;
-            if (i_in_s)
-                ++set_s_size;
+
+            if (!i_in_s)
+                continue;
+
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j)
+                    continue;
+
+                int32_t j_color = mf->colors[j];
+                bool j_is_customer = j > 0;
+                bool j_in_s = (j_color == depot_color) && j_is_customer;
+
+                if (j_in_s)
+                    continue;
+
+                ctx->index[nnz] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
+                ctx->value[nnz] = +1.0;
+                double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                flow += x;
+                ++nnz;
+            }
         }
 
-        if (set_s_size >= 2) {
-            // Separate the cut
-            CPXNNZ nnz = 0;
-            const double rhs = 0;
-            const char sense = 'G';
-            const int purgeable = CPX_USECUT_FILTER;
-            const int local_validity = 0; // (Globally valid)
+        assert(feq(flow, mf->maxflow, EPS));
+        validate_index_array(ctx, nnz - 1);
 
-            double flow = 0.0;
-            for (int32_t i = 0; i < n; i++) {
-                int32_t i_color = ctx->max_flow_result.colors[i];
-                bool i_is_customer = i > 0;
-                bool i_in_s = (i_color == depot_color) && i_is_customer;
+        for (int32_t i = 0; i < n; i++) {
+            double y_i = vstar[get_y_mip_var_idx(instance, i)];
+            int32_t bp_i = mf->colors[i];
 
-                if (!i_in_s)
-                    continue;
+            bool i_is_customer = i > 0;
+            bool i_in_s = (bp_i == depot_color) && i_is_customer;
 
-                for (int32_t j = 0; j < n; j++) {
-                    if (i == j)
-                        continue;
-
-                    int32_t j_color = ctx->max_flow_result.colors[j];
-                    bool j_is_customer = j > 0;
-                    bool j_in_s = (j_color == depot_color) && j_is_customer;
-
-                    if (j_in_s)
-                        continue;
-
-                    ctx->index[nnz] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
-                    ctx->value[nnz] = +1.0;
-                    double x = vstar[get_x_mip_var_idx(instance, i, j)];
-                    flow += x;
-                    ++nnz;
-                }
+            if (!i_in_s) {
+                continue;
             }
 
-            assert(feq(flow, max_flow, EPS));
-            validate_index_array(ctx, nnz - 1);
+            if (is_violated_cut(mf->maxflow, y_i)) {
+                ctx->index[nnz] = (CPXDIM)get_y_mip_var_idx(instance, i);
+                ctx->value[nnz] = -2.0;
 
-            for (int32_t i = 0; i < n; i++) {
-                double y_i = vstar[get_y_mip_var_idx(instance, i)];
-                int32_t bp_i = ctx->max_flow_result.colors[i];
+                log_trace("%s :: Adding GSEC fractional constraint (%g >= "
+                          "2.0 * %g)"
+                          " (nnz = %lld)",
+                          __func__, mf->maxflow, y_i, nnz);
 
-                bool i_is_customer = i > 0;
-                bool i_in_s = (bp_i == depot_color) && i_is_customer;
-
-                if (!i_in_s)
-                    continue;
-
-                if (is_violated_cut(max_flow, y_i)) {
-                    ctx->index[nnz] = (CPXDIM)get_y_mip_var_idx(instance, i);
-                    ctx->value[nnz] = -2.0;
-
-                    log_trace("%s :: Adding GSEC fractional constraint (%g >= "
-                              "2.0 * %g)"
-                              " (nnz = %lld)",
-                              __func__, max_flow, y_i, nnz);
-
-                    if (!mip_cut_fractional_sol(self, nnz, rhs, sense,
-                                                ctx->index, ctx->value,
-                                                purgeable, local_validity)) {
-                        log_fatal("%s :: Failed to generate cut for fractional "
-                                  "solution",
-                                  __func__);
-                        goto failure;
-                    }
-
-                    added_cuts += 1;
+                if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
+                                            ctx->value, purgeable,
+                                            local_validity)) {
+                    log_fatal("%s :: Failed to generate cut for fractional "
+                              "solution",
+                              __func__);
+                    goto failure;
                 }
+
+                added_cuts += 1;
             }
         }
     }

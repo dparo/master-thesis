@@ -409,6 +409,8 @@ double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
         validate_min_cut(net, result, max_flow);
     }
 
+    result->source = source_vertex;
+    result->sink = sink_vertex;
     return max_flow;
 }
 
@@ -661,6 +663,8 @@ void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
 double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
                        MaxFlowResult *result, GomoryHuTreeCtx *ctx) {
     const int32_t n = ctx->nnodes;
+    result->source = source;
+    result->sink = sink;
 
     for (int32_t u = 0; u < n; u++) {
         result->colors[u] = WHITE;

@@ -50,6 +50,8 @@ typedef struct {
 
 typedef struct {
     int32_t nnodes;
+    int32_t source;
+    int32_t sink;
     double maxflow;
     int32_t *colors;
 } MaxFlowResult;

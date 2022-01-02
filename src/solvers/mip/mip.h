@@ -76,7 +76,7 @@ typedef struct {
     void (*deactivate)(CutSeparationPrivCtx *ctx);
 
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, FlowNetwork *network);
+                           const double *vstar, MaxFlowResult *mf);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour);
 } CutSeparationIface;

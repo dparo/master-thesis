@@ -603,7 +603,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                             // thread
                             functor->internal.cplex_cb_ctx = cplex_cb_ctx;
                             bool separation_success = iface->fractional_sep(
-                                functor, obj_p, vstar, net);
+                                functor, obj_p, vstar, &tld->max_flow);
                             functor->internal.fractional_stats.accum_usecs +=
                                 os_get_usecs() - begin_time;
 
