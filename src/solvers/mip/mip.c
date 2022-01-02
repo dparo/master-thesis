@@ -575,26 +575,42 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         FlowNetwork *net = &tld->network;
         init_flow_network(net, instance, vstar);
 
-        for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
-            if (is_fractional_cut_active(cut_id)) {
-                CutSeparationFunctor *functor = &tld->functors[cut_id];
-                const CutSeparationIface *iface = G_cuts[cut_id].descr->iface;
-                if (iface->fractional_sep) {
-                    const int64_t begin_time = os_get_usecs();
-                    // NOTE: We need to reset the cplex_cb_ctx since it might
-                    // change during the execution. The same threadid id, is not
-                    // guaranteed to have the same cplex_cb_ctx for the entire
-                    // duration of the thread
-                    functor->internal.cplex_cb_ctx = cplex_cb_ctx;
-                    bool separation_success =
-                        iface->fractional_sep(functor, obj_p, vstar, net);
-                    functor->internal.fractional_stats.accum_usecs +=
-                        os_get_usecs() - begin_time;
+        gomory_hu_tree2(net, &tld->gh_tree, &tld->gh_ctx);
 
-                    if (!separation_success) {
-                        log_fatal("Separation of integral `%s` cuts failed",
-                                  "GSEC");
-                        goto terminate;
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
+                if (i == j) {
+                    continue;
+                }
+
+                gomory_hu_query(&tld->gh_tree, i, j, &tld->max_flow,
+                                &tld->gh_ctx);
+
+                for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
+                    if (is_fractional_cut_active(cut_id)) {
+                        CutSeparationFunctor *functor = &tld->functors[cut_id];
+                        const CutSeparationIface *iface =
+                            G_cuts[cut_id].descr->iface;
+                        if (iface->fractional_sep) {
+                            const int64_t begin_time = os_get_usecs();
+                            // NOTE: We need to reset the cplex_cb_ctx since it
+                            // might change during the execution. The same
+                            // threadid id, is not guaranteed to have the same
+                            // cplex_cb_ctx for the entire duration of the
+                            // thread
+                            functor->internal.cplex_cb_ctx = cplex_cb_ctx;
+                            bool separation_success = iface->fractional_sep(
+                                functor, obj_p, vstar, net);
+                            functor->internal.fractional_stats.accum_usecs +=
+                                os_get_usecs() - begin_time;
+
+                            if (!separation_success) {
+                                log_fatal(
+                                    "Separation of integral `%s` cuts failed",
+                                    "GSEC");
+                                goto terminate;
+                            }
+                        }
                     }
                 }
             }
