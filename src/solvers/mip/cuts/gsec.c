@@ -80,7 +80,7 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
     if (!ctx->index || !ctx->value || !ctx->cnnodes ||
-        !ctx->max_flow_result.bipartition.data ||
+        !ctx->max_flow_result.colors ||
         !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
         deactivate(ctx);
         return NULL;
@@ -112,15 +112,15 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             network, source_vertex, sink_vertex, &ctx->max_flow_result,
             &ctx->push_relabel_ctx);
 
-        int32_t bp_depot = ctx->max_flow_result.bipartition.data[0];
+        int32_t bp_depot = ctx->max_flow_result.colors[0];
 
-        assert(1 == ctx->max_flow_result.bipartition.data[source_vertex]);
-        assert(0 == ctx->max_flow_result.bipartition.data[sink_vertex]);
+        assert(1 == ctx->max_flow_result.colors[source_vertex]);
+        assert(0 == ctx->max_flow_result.colors[sink_vertex]);
 
         int32_t set_s_size = 0;
 
         for (int32_t i = 0; i < n; i++) {
-            int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+            int32_t bp_i = ctx->max_flow_result.colors[i];
             bool i_is_customer = i > 0;
             bool i_in_s = (bp_i == bp_depot) && i_is_customer;
             if (i_in_s)
@@ -137,7 +137,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
             double flow = 0.0;
             for (int32_t i = 0; i < n; i++) {
-                int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+                int32_t bp_i = ctx->max_flow_result.colors[i];
                 bool i_is_customer = i > 0;
                 bool i_in_s = (bp_i == bp_depot) && i_is_customer;
 
@@ -148,7 +148,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                     if (i == j)
                         continue;
 
-                    int32_t bp_j = ctx->max_flow_result.bipartition.data[j];
+                    int32_t bp_j = ctx->max_flow_result.colors[j];
                     bool j_is_customer = j > 0;
                     bool j_in_s = (bp_j == bp_depot) && j_is_customer;
 
@@ -168,7 +168,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
             for (int32_t i = 0; i < n; i++) {
                 double y_i = vstar[get_y_mip_var_idx(instance, i)];
-                int32_t bp_i = ctx->max_flow_result.bipartition.data[i];
+                int32_t bp_i = ctx->max_flow_result.colors[i];
 
                 bool i_is_customer = i > 0;
                 bool i_in_s = (bp_i == bp_depot) && i_is_customer;

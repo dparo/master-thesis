@@ -65,8 +65,7 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
     for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
         bool found = true;
         for (int32_t i = 0; i < net->nnodes; i++) {
-            if (result->bipartition.data[i] !=
-                bf.sections[secidx].bipartition.data[i]) {
+            if (result->colors[i] != bf.sections[secidx].colors[i]) {
                 found = false;
                 break;
             }

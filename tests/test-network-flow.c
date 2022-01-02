@@ -58,14 +58,13 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
     printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
 
     for (int32_t i = 0; i < net->nnodes; i++) {
-        printf("computed_bipartition[%d] = %d\n", i,
-               result->bipartition.data[i]);
+        printf("computed_bipartition[%d] = %d\n", i, result->colors[i]);
     }
 
     for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
         for (int32_t i = 0; i < net->nnodes; i++) {
             printf("section[%d][%d] = %d\n", secidx, i,
-                   bf.sections[secidx].bipartition.data[i]);
+                   bf.sections[secidx].colors[i]);
         }
     }
     printf("\n");
@@ -75,8 +74,7 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
     for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
         bool found = true;
         for (int32_t i = 0; i < net->nnodes; i++) {
-            if (result->bipartition.data[i] !=
-                bf.sections[secidx].bipartition.data[i]) {
+            if (result->colors[i] != bf.sections[secidx].colors[i]) {
                 found = false;
                 break;
             }
@@ -289,12 +287,12 @@ TEST CLRS_network(void) {
                                             &max_flow_result);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[2]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[3]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[4]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[5]);
+    ASSERT_EQ(1, max_flow_result.colors[0]);
+    ASSERT_EQ(1, max_flow_result.colors[1]);
+    ASSERT_EQ(1, max_flow_result.colors[2]);
+    ASSERT_EQ(0, max_flow_result.colors[3]);
+    ASSERT_EQ(1, max_flow_result.colors[4]);
+    ASSERT_EQ(0, max_flow_result.colors[5]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -328,13 +326,13 @@ TEST non_trivial_network1(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(5, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -368,13 +366,13 @@ TEST non_trivial_network2(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(15, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[2 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -410,14 +408,14 @@ TEST non_trivial_network3(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(10, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[1 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[2 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[4 - 1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[7 - 1]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[8 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(1, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
+    ASSERT_EQ(0, max_flow_result.colors[8 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -446,10 +444,10 @@ TEST no_path_flow(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(0, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[0]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[1]);
-    ASSERT_EQ(1, max_flow_result.bipartition.data[2]);
-    ASSERT_EQ(0, max_flow_result.bipartition.data[3]);
+    ASSERT_EQ(1, max_flow_result.colors[0]);
+    ASSERT_EQ(1, max_flow_result.colors[1]);
+    ASSERT_EQ(1, max_flow_result.colors[2]);
+    ASSERT_EQ(0, max_flow_result.colors[3]);
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();

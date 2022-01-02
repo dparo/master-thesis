@@ -27,13 +27,13 @@ static const double EPS = 1e-6;
 
 MaxFlowResult max_flow_result_create(int32_t nnodes) {
     MaxFlowResult result = {0};
-    result.bipartition.nnodes = nnodes;
-    result.bipartition.data = malloc(nnodes * sizeof(*result.bipartition.data));
+    result.nnodes = nnodes;
+    result.colors = malloc(nnodes * sizeof(*result.colors));
     return result;
 }
 
 void max_flow_result_destroy(MaxFlowResult *m) {
-    free(m->bipartition.data);
+    free(m->colors);
     memset(m, 0, sizeof(*m));
 }
 
@@ -237,7 +237,7 @@ static void compute_bipartition_from_height(FlowNetwork *net,
         }
         if (!found) {
             for (int32_t i = 0; i < net->nnodes; i++) {
-                result->bipartition.data[i] = ctx->height[i] > h;
+                result->colors[i] = ctx->height[i] > h;
             }
             break;
         }
@@ -307,8 +307,8 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
     double section_flow = 0.0;
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = 0; j < net->nnodes; j++) {
-            int32_t li = (int32_t)result->bipartition.data[i];
-            int32_t lj = (int32_t)result->bipartition.data[j];
+            int32_t li = (int32_t)result->colors[i];
+            int32_t lj = (int32_t)result->colors[j];
             assert(feq(*flow(net, i, j), -*flow(net, j, i), EPS));
             double f = *flow(net, i, j);
             double c = *cap(net, i, j);
@@ -397,11 +397,11 @@ double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
     validate_flow(net, ctx, max_flow);
 
     if (result) {
-        assert(result->bipartition.data);
-        assert(result->bipartition.nnodes == net->nnodes);
+        assert(result->colors);
+        assert(result->nnodes == net->nnodes);
 
         result->maxflow = max_flow;
-        result->bipartition.nnodes = net->nnodes;
+        result->nnodes = net->nnodes;
         compute_bipartition_from_height(net, result, ctx);
 
         // Assert that the cross section induced from the bipartition is
@@ -534,7 +534,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
         if (feq(flow, max_flow, EPS)) {
             for (int32_t i = 0; i < net->nnodes; i++) {
                 assert(cut_idx < num_sections);
-                result.sections[cut_idx].bipartition.data[i] = labels[i];
+                result.sections[cut_idx].colors[i] = labels[i];
             }
             cut_idx += 1;
         }
@@ -579,16 +579,16 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
         int32_t t = ctx->p[s];
         double max_flow = push_relabel_max_flow2(net, s, t, &ctx->mf, &ctx->pr);
 
-        assert(ctx->mf.bipartition.data[s] == 1);
-        assert(ctx->mf.bipartition.data[t] == 0);
+        assert(ctx->mf.colors[s] == 1);
+        assert(ctx->mf.colors[t] == 0);
 
         ctx->flows[s] = max_flow;
 
         // Setup the next sink candidate for each vertex according to their
         // bipartition (s, t) as valid max_flow candidates.
         for (int32_t i = 0; i < n; i++) {
-            bool black = ctx->mf.bipartition.data[i] == 1;
-            bool white = ctx->mf.bipartition.data[i] == 0;
+            bool black = ctx->mf.colors[i] == 1;
+            bool white = ctx->mf.colors[i] == 0;
             if (i != s && ctx->p[i] == t && black) {
                 ctx->p[i] = s;
             } else if (i != t && ctx->p[i] == s && white) {
@@ -598,7 +598,7 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
 
         // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
         // s bipartition), fix the candidates, and swap the flows
-        if (ctx->mf.bipartition.data[ctx->p[t]] == 1) {
+        if (ctx->mf.colors[ctx->p[t]] == 1) {
             ctx->p[s] = ctx->p[t];
             ctx->p[t] = s;
             SWAP(double, ctx->flows[s], ctx->flows[t]);
@@ -662,7 +662,7 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
     const int32_t n = ctx->nnodes;
 
     for (int32_t u = 0; u < n; u++) {
-        result->bipartition.data[u] = 1;
+        result->colors[u] = 1;
     }
 
     int32_t *queue = ctx->ff.bfs_queue;
@@ -676,15 +676,15 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
     while (head != tail) {
         // Pop vertex
         int32_t u = queue[head++];
-        result->bipartition.data[u] = 0;
+        result->colors[u] = 0;
 
         for (int32_t v = 0; v < n; v++) {
-            bool v_needs_processing = result->bipartition.data[v] == 1 &&
-                                      *cap(&tree->reduced_net, u, v) > 0.0;
+            bool v_needs_processing =
+                result->colors[v] == 1 && *cap(&tree->reduced_net, u, v) > 0.0;
             if (v_needs_processing) {
                 // Queue v for further processing, and mark it as "visited"
                 queue[tail++] = v;
-                result->bipartition.data[v] = 2;
+                result->colors[v] = 2;
                 ctx->ff.pred[v] = u;
             }
         }
@@ -692,12 +692,11 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
 
 #ifndef NDEBUG
     for (int32_t i = 0; i < n; i++) {
-        assert(result->bipartition.data[i] == 0 ||
-               result->bipartition.data[i] == 1);
+        assert(result->colors[i] == 0 || result->colors[i] == 1);
     }
 #endif
 
-    bool sink_reachable = result->bipartition.data[sink] == 0;
+    bool sink_reachable = result->colors[sink] == 0;
     if (!sink_reachable) {
         result->maxflow = 0.0;
         return 0.0;

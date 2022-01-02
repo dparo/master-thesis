@@ -58,7 +58,7 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     ctx->max_flow_result = max_flow_result_create(n);
     ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->max_flow_result.bipartition.data ||
+    if (!ctx->index || !ctx->value || !ctx->max_flow_result.colors ||
         !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
         deactivate(ctx);
         return NULL;

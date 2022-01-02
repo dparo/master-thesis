@@ -45,13 +45,13 @@ typedef enum {
 } MaxFlowColor;
 
 typedef struct {
-    int32_t nnodes;
     bool *data;
 } NetworkBipartition;
 
 typedef struct {
+    int32_t nnodes;
     double maxflow;
-    NetworkBipartition bipartition;
+    int32_t *colors;
 } MaxFlowResult;
 
 /// For debug only
