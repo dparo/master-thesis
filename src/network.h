@@ -87,6 +87,8 @@ typedef struct {
     int32_t *p;
     double *flows;
     FordFulkersonCtx ff;
+    PushRelabelCtx pr;
+    MaxFlowResult mf;
 } GomoryHuTreeCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {

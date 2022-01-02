@@ -648,35 +648,47 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
     for (int32_t s = 1; s < n; s++) {
 
         int32_t t = ctx->p[s];
-        double max_flow = ford_fulkerson(net, &ctx->ff, s, t);
-        ctx->flows[s] = max_flow;
+        // double max_flow = ford_fulkerson(net, &ctx->ff, s, t);
+        double max_flow = push_relabel_max_flow2(net, s, t, &ctx->mf, &ctx->pr);
 
         // NOTE:
         //       As a side effect from running the ford_fulkerson and bfs,
         //       ctx->ff.colors will mark
         //       the bipartition induced from the minimum cut
+#if 0
 #ifndef NDEBUG
+
         assert(ctx->ff.colors[s] == BLACK);
         assert(ctx->ff.colors[t] == WHITE);
         for (int32_t i = 0; i < n; i++) {
             assert(ctx->ff.colors[i] == WHITE || ctx->ff.colors[i] == BLACK);
         }
 #endif
+#endif
+
+        assert(ctx->mf.bipartition.data[s] == 0);
+        assert(ctx->mf.bipartition.data[t] == 1);
+
+        ctx->flows[s] = max_flow;
 
         // Setup the next sink candidate for each vertex according to their
         // bipartition (s, t) are setup in such a way that they share
         // bipartition, are unique, and valid max_flow candidate
         for (int32_t i = 0; i < n; i++) {
-            if (i != s && ctx->p[i] == t && ctx->ff.colors[i] == BLACK) {
+            // bool black =  ctx->ff.colors[i] == BLACK;
+            // bool white = ctx->ff.colors[i] == WHITE;
+            bool black = ctx->mf.bipartition.data[i] == 1;
+            bool white = ctx->mf.bipartition.data[i] == 0;
+            if (i != s && ctx->p[i] == t && black) {
                 ctx->p[i] = s;
-            } else if (i != t && ctx->p[i] == s && ctx->ff.colors[i] == WHITE) {
+            } else if (i != t && ctx->p[i] == s && white) {
                 ctx->p[i] = t;
             }
         }
 
         // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
         // s bipartition), fix the candidates, and swap the flows
-        if (ctx->ff.colors[ctx->p[t]] == BLACK) {
+        if (ctx->mf.bipartition.data[ctx->p[t]] == 1) {
             ctx->p[s] = ctx->p[t];
             ctx->p[t] = s;
             SWAP(double, ctx->flows[s], ctx->flows[t]);
@@ -721,6 +733,8 @@ bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {
     ctx->ff.colors = malloc(nnodes * sizeof(*ctx->ff.colors));
     ctx->ff.pred = malloc(nnodes * sizeof(*ctx->ff.pred));
     ctx->ff.bfs_queue = malloc((nnodes + 2) * sizeof(*ctx->ff.bfs_queue));
+    ctx->mf = max_flow_result_create(nnodes);
+    ctx->pr = push_relabel_ctx_create(nnodes);
 
     if (ctx->p && ctx->flows && ctx->ff.colors && ctx->ff.bfs_queue) {
         return true;
@@ -744,6 +758,8 @@ void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
     free(ctx->flows);
     free(ctx->ff.colors);
     free(ctx->ff.bfs_queue);
+    max_flow_result_destroy(&ctx->mf);
+    push_relabel_ctx_destroy(&ctx->pr);
     memset(ctx, 0, sizeof(*ctx));
 }
 
