@@ -700,7 +700,7 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
         double f = ctx->flows[i];
         int32_t u = ctx->p[i];
         *network_cap(&output->reduced_net, i, u) = f;
-        // *network_cap(&output->reduced_net, u, i) = f;
+        *network_cap(&output->reduced_net, u, i) = f;
     }
 }
 
