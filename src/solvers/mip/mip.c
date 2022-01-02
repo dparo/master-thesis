@@ -586,6 +586,9 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                 gomory_hu_query(&tld->gh_tree, i, j, &tld->max_flow,
                                 &tld->gh_ctx);
 
+                assert(tld->max_flow.colors[i] == BLACK);
+                assert(tld->max_flow.colors[j] == WHITE);
+
                 for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
                     if (is_fractional_cut_active(cut_id)) {
                         CutSeparationFunctor *functor = &tld->functors[cut_id];
