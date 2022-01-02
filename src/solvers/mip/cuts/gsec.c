@@ -114,8 +114,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
         int32_t bp_depot = ctx->max_flow_result.colors[0];
 
-        assert(1 == ctx->max_flow_result.colors[source_vertex]);
-        assert(0 == ctx->max_flow_result.colors[sink_vertex]);
+        assert(BLACK == ctx->max_flow_result.colors[source_vertex]);
+        assert(WHITE == ctx->max_flow_result.colors[sink_vertex]);
 
         int32_t set_s_size = 0;
 

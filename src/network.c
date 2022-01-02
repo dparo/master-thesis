@@ -237,7 +237,7 @@ static void compute_bipartition_from_height(FlowNetwork *net,
         }
         if (!found) {
             for (int32_t i = 0; i < net->nnodes; i++) {
-                result->colors[i] = ctx->height[i] > h;
+                result->colors[i] = (ctx->height[i] > h) ? BLACK : WHITE;
             }
             break;
         }
@@ -315,12 +315,12 @@ static void validate_min_cut(FlowNetwork *net, MaxFlowResult *result,
             assert(c >= 0.0);
             assert(flte(f, c, EPS));
             if (f >= 0) {
-                if (li == 1 && lj == 0) {
+                if (li == BLACK && lj == WHITE) {
                     // All edges should be saturated
                     double r = residual_cap(net, i, j);
                     assert(feq(0.0, r, EPS));
                     section_flow += f;
-                } else if (li == 0 && lj == 1) {
+                } else if (li == WHITE && lj == BLACK) {
                     // All edges should be drained
                     assert(feq(f, 0, EPS));
                     section_flow -= f;
@@ -534,7 +534,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
         if (feq(flow, max_flow, EPS)) {
             for (int32_t i = 0; i < net->nnodes; i++) {
                 assert(cut_idx < num_sections);
-                result.sections[cut_idx].colors[i] = labels[i];
+                result.sections[cut_idx].colors[i] = labels[i] ? BLACK : WHITE;
             }
             cut_idx += 1;
         }
@@ -579,16 +579,16 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
         int32_t t = ctx->p[s];
         double max_flow = push_relabel_max_flow2(net, s, t, &ctx->mf, &ctx->pr);
 
-        assert(ctx->mf.colors[s] == 1);
-        assert(ctx->mf.colors[t] == 0);
+        assert(ctx->mf.colors[s] == BLACK);
+        assert(ctx->mf.colors[t] == WHITE);
 
         ctx->flows[s] = max_flow;
 
         // Setup the next sink candidate for each vertex according to their
         // bipartition (s, t) as valid max_flow candidates.
         for (int32_t i = 0; i < n; i++) {
-            bool black = ctx->mf.colors[i] == 1;
-            bool white = ctx->mf.colors[i] == 0;
+            bool black = ctx->mf.colors[i] == BLACK;
+            bool white = ctx->mf.colors[i] == WHITE;
             if (i != s && ctx->p[i] == t && black) {
                 ctx->p[i] = s;
             } else if (i != t && ctx->p[i] == s && white) {
@@ -598,7 +598,7 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
 
         // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
         // s bipartition), fix the candidates, and swap the flows
-        if (ctx->mf.colors[ctx->p[t]] == 1) {
+        if (ctx->mf.colors[ctx->p[t]] == BLACK) {
             ctx->p[s] = ctx->p[t];
             ctx->p[t] = s;
             SWAP(double, ctx->flows[s], ctx->flows[t]);
@@ -662,7 +662,7 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
     const int32_t n = ctx->nnodes;
 
     for (int32_t u = 0; u < n; u++) {
-        result->colors[u] = 1;
+        result->colors[u] = WHITE;
     }
 
     int32_t *queue = ctx->ff.bfs_queue;
@@ -676,15 +676,15 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
     while (head != tail) {
         // Pop vertex
         int32_t u = queue[head++];
-        result->colors[u] = 0;
+        result->colors[u] = BLACK;
 
         for (int32_t v = 0; v < n; v++) {
-            bool v_needs_processing =
-                result->colors[v] == 1 && *cap(&tree->reduced_net, u, v) > 0.0;
+            bool v_needs_processing = result->colors[v] == WHITE &&
+                                      *cap(&tree->reduced_net, u, v) > 0.0;
             if (v_needs_processing) {
                 // Queue v for further processing, and mark it as "visited"
                 queue[tail++] = v;
-                result->colors[v] = 2;
+                result->colors[v] = GRAY;
                 ctx->ff.pred[v] = u;
             }
         }
@@ -692,11 +692,11 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
 
 #ifndef NDEBUG
     for (int32_t i = 0; i < n; i++) {
-        assert(result->colors[i] == 0 || result->colors[i] == 1);
+        assert(result->colors[i] == BLACK || result->colors[i] == WHITE);
     }
 #endif
 
-    bool sink_reachable = result->colors[sink] == 0;
+    bool sink_reachable = result->colors[sink] == BLACK;
     if (!sink_reachable) {
         result->maxflow = 0.0;
         return 0.0;

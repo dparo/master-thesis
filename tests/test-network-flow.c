@@ -287,12 +287,12 @@ TEST CLRS_network(void) {
                                             &max_flow_result);
 
     ASSERT_IN_RANGE(23, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.colors[0]);
-    ASSERT_EQ(1, max_flow_result.colors[1]);
-    ASSERT_EQ(1, max_flow_result.colors[2]);
-    ASSERT_EQ(0, max_flow_result.colors[3]);
-    ASSERT_EQ(1, max_flow_result.colors[4]);
-    ASSERT_EQ(0, max_flow_result.colors[5]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[0]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[2]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[3]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[4]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[5]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -326,13 +326,13 @@ TEST non_trivial_network1(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(5, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[2 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[7 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -366,13 +366,13 @@ TEST non_trivial_network2(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(15, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[2 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[7 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -408,14 +408,14 @@ TEST non_trivial_network3(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(10, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.colors[1 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[2 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[3 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[4 - 1]);
-    ASSERT_EQ(1, max_flow_result.colors[5 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[6 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[7 - 1]);
-    ASSERT_EQ(0, max_flow_result.colors[8 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[1 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[2 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[3 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[4 - 1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[5 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[6 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[7 - 1]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[8 - 1]);
 
     CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                            &max_flow_result));
@@ -444,10 +444,10 @@ TEST no_path_flow(void) {
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
     ASSERT_IN_RANGE(0, max_flow, 1e-4);
-    ASSERT_EQ(1, max_flow_result.colors[0]);
-    ASSERT_EQ(1, max_flow_result.colors[1]);
-    ASSERT_EQ(1, max_flow_result.colors[2]);
-    ASSERT_EQ(0, max_flow_result.colors[3]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[0]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[1]);
+    ASSERT_EQ(BLACK, max_flow_result.colors[2]);
+    ASSERT_EQ(WHITE, max_flow_result.colors[3]);
     flow_network_destroy(&net);
     max_flow_result_destroy(&max_flow_result);
     PASS();
