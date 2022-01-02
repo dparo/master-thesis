@@ -30,15 +30,19 @@ extern "C" {
 #include "core-utils.h"
 
 typedef struct {
-    int32_t w, h;
-    int16_t *data;
-} AdjMatrix;
-
-typedef struct {
     int32_t nnodes;
     double *flow;
     double *cap;
 } FlowNetwork;
+
+typedef enum {
+    BLACK = 0,
+    WHITE = 1,
+
+    // For internal computations of gomory-hu-trees and maxflow only.
+    // Client code does not need to worry about this color
+    GRAY = 2,
+} MaxFlowColor;
 
 typedef struct {
     int32_t nnodes;
@@ -84,6 +88,7 @@ typedef struct {
 } FordFulkersonCtx;
 
 typedef struct {
+    int32_t nnodes;
     int32_t *p;
     double *flows;
     FordFulkersonCtx ff;

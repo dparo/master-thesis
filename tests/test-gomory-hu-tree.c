@@ -171,7 +171,7 @@ TEST random_symm_networks(void) {
 
 TEST random_gomory_hu(void) {
     for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
-        for (int32_t try_it = 0; try_it < 2048; try_it++) {
+        for (int32_t try_it = 0; try_it < 1024; try_it++) {
             FlowNetwork network = flow_network_create(nnodes);
             init_symm_random_flownet(&network);
 
@@ -216,7 +216,7 @@ GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
-    // RUN_TEST(random_symm_networks);
+    RUN_TEST(random_symm_networks);
     RUN_TEST(random_gomory_hu);
     GREATEST_MAIN_END(); /* display results */
 }

@@ -545,92 +545,6 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
 
     return result;
 }
-enum {
-    BLACK = 0,
-    GRAY = 1,
-    WHITE = 2,
-};
-
-/// Ford Fulkerson Breadth first search
-static bool ff_bfs(FlowNetwork *net, FordFulkersonCtx *ctx, int32_t source,
-                   int32_t sink) {
-    const int32_t n = net->nnodes;
-
-    // NOTE:
-    //      Colors are part of a standard approach to BFS for Ford-Fulersons
-    //      implementations
-    //     (they are not exclusive to the Gomory Hu Tree)
-    //     Colors are used to track whether a vertex was at some point added in
-    //     the queue and therefore should not be re-added in the queue
-
-    // Reset color of vertices
-    for (int32_t u = 0; u < n; u++) {
-        ctx->colors[u] = WHITE;
-    }
-
-    int32_t *queue = ctx->bfs_queue;
-
-    int32_t head = 0;
-    int32_t tail = 0;
-    queue[tail++] = source;
-    ctx->pred[source] = -1;
-
-    // While queue is not empty
-    while (head != tail) {
-        // Pop vertex
-        int32_t u = queue[head++];
-        ctx->colors[u] = BLACK;
-
-        for (int32_t v = 0; v < n; v++) {
-            bool v_needs_processing =
-                ctx->colors[v] == WHITE && residual_cap(net, u, v) > 0.0;
-            if (v_needs_processing) {
-                // Queue v forfurther processing, and mark it as "visited"
-                queue[tail++] = v;
-                ctx->colors[v] = GRAY;
-                ctx->pred[v] = u;
-            }
-        }
-    }
-
-    // Sink vertex was reached, eg an augmenting path was found
-    return ctx->colors[sink] == BLACK;
-}
-
-static double ford_fulkerson(FlowNetwork *net, FordFulkersonCtx *ctx,
-                             int32_t source, int32_t sink) {
-    const int32_t n = net->nnodes;
-
-    double max_flow = 0.0;
-
-    // Clear the network flows
-    flow_network_clear(net, false);
-
-    // While there are augmenting paths (eg paths to which we can push
-    // additional flow)
-    while (ff_bfs(net, ctx, source, sink)) {
-        double increment = INFINITY;
-
-        // Walk the augmenting path backward, and find the minimum residual
-        // capacity available in the path
-        for (int32_t u = n - 1; ctx->pred[u] >= 0; u = ctx->pred[u]) {
-            int32_t pred_u = ctx->pred[u];
-            double res_cap = residual_cap(net, pred_u, u);
-            increment = MIN(increment, res_cap);
-        }
-
-        // Update the path with the computed delta flow
-        for (int32_t u = n - 1; ctx->pred[u] >= 0; u = ctx->pred[u]) {
-            int32_t pred_u = ctx->pred[u];
-            *flow(net, pred_u, u) += increment;
-            *flow(net, u, pred_u) -= increment;
-        }
-
-        max_flow += increment;
-    }
-
-    return max_flow;
-}
 
 void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
                      GomoryHuTreeCtx *ctx) {
@@ -671,8 +585,7 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
         ctx->flows[s] = max_flow;
 
         // Setup the next sink candidate for each vertex according to their
-        // bipartition (s, t) are setup in such a way that they share
-        // bipartition, are unique, and valid max_flow candidate
+        // bipartition (s, t) as valid max_flow candidates.
         for (int32_t i = 0; i < n; i++) {
             bool black = ctx->mf.bipartition.data[i] == 1;
             bool white = ctx->mf.bipartition.data[i] == 0;
@@ -692,7 +605,7 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
         }
     }
 
-    // Produce the tree
+    // Output the tree
     for (int32_t i = 1; i < n; i++) {
         double f = ctx->flows[i];
         int32_t u = ctx->p[i];
@@ -702,6 +615,7 @@ void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
 }
 
 bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {
+    ctx->nnodes = nnodes;
     ctx->p = malloc(nnodes * sizeof(*ctx->p));
     ctx->flows = malloc(nnodes * sizeof(*ctx->flows));
     ctx->ff.colors = malloc(nnodes * sizeof(*ctx->ff.colors));
@@ -745,14 +659,10 @@ void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
 // between any pair of nodes
 double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
                        MaxFlowResult *result, GomoryHuTreeCtx *ctx) {
-
-    return push_relabel_max_flow2(&tree->reduced_net, source, sink, result,
-                                  &ctx->pr);
-
-    const int32_t n = result->bipartition.nnodes;
+    const int32_t n = ctx->nnodes;
 
     for (int32_t u = 0; u < n; u++) {
-        result->bipartition.data[u] = 0;
+        result->bipartition.data[u] = 1;
     }
 
     int32_t *queue = ctx->ff.bfs_queue;
@@ -787,8 +697,9 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
     }
 #endif
 
-    bool sink_reachable = result->bipartition.data[sink] == 1;
+    bool sink_reachable = result->bipartition.data[sink] == 0;
     if (!sink_reachable) {
+        result->maxflow = 0.0;
         return 0.0;
     }
 
@@ -796,12 +707,15 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
 
     // Walk the augmenting path backward, and find the minimum capacity
     // available in the path
-    for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
+    for (int32_t u = sink; u != source && ctx->ff.pred[u] >= 0;
+         u = ctx->ff.pred[u]) {
         int32_t pred_u = ctx->ff.pred[u];
         double cap = *network_cap(&tree->reduced_net, pred_u, u);
         max_flow = MIN(max_flow, cap);
     }
 
+    assert(max_flow != INFINITY);
+    result->maxflow = max_flow;
     return max_flow;
 }
 
