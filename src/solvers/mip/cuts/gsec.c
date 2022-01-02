@@ -112,7 +112,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             network, source_vertex, sink_vertex, &ctx->max_flow_result,
             &ctx->push_relabel_ctx);
 
-        int32_t bp_depot = ctx->max_flow_result.colors[0];
+        int32_t depot_color = ctx->max_flow_result.colors[0];
 
         assert(BLACK == ctx->max_flow_result.colors[source_vertex]);
         assert(WHITE == ctx->max_flow_result.colors[sink_vertex]);
@@ -120,9 +120,9 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         int32_t set_s_size = 0;
 
         for (int32_t i = 0; i < n; i++) {
-            int32_t bp_i = ctx->max_flow_result.colors[i];
+            int32_t i_color = ctx->max_flow_result.colors[i];
             bool i_is_customer = i > 0;
-            bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+            bool i_in_s = (i_color == depot_color) && i_is_customer;
             if (i_in_s)
                 ++set_s_size;
         }
@@ -137,9 +137,9 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
             double flow = 0.0;
             for (int32_t i = 0; i < n; i++) {
-                int32_t bp_i = ctx->max_flow_result.colors[i];
+                int32_t i_color = ctx->max_flow_result.colors[i];
                 bool i_is_customer = i > 0;
-                bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+                bool i_in_s = (i_color == depot_color) && i_is_customer;
 
                 if (!i_in_s)
                     continue;
@@ -148,14 +148,14 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                     if (i == j)
                         continue;
 
-                    int32_t bp_j = ctx->max_flow_result.colors[j];
+                    int32_t j_color = ctx->max_flow_result.colors[j];
                     bool j_is_customer = j > 0;
-                    bool j_in_s = (bp_j == bp_depot) && j_is_customer;
+                    bool j_in_s = (j_color == depot_color) && j_is_customer;
 
                     if (j_in_s)
                         continue;
 
-                    ctx->index[nnz] = get_x_mip_var_idx(instance, i, j);
+                    ctx->index[nnz] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                     ctx->value[nnz] = +1.0;
                     double x = vstar[get_x_mip_var_idx(instance, i, j)];
                     flow += x;
@@ -171,13 +171,13 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                 int32_t bp_i = ctx->max_flow_result.colors[i];
 
                 bool i_is_customer = i > 0;
-                bool i_in_s = (bp_i == bp_depot) && i_is_customer;
+                bool i_in_s = (bp_i == depot_color) && i_is_customer;
 
                 if (!i_in_s)
                     continue;
 
                 if (is_violated_cut(max_flow, y_i)) {
-                    ctx->index[nnz] = get_y_mip_var_idx(instance, i);
+                    ctx->index[nnz] = (CPXDIM)get_y_mip_var_idx(instance, i);
                     ctx->value[nnz] = -2.0;
 
                     log_trace("%s :: Adding GSEC fractional constraint (%g >= "

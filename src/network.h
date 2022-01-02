@@ -72,12 +72,6 @@ typedef struct {
 } PushRelabelCtx;
 
 typedef struct {
-    int32_t u, v;
-} GomoryHuEdge;
-
-typedef struct {
-    int32_t nedges;
-    GomoryHuEdge *edges;
     FlowNetwork reduced_net;
 } GomoryHuTree;
 

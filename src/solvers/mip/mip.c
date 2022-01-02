@@ -141,6 +141,9 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
     flow_network_destroy(&thread_local_data->network);
+    gomory_hu_tree_ctx_destroy(&thread_local_data->gh_ctx);
+    gomory_hu_tree_destroy(&thread_local_data->gh_tree);
+    max_flow_result_destroy(&thread_local_data->max_flow);
     thread_local_data->valid = false;
 }
 
@@ -156,16 +159,19 @@ static bool
 create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
                                   CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                   const Instance *instance, Solver *solver) {
+    bool success = true;
+    const int32_t n = instance->num_customers + 1;
     memset(thread_local_data, 0, sizeof(*thread_local_data));
 
-    thread_local_data->network =
-        flow_network_create(instance->num_customers + 1);
+    thread_local_data->network = flow_network_create(n);
+    thread_local_data->max_flow = max_flow_result_create(n);
+    thread_local_data->gh_tree = gomory_hu_tree_create(n);
+    success &= gomory_hu_tree_ctx_create(&thread_local_data->gh_ctx, n);
+
     thread_local_data->tour = tour_create(instance);
 
     thread_local_data->vstar =
         malloc(sizeof(*thread_local_data->vstar) * solver->data->num_mip_vars);
-
-    bool success = true;
 
     for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
         if (is_active_cut(cut_id)) {
@@ -181,6 +187,8 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
             success &= functor->ctx && thread_local_data->vstar &&
                        thread_local_data->network.flow &&
                        thread_local_data->network.cap &&
+                       thread_local_data->max_flow.colors &&
+                       thread_local_data->gh_tree.reduced_net.cap &&
                        tour_is_valid(&thread_local_data->tour);
         }
     }

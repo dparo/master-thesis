@@ -408,6 +408,7 @@ double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
         // consistent with the computed maxflow
         validate_min_cut(net, result, max_flow);
     }
+
     return max_flow;
 }
 
