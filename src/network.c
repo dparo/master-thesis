@@ -632,10 +632,25 @@ static double ford_fulkerson(FlowNetwork *net, FordFulkersonCtx *ctx,
     return max_flow;
 }
 
-static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
-                                                GomoryHuTree *output,
-                                                GomoryHuTreeCtx *ctx) {
+void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
+                     GomoryHuTreeCtx *ctx) {
     ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
+
+#ifndef NDEBUG
+
+    // IMPORTANT:
+    //     This implementation only works with undirected graphs.
+    //     Since the FlowNetwork allows representations of directed graphs
+    //     We are going to assert that the network is undirected here
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i != j) {
+                assert(*network_cap(net, i, j) == *network_cap(net, j, i));
+            }
+        }
+    }
+
+#endif
 
     for (int32_t i = 0; i < n; i++) {
         ctx->p[i] = 0;
@@ -648,23 +663,7 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
     for (int32_t s = 1; s < n; s++) {
 
         int32_t t = ctx->p[s];
-        // double max_flow = ford_fulkerson(net, &ctx->ff, s, t);
         double max_flow = push_relabel_max_flow2(net, s, t, &ctx->mf, &ctx->pr);
-
-        // NOTE:
-        //       As a side effect from running the ford_fulkerson and bfs,
-        //       ctx->ff.colors will mark
-        //       the bipartition induced from the minimum cut
-#if 0
-#ifndef NDEBUG
-
-        assert(ctx->ff.colors[s] == BLACK);
-        assert(ctx->ff.colors[t] == WHITE);
-        for (int32_t i = 0; i < n; i++) {
-            assert(ctx->ff.colors[i] == WHITE || ctx->ff.colors[i] == BLACK);
-        }
-#endif
-#endif
 
         assert(ctx->mf.bipartition.data[s] == 1);
         assert(ctx->mf.bipartition.data[t] == 0);
@@ -675,8 +674,6 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
         // bipartition (s, t) are setup in such a way that they share
         // bipartition, are unique, and valid max_flow candidate
         for (int32_t i = 0; i < n; i++) {
-            // bool black =  ctx->ff.colors[i] == BLACK;
-            // bool white = ctx->ff.colors[i] == WHITE;
             bool black = ctx->mf.bipartition.data[i] == 1;
             bool white = ctx->mf.bipartition.data[i] == 0;
             if (i != s && ctx->p[i] == t && black) {
@@ -702,29 +699,6 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
         *network_cap(&output->reduced_net, i, u) = f;
         *network_cap(&output->reduced_net, u, i) = f;
     }
-}
-
-void gomory_hu_tree2(FlowNetwork *net, GomoryHuTree *output,
-                     GomoryHuTreeCtx *ctx) {
-    ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
-
-#ifndef NDEBUG
-
-    // IMPORTANT:
-    //     This implementation only works with undirected graphs.
-    //     Since the FlowNetwork allows representations of directed graphs
-    //     We are going to assert that the network is undirected here
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            if (i != j) {
-                assert(*network_cap(net, i, j) == *network_cap(net, j, i));
-            }
-        }
-    }
-
-#endif
-
-    gomory_hu_tree_using_ford_fulkerson(net, output, ctx);
 }
 
 bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {

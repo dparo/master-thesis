@@ -107,6 +107,9 @@ typedef struct {
     bool valid;
     double *vstar;
     FlowNetwork network;
+    GomoryHuTreeCtx gh_ctx;
+    GomoryHuTree gh_tree;
+    MaxFlowResult max_flow;
     Tour tour;
     CutSeparationFunctor functors[NUM_CUTS];
 } CallbackThreadLocalData;
@@ -552,7 +555,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         goto terminate;
     }
 
-    double obj_p;
+    double obj_p = INFINITY;
     if (CPXXcallbackgetrelaxationpoint(
             cplex_cb_ctx, vstar, 0, solver->data->num_mip_vars - 1, &obj_p)) {
         log_fatal("%s :: Failed `CPXXcallbackgetrelaxationpoint`", __func__);
