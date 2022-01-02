@@ -538,6 +538,8 @@ TEST two_path_flow(void) {
 }
 
 TEST random_networks(void) {
+    const double RAND_VALS[] = {0.0, 1e-3, 1e-2, 1e-1, 0.5, 0.8, 1.0};
+
     for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
         for (int32_t try_it = 0; try_it < 2048; try_it++) {
             FlowNetwork network = flow_network_create(nnodes);
@@ -548,7 +550,8 @@ TEST random_networks(void) {
             for (int32_t i = 0; i < nnodes; i++) {
                 for (int32_t j = 0; j < nnodes; j++) {
                     if (i != j) {
-                        *network_cap(&network, i, j) = (double)(rand() % 3);
+                        *network_cap(&network, i, j) =
+                            RAND_VALS[rand() % ARRAY_LEN(RAND_VALS)];
                     }
                 }
             }

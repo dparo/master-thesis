@@ -105,10 +105,11 @@ static NodePair make_random_node_pair(int32_t n) {
 
 static void init_symm_random_flownet(FlowNetwork *net) {
 
+    const double RAND_VALS[] = {0.0, 1e-3, 1e-2, 1e-1, 0.5, 0.8, 1.0};
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = i + 1; j < net->nnodes; j++) {
             if (i != j) {
-                double r = (double)(rand() % 6);
+                double r = RAND_VALS[rand() % ARRAY_LEN(RAND_VALS)];
                 *network_cap(net, i, j) = r;
                 *network_cap(net, j, i) = r;
             }
