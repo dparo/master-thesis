@@ -666,8 +666,8 @@ static void gomory_hu_tree_using_ford_fulkerson(FlowNetwork *net,
 #endif
 #endif
 
-        assert(ctx->mf.bipartition.data[s] == 0);
-        assert(ctx->mf.bipartition.data[t] == 1);
+        assert(ctx->mf.bipartition.data[s] == 1);
+        assert(ctx->mf.bipartition.data[t] == 0);
 
         ctx->flows[s] = max_flow;
 
