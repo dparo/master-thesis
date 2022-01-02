@@ -732,14 +732,77 @@ void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
     free(ctx->flows);
     free(ctx->ff.colors);
     free(ctx->ff.bfs_queue);
+    free(ctx->ff.pred);
     max_flow_result_destroy(&ctx->mf);
     push_relabel_ctx_destroy(&ctx->pr);
     memset(ctx, 0, sizeof(*ctx));
 }
 
+// Due to the Gomory Hu Tree max flow algorithm: only N max flows computations
+// are required to build the tree. The tree is then a simpler data structure
+// that can answer max flow computations for any (s,t) pair by a simple
+// bfs algorithm. Because the tree is guaranteed to create a unique path
+// between any pair of nodes
 double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
-                       MaxFlowResult *result) {
-    return push_relabel_max_flow(&tree->reduced_net, source, sink, result);
+                       MaxFlowResult *result, GomoryHuTreeCtx *ctx) {
+
+    return push_relabel_max_flow2(&tree->reduced_net, source, sink, result,
+                                  &ctx->pr);
+
+    const int32_t n = result->bipartition.nnodes;
+
+    for (int32_t u = 0; u < n; u++) {
+        result->bipartition.data[u] = 0;
+    }
+
+    int32_t *queue = ctx->ff.bfs_queue;
+
+    int32_t head = 0;
+    int32_t tail = 0;
+    queue[tail++] = source;
+    ctx->ff.pred[source] = -1;
+
+    // While queue is not empty
+    while (head != tail) {
+        // Pop vertex
+        int32_t u = queue[head++];
+        result->bipartition.data[u] = 0;
+
+        for (int32_t v = 0; v < n; v++) {
+            bool v_needs_processing = result->bipartition.data[v] == 1 &&
+                                      *cap(&tree->reduced_net, u, v) > 0.0;
+            if (v_needs_processing) {
+                // Queue v for further processing, and mark it as "visited"
+                queue[tail++] = v;
+                result->bipartition.data[v] = 2;
+                ctx->ff.pred[v] = u;
+            }
+        }
+    }
+
+#ifndef NDEBUG
+    for (int32_t i = 0; i < n; i++) {
+        assert(result->bipartition.data[i] == 0 ||
+               result->bipartition.data[i] == 1);
+    }
+#endif
+
+    bool sink_reachable = result->bipartition.data[sink] == 1;
+    if (!sink_reachable) {
+        return 0.0;
+    }
+
+    double max_flow = INFINITY;
+
+    // Walk the augmenting path backward, and find the minimum capacity
+    // available in the path
+    for (int32_t u = n - 1; ctx->ff.pred[u] >= 0; u = ctx->ff.pred[u]) {
+        int32_t pred_u = ctx->ff.pred[u];
+        double cap = *network_cap(&tree->reduced_net, pred_u, u);
+        max_flow = MIN(max_flow, cap);
+    }
+
+    return max_flow;
 }
 
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {

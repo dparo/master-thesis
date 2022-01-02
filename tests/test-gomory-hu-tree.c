@@ -179,12 +179,13 @@ TEST random_gomory_hu(void) {
             MaxFlowResult max_flow_result2 = max_flow_result_create(nnodes);
 
             GomoryHuTree tree = gomory_hu_tree_create(nnodes);
-            GomoryHuTreeCtx gh_ctx;
+            GomoryHuTreeCtx gh_ctx = {0};
 
             double max_flow1 = INFINITY, max_flow2 = INFINITY;
 
             gomory_hu_tree_ctx_create(&gh_ctx, nnodes);
             gomory_hu_tree2(&network, &tree, &gh_ctx);
+
             for (int32_t source = 0; source < nnodes; source++) {
                 for (int32_t sink = 0; sink < nnodes; sink++) {
                     if (source == sink) {
@@ -192,8 +193,9 @@ TEST random_gomory_hu(void) {
                     }
                     max_flow1 = push_relabel_max_flow(&network, source, sink,
                                                       &max_flow_result1);
-                    max_flow2 =
-                        gomory_hu_query(&tree, source, sink, &max_flow_result2);
+                    max_flow2 = gomory_hu_query(&tree, source, sink,
+                                                &max_flow_result2, &gh_ctx);
+
                     ASSERT_IN_RANGE(max_flow1, max_flow_result1.maxflow, 1e-5);
                     ASSERT_IN_RANGE(max_flow2, max_flow_result2.maxflow, 1e-5);
                     ASSERT_IN_RANGE(max_flow1, max_flow2, 1e-5);
@@ -214,7 +216,7 @@ GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
-    RUN_TEST(random_symm_networks);
+    // RUN_TEST(random_symm_networks);
     RUN_TEST(random_gomory_hu);
     GREATEST_MAIN_END(); /* display results */
 }
