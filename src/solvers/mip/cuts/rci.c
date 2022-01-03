@@ -50,6 +50,7 @@ typedef struct {
 } SeparationInfo;
 
 static inline bool is_violated_cut(double lhs, double rhs) {
+    // printf("%s :: lhs = %f, rhs = %f\n", __func__, lhs, rhs);
     switch (CONSTRAINT_SENSE) {
     case 'G':
         return !fgte(lhs, rhs, EPS);
@@ -72,7 +73,6 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
 
-    // Curr color must be different from the color of the depot.
     assert(curr_color != colors[0]);
     assert(demand(instance, 0) == 0.0);
 
@@ -131,6 +131,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
             assert(colors[i] == curr_color);
             ctx->index[pos] = (CPXDIM)get_y_mip_var_idx(instance, i);
             ctx->value[pos] = -2.0 * d / demand_rem;
+            lhs += vstar[get_y_mip_var_idx(instance, i)];
             ++pos;
 
             for (int32_t j = 0; j < n; j++) {
@@ -149,7 +150,9 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 assert(colors[j] != curr_color);
                 ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                 ctx->value[pos] = 1.0;
-                flow += vstar[get_x_mip_var_idx(instance, i, j)];
+                double x = vstar[get_x_mip_var_idx(instance, i, j)];
+                flow += x;
+                lhs += x;
                 ++pos;
             }
         }
@@ -177,7 +180,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     SeparationInfo info =
         separate(self, obj_p, vstar, mf->colors,
                  depot_color == BLACK ? WHITE : BLACK, mf->maxflow);
-    if (info.nnz && info.is_violated) {
+    if (info.nnz) {
         log_trace("%s :: Adding RCI fractional constraint", __func__);
 
         if (!mip_cut_fractional_sol(self, info.nnz, info.rhs, CONSTRAINT_SENSE,

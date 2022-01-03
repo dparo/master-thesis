@@ -22,12 +22,13 @@
 
 #include "../mip.h"
 #include "../cuts.h"
+#include "./cuts-utils.h"
 
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
-
 static const char CONSTRAINT_SENSE = 'G';
 
 struct CutSeparationPrivCtx {
+    CPXNNZ pos;
     CPXDIM *index;
     double *value;
 };
@@ -41,19 +42,6 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
     free(ctx->index);
     free(ctx->value);
     free(ctx);
-}
-
-static inline bool is_violated_cut(double lhs, double rhs) {
-    switch (CONSTRAINT_SENSE) {
-    case 'G':
-        return !fgte(lhs, rhs, EPS);
-    case 'L':
-        return !flte(lhs, rhs, EPS);
-    case 'E':
-        return !feq(lhs, rhs, EPS);
-    default:
-        assert(0);
-    }
 }
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
@@ -73,12 +61,20 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     return ctx;
 }
 
-typedef struct {
-    bool is_violated;
-    CPXNNZ nnz;
-    double lhs;
-    double rhs;
-} SeparationInfo;
+static inline void push_var_lhs(CutSeparationPrivCtx *ctx,
+                                const Instance *instance, SeparationInfo *info,
+                                double *vstar, CPXDIM var_index, double value) {
+    ctx->index[ctx->pos] = var_index;
+    ctx->value[ctx->pos] = value;
+    info->lhs += value * vstar[var_index];
+    ++info->pos;
+}
+
+static inline void push_var_rhs(CutSeparationPrivCtx *ctx,
+                                const Instance *instance, SeparationInfo *info,
+                                double *vstar, CPXDIM var_index, double value) {
+    push_var_lhs(ctx, instance, info, vstar, var_index, -value);
+}
 
 static inline SeparationInfo separate(CutSeparationFunctor *self,
                                       const double obj_p, const double *vstar,
@@ -91,7 +87,6 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
 
-    // Curr color must be different from the color of the depot.
     assert(curr_color != colors[0]);
     assert(demand(instance, 0) == 0.0);
 
