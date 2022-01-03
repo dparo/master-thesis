@@ -28,9 +28,7 @@ ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 static const char CONSTRAINT_SENSE = 'G';
 
 struct CutSeparationPrivCtx {
-    CPXNNZ pos;
-    CPXDIM *index;
-    double *value;
+    CutSeparationPrivCtxCommon super;
 };
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
@@ -39,8 +37,8 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
-    free(ctx->index);
-    free(ctx->value);
+    free(ctx->super.index);
+    free(ctx->super.value);
     free(ctx);
 }
 
@@ -48,12 +46,12 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
                                       Solver *solver) {
 
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
-    int32_t nnz_ub = get_nnz_upper_bound(instance);
+    size_t nnz_ub = get_nnz_upper_bound(instance);
 
-    ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
-    ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
+    ctx->super.index = malloc(nnz_ub * sizeof(*ctx->super.index));
+    ctx->super.value = malloc(nnz_ub * sizeof(*ctx->super.value));
 
-    if (!ctx->index || !ctx->value) {
+    if (!ctx->super.index || !ctx->super.value) {
         deactivate(ctx);
         return NULL;
     }
@@ -61,31 +59,16 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     return ctx;
 }
 
-static inline void push_var_lhs(CutSeparationPrivCtx *ctx,
-                                const Instance *instance, SeparationInfo *info,
-                                double *vstar, CPXDIM var_index, double value) {
-    ctx->index[ctx->pos] = var_index;
-    ctx->value[ctx->pos] = value;
-    info->lhs += value * vstar[var_index];
-    ++info->pos;
-}
-
-static inline void push_var_rhs(CutSeparationPrivCtx *ctx,
-                                const Instance *instance, SeparationInfo *info,
-                                double *vstar, CPXDIM var_index, double value) {
-    push_var_lhs(ctx, instance, info, vstar, var_index, -value);
-}
-
 static inline SeparationInfo separate(CutSeparationFunctor *self,
-                                      const double obj_p, const double *vstar,
-                                      int32_t *colors, int32_t curr_color,
-                                      double max_flow) {
-
+                                      const double *vstar, int32_t *colors,
+                                      int32_t curr_color, double max_flow) {
     SeparationInfo info = {0};
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
+
+    info.sense = 'G';
 
     assert(curr_color != colors[0]);
     assert(demand(instance, 0) == 0.0);
@@ -98,13 +81,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         }
     }
 
-    double lhs = 0.0;
-    double rhs = 0.0;
-    CPXNNZ pos = 0;
-
     if (set_s_size >= 2) {
-        double flow = 0.0;
-
         for (int32_t i = 0; i < n; i++) {
             bool i_in_s = colors[i] == curr_color;
 
@@ -130,16 +107,11 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 assert(colors[i] == curr_color);
                 assert(colors[j] != curr_color);
 
-                double x = 1.0 - 2.0 * d / Q;
-                ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
-                ctx->value[pos] = x;
-                lhs += x;
-                flow += vstar[get_x_mip_var_idx(instance, i, j)];
-                ++pos;
+                double value = 1.0 - 2.0 * d / Q;
+                push_var_lhs(&ctx->super, &info, vstar, value,
+                             (CPXDIM)get_x_mip_var_idx(instance, i, j));
             }
         }
-
-        assert(feq(flow, max_flow, EPS));
 
         for (int32_t i = 0; i < n; i++) {
             bool i_in_s = colors[i] == curr_color;
@@ -147,22 +119,14 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
             if (!i_in_s)
                 continue;
 
-            double d = demand(instance, i);
-            double x = -2.0 * d / Q;
             assert(i != 0);
-            ctx->index[pos] = (CPXDIM)get_y_mip_var_idx(instance, i);
-            ctx->value[pos] = x;
-            lhs += x;
-            ++pos;
+            double value = -2.0 * demand(instance, i) / Q;
+            push_var_lhs(&ctx->super, &info, vstar, value,
+                         (CPXDIM)get_y_mip_var_idx(instance, i));
         }
-    }
 
-    info.nnz = pos;
-
-    if (info.nnz) {
-        info.is_violated = is_violated_cut(lhs, rhs);
-        info.lhs = lhs;
-        info.rhs = rhs;
+        assert(info.num_vars);
+        info.is_violated = is_violated_cut(&ctx->super, &info, EPS);
     }
 
     return info;
@@ -170,19 +134,22 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar, MaxFlowResult *mf) {
+    UNUSED_PARAM(obj_p);
+
     CutSeparationPrivCtx *ctx = self->ctx;
     const int purgeable = CPX_USECUT_FILTER;
     const int local_validity = 0; // (Globally valid)
 
     int32_t depot_color = mf->colors[0];
     SeparationInfo info =
-        separate(self, obj_p, vstar, mf->colors,
-                 depot_color == BLACK ? WHITE : BLACK, mf->maxflow);
-    if (info.nnz && info.is_violated) {
+        separate(self, vstar, mf->colors, depot_color == BLACK ? WHITE : BLACK,
+                 mf->maxflow);
+    if (info.is_violated) {
         log_trace("%s :: Adding GLM fractional constraint", __func__);
 
-        if (!mip_cut_fractional_sol(self, info.nnz, info.rhs, CONSTRAINT_SENSE,
-                                    ctx->index, ctx->value, purgeable,
+        if (!mip_cut_fractional_sol(self, info.num_vars, info.rhs,
+                                    CONSTRAINT_SENSE, ctx->super.index,
+                                    ctx->super.value, purgeable,
                                     local_validity)) {
             log_fatal("%s :: Failed cut of for fractional solution solution",
                       __func__);
@@ -197,6 +164,8 @@ failure:
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour) {
+    UNUSED_PARAM(obj_p);
+
     if (tour->num_comps == 1) {
         return true;
     }
@@ -207,13 +176,13 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     // NOTE:
     // Start from c = 1. GLM cuts that include the depot node are NOT valid.
     for (int32_t c = 1; c < tour->num_comps; c++) {
-        SeparationInfo info = separate(self, obj_p, vstar, tour->comp, c, 0.0);
-        if (info.nnz && info.is_violated) {
+        SeparationInfo info = separate(self, vstar, tour->comp, c, 0.0);
+        if (info.is_violated) {
             log_trace("%s :: Adding GLM integral constraint", __func__);
 
-            if (!mip_cut_integral_sol(self, info.nnz, info.rhs,
-                                      CONSTRAINT_SENSE, ctx->index,
-                                      ctx->value)) {
+            if (!mip_cut_integral_sol(self, info.num_vars, info.rhs,
+                                      CONSTRAINT_SENSE, ctx->super.index,
+                                      ctx->super.value)) {
                 log_fatal("%s :: Failed cut of integral solution", __func__);
                 goto failure;
             }

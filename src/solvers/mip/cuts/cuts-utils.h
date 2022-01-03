@@ -8,22 +8,21 @@ extern "C" {
 #include "../cuts.h"
 
 typedef struct {
-    char sense;
     CPXDIM *index;
     double *value;
 } CutSeparationPrivCtxCommon;
 
 typedef struct {
+    char sense;
     bool is_violated;
-    CPXNNZ nnz;
     double lhs;
     double rhs;
-    CPXNNZ pos;
+    CPXNNZ num_vars;
 } SeparationInfo;
 
 static inline bool is_violated_cut(CutSeparationPrivCtxCommon *ctx,
                                    SeparationInfo *info, double eps) {
-    switch (ctx->sense) {
+    switch (info->sense) {
     case 'G':
         return !fgte(info->lhs, info->rhs, eps);
     case 'L':
@@ -36,26 +35,27 @@ static inline bool is_violated_cut(CutSeparationPrivCtxCommon *ctx,
 }
 
 static inline void push_var_lhs(CutSeparationPrivCtxCommon *ctx,
-                                SeparationInfo *info, double *vstar,
-                                CPXDIM var_index, double value) {
-    ctx->index[info->pos] = var_index;
-    ctx->value[info->pos] = value;
+                                SeparationInfo *info, const double *vstar,
+                                double value, CPXDIM var_index) {
+    ctx->index[info->num_vars] = var_index;
+    ctx->value[info->num_vars] = value;
     info->lhs += value * vstar[var_index];
-    ++info->pos;
+    ++info->num_vars;
 }
 
-static inline void push_var_rhs(CutSeparationPrivCtx *ctx, SeparationInfo *info,
-                                double *vstar, CPXDIM var_index, double value) {
+static inline void push_var_rhs(CutSeparationPrivCtxCommon *ctx,
+                                SeparationInfo *info, const double *vstar,
+                                double value, CPXDIM var_index) {
     push_var_lhs(ctx, info, vstar, var_index, -value);
 }
 
-static inline void push_term_rhs(CutSeparationPrivCtx *ctx,
-                                 SeparationInfo *info, double value) {
+static inline void add_term_rhs(CutSeparationPrivCtx *ctx, SeparationInfo *info,
+                                double value) {
     info->rhs += value;
 }
-static inline void push_term_lhs(CutSeparationPrivCtx *ctx,
-                                 SeparationInfo *info, double value) {
-    push_term_rhs(ctx, info, -value);
+static inline void add_term_lhs(CutSeparationPrivCtx *ctx, SeparationInfo *info,
+                                double value) {
+    add_term_rhs(ctx, info, -value);
 }
 
 #if __cplusplus
