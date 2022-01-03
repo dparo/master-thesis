@@ -932,9 +932,13 @@ static bool on_solve_start(Solver *self, const Instance *instance,
 
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
-        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_LOCAL_PROGRESS |
-        CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS | CPX_CALLBACKCONTEXT_THREAD_UP |
+        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_THREAD_UP |
         CPX_CALLBACKCONTEXT_THREAD_DOWN;
+
+#ifndef NDEBUG
+    contextmask |= CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS |
+                   CPX_CALLBACKCONTEXT_LOCAL_PROGRESS;
+#endif
 
     if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
                             cplex_callback, (void *)callback_ctx) != 0) {
@@ -1121,6 +1125,7 @@ static void enable_cuts(SolverTypedParams *tparams) {
 
     G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
         solver_params_get_bool(tparams, "GSEC_FRAC_CUTS");
+    G_cuts[GLM_CUT_ID].fractional_sep_enabled = G_cuts[GLM_CUT_ID].enabled;
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance,
