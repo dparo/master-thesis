@@ -621,13 +621,13 @@ bool gomory_hu_tree_ctx_create(GomoryHuTreeCtx *ctx, int32_t nnodes) {
     ctx->nnodes = nnodes;
     ctx->p = malloc(nnodes * sizeof(*ctx->p));
     ctx->flows = malloc(nnodes * sizeof(*ctx->flows));
-    ctx->ff.colors = malloc(nnodes * sizeof(*ctx->ff.colors));
-    ctx->ff.pred = malloc(nnodes * sizeof(*ctx->ff.pred));
+    ctx->ff.visited = malloc(nnodes * sizeof(*ctx->ff.visited));
+    ctx->ff.parent = malloc(nnodes * sizeof(*ctx->ff.parent));
     ctx->ff.bfs_queue = malloc((nnodes + 2) * sizeof(*ctx->ff.bfs_queue));
     ctx->mf = max_flow_result_create(nnodes);
     ctx->pr = push_relabel_ctx_create(nnodes);
 
-    if (ctx->p && ctx->flows && ctx->ff.colors && ctx->ff.bfs_queue) {
+    if (ctx->p && ctx->flows && ctx->ff.visited && ctx->ff.bfs_queue) {
         return true;
     } else {
         return false;
@@ -647,80 +647,111 @@ void gomory_hu_tree_destroy(GomoryHuTree *tree) {
 void gomory_hu_tree_ctx_destroy(GomoryHuTreeCtx *ctx) {
     free(ctx->p);
     free(ctx->flows);
-    free(ctx->ff.colors);
+    free(ctx->ff.visited);
     free(ctx->ff.bfs_queue);
-    free(ctx->ff.pred);
+    free(ctx->ff.parent);
     max_flow_result_destroy(&ctx->mf);
     push_relabel_ctx_destroy(&ctx->pr);
     memset(ctx, 0, sizeof(*ctx));
 }
 
+static inline void dfs(FlowNetwork *net, MaxFlowResult *result, int32_t s) {
+    result->colors[s] = BLACK;
+
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        bool i_visited = result->colors[i] == BLACK;
+        if (!i_visited && residual_cap(net, s, i) > 0.0) {
+            dfs(net, result, i);
+        }
+    }
+}
+
 // Due to the Gomory Hu Tree max flow algorithm: only N max flows computations
 // are required to build the tree. The tree is then a simpler data structure
 // that can answer max flow computations for any (s,t) pair by a simple
-// bfs algorithm. Because the tree is guaranteed to create a unique path
-// between any pair of nodes
+// single iteration FordFulkerson's BFS algorithm. Because the tree is
+// guaranteed to create a unique path between any pair of nodes
 double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
                        MaxFlowResult *result, GomoryHuTreeCtx *ctx) {
+#if 0
+    return push_relabel_max_flow2(&tree->reduced_net, source, sink, result,
+                                  &ctx->pr);
+#else
     const int32_t n = ctx->nnodes;
     result->source = source;
     result->sink = sink;
 
-    for (int32_t u = 0; u < n; u++) {
-        result->colors[u] = WHITE;
-    }
+    memset(ctx->ff.visited, 0, n * sizeof(*ctx->ff.visited));
+    flow_network_clear(&tree->reduced_net, false);
 
-    int32_t *queue = ctx->ff.bfs_queue;
+    // BREADTH First search
+    // NOTE:
+    //    A single BFS iteration is sufficient because only a unique flow path
+    //    exists thanks to the gomory hu tree
+    {
+        int32_t *queue = ctx->ff.bfs_queue;
 
-    int32_t head = 0;
-    int32_t tail = 0;
-    queue[tail++] = source;
-    ctx->ff.pred[source] = -1;
+        int32_t head = 0;
+        int32_t tail = 0;
+        queue[tail++] = source;
+        ctx->ff.visited[source] = true;
+        ctx->ff.parent[source] = -1;
 
-    // While queue is not empty
-    while (head != tail) {
-        // Pop vertex
-        int32_t u = queue[head++];
-        result->colors[u] = BLACK;
+        // While queue is not empty
+        while (head != tail) {
+            // Pop vertex
+            int32_t u = queue[head++];
 
-        for (int32_t v = 0; v < n; v++) {
-            bool v_needs_processing = result->colors[v] == WHITE &&
-                                      *cap(&tree->reduced_net, u, v) > 0.0;
-            if (v_needs_processing) {
-                // Queue v for further processing, and mark it as "visited"
-                queue[tail++] = v;
-                result->colors[v] = GRAY;
-                ctx->ff.pred[v] = u;
+            for (int32_t v = 0; v < n; v++) {
+                bool explore_v = !ctx->ff.visited[v] &&
+                                 residual_cap(&tree->reduced_net, u, v) > 0.0;
+                if (explore_v) {
+                    // Queue v for further processing, and mark it as "visited"
+                    queue[tail++] = v;
+                    ctx->ff.parent[v] = u;
+                    ctx->ff.visited[v] = true;
+                }
             }
         }
     }
 
-#ifndef NDEBUG
-    for (int32_t i = 0; i < n; i++) {
-        assert(result->colors[i] == BLACK || result->colors[i] == WHITE);
-    }
-#endif
-
-    bool sink_reachable = result->colors[sink] == BLACK;
-    if (!sink_reachable) {
-        result->maxflow = 0.0;
-        return 0.0;
-    }
-
     double max_flow = INFINITY;
+    if (!ctx->ff.visited[sink]) {
+        max_flow = 0.0;
+    } else {
+        // Ford fulkerson single iteration update
+        // Walk the augmenting path backward, and find the minimum capacity
+        // available in the path
+        max_flow = INFINITY;
+        for (int32_t v = sink; v != source; v = ctx->ff.parent[v]) {
+            int32_t u = ctx->ff.parent[v];
+            double rescap = residual_cap(&tree->reduced_net, u, v);
+            max_flow = MIN(max_flow, rescap);
+        }
 
-    // Walk the augmenting path backward, and find the minimum capacity
-    // available in the path
-    for (int32_t u = sink; u != source && ctx->ff.pred[u] >= 0;
-         u = ctx->ff.pred[u]) {
-        int32_t pred_u = ctx->ff.pred[u];
-        double cap = *network_cap(&tree->reduced_net, pred_u, u);
-        max_flow = MIN(max_flow, cap);
+        assert(max_flow != INFINITY);
+
+        // Update residual capacities of the edges and reverse edges
+        // along the path
+        for (int32_t v = sink; v != source; v = ctx->ff.parent[v]) {
+            int32_t u = ctx->ff.parent[v];
+            *network_flow(&tree->reduced_net, u, v) -= max_flow;
+            *network_flow(&tree->reduced_net, v, u) += max_flow;
+        }
     }
 
     assert(max_flow != INFINITY);
+
+    // DFS to determine the final bipartition
+    for (int32_t i = 0; i < n; i++) {
+        result->colors[i] = WHITE;
+    }
+    dfs(&tree->reduced_net, result, source);
     result->maxflow = max_flow;
+    assert(result->colors[source] == BLACK);
+    assert(result->colors[sink] == WHITE);
     return max_flow;
+#endif
 }
 
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {

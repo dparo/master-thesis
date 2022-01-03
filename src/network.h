@@ -38,10 +38,6 @@ typedef struct {
 typedef enum {
     BLACK = 0,
     WHITE = 1,
-
-    // For internal computations of gomory-hu-trees and maxflow only.
-    // Client code does not need to worry about this color
-    GRAY = 2,
 } MaxFlowColor;
 
 typedef struct {
@@ -78,8 +74,8 @@ typedef struct {
 } GomoryHuTree;
 
 typedef struct {
-    uint8_t *colors;
-    int32_t *pred;
+    bool *visited;
+    int32_t *parent;
     int32_t *bfs_queue;
 } FordFulkersonCtx;
 

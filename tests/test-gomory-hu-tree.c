@@ -196,8 +196,14 @@ TEST random_gomory_hu(void) {
                     max_flow2 = gomory_hu_query(&tree, source, sink,
                                                 &max_flow_result2, &gh_ctx);
 
+                    assert(max_flow_result1.colors[source] == BLACK);
+                    assert(max_flow_result1.colors[sink] == WHITE);
+                    assert(max_flow_result2.colors[source] == BLACK);
+                    assert(max_flow_result2.colors[sink] == WHITE);
+
                     ASSERT_IN_RANGE(max_flow1, max_flow_result1.maxflow, 1e-5);
                     ASSERT_IN_RANGE(max_flow2, max_flow_result2.maxflow, 1e-5);
+
                     ASSERT_IN_RANGE(max_flow1, max_flow2, 1e-5);
                 }
             }
