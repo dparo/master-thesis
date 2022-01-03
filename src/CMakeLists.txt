@@ -63,11 +63,14 @@ add_library(libcptp
 
     # MIP solver
     solvers/mip/mip.c
-    solvers/mip/warm-start.c
-    solvers/mip/cuts/gsec.c
-    solvers/mip/cuts/glm.c
-    solvers/mip/cuts/rci.c
-    )
+    $<$<BOOL:CPLEX_FOUND>:
+        solvers/mip/warm-start.c
+        solvers/mip/cuts/gsec.c
+        solvers/mip/cuts/glm.c
+        solvers/mip/cuts/rci.c
+    >
+)
+
 target_include_directories(libcptp PUBLIC ./)
 target_link_libraries(libcptp PUBLIC debugbreak logc libstb cjson-static libcrypto)
 

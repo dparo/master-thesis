@@ -31,6 +31,8 @@ extern "C" {
 #include "core-utils.h"
 #include "network.h"
 
+#ifdef COMPILED_WITH_CPLEX
+
 // NOTE:
 //       cplexx is the 64 bit version of the API, while cplex (one x) is the 32
 //       bit version of the API.
@@ -173,6 +175,8 @@ static inline bool mip_cut_fractional_sol(CutSeparationFunctor *ctx, CPXNNZ nnz,
 }
 
 void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar);
+
+#endif
 
 #if __cplusplus
 }

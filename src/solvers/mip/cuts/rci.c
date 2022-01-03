@@ -28,9 +28,6 @@ ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
-
-    PushRelabelCtx push_relabel_ctx;
-    MaxFlowResult max_flow_result;
 };
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
@@ -39,8 +36,6 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
-    max_flow_result_destroy(&ctx->max_flow_result);
-    push_relabel_ctx_destroy(&ctx->push_relabel_ctx);
     free(ctx->index);
     free(ctx->value);
     free(ctx);
@@ -136,11 +131,8 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     int32_t n = instance->num_customers + 1;
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
-    ctx->max_flow_result = max_flow_result_create(n);
-    ctx->push_relabel_ctx = push_relabel_ctx_create(n);
 
-    if (!ctx->index || !ctx->value || !ctx->max_flow_result.colors ||
-        !push_relabel_ctx_is_valid(&ctx->push_relabel_ctx)) {
+    if (!ctx->index || !ctx->value) {
         deactivate(ctx);
         return NULL;
     }
