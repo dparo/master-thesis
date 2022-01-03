@@ -25,6 +25,8 @@
 
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
+static const char CONSTRAINT_SENSE = 'G';
+
 struct CutSeparationPrivCtx {
     CPXDIM *index;
     double *value;
@@ -42,7 +44,16 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
 }
 
 static inline bool is_violated_cut(double lhs, double rhs) {
-    return fgte(lhs, rhs, EPS);
+    switch (CONSTRAINT_SENSE) {
+    case 'G':
+        return !fgte(lhs, rhs, EPS);
+    case 'L':
+        return !flte(lhs, rhs, EPS);
+    case 'E':
+        return !feq(lhs, rhs, EPS);
+    default:
+        assert(0);
+    }
 }
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
@@ -149,6 +160,8 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
             lhs += x;
             ++pos;
         }
+    } else {
+        pos = 0;
     }
 
     info.nnz = pos;
@@ -165,8 +178,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                            const double *vstar, MaxFlowResult *mf) {
     CutSeparationPrivCtx *ctx = self->ctx;
-    const char sense = 'G';
-    const int purgeable = CPX_USECUT_PURGE;
+    const int purgeable = CPX_USECUT_FILTER;
     const int local_validity = 0; // (Globally valid)
 
     int32_t depot_color = mf->colors[0];
@@ -176,8 +188,9 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     if (info.nnz && info.is_violated) {
         log_trace("%s :: Adding GLM fractional constraint", __func__);
 
-        if (!mip_cut_fractional_sol(self, info.nnz, info.rhs, sense, ctx->index,
-                                    ctx->value, purgeable, local_validity)) {
+        if (!mip_cut_fractional_sol(self, info.nnz, info.rhs, CONSTRAINT_SENSE,
+                                    ctx->index, ctx->value, purgeable,
+                                    local_validity)) {
             log_fatal("%s :: Failed cut of for fractional solution solution",
                       __func__);
             goto failure;

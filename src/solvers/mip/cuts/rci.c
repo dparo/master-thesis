@@ -24,6 +24,7 @@
 #include "../cuts.h"
 
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
+const static char CONSTRAINT_SENSE = 'G';
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
@@ -41,6 +42,26 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
     free(ctx);
 }
 
+typedef struct {
+    bool is_violated;
+    CPXNNZ nnz;
+    double lhs;
+    double rhs;
+} SeparationInfo;
+
+static inline bool is_violated_cut(double lhs, double rhs, char sense) {
+    switch (CONSTRAINT_SENSE) {
+    case 'G':
+        return !fgte(lhs, rhs, EPS);
+    case 'L':
+        return !flte(lhs, rhs, EPS);
+    case 'E':
+        return !feq(lhs, rhs, EPS);
+    default:
+        assert(0);
+    }
+}
+
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour) {
     if (tour->num_comps == 1) {
@@ -52,7 +73,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     const int32_t n = instance->num_customers + 1;
 
     const double Q = instance->vehicle_cap;
-    const char sense = 'G';
 
     int32_t added_cuts = 0;
 

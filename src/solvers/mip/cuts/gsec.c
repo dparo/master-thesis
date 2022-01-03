@@ -52,7 +52,7 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
 }
 
 static inline bool is_violated_cut(double flow, double y_i) {
-    return flt(flow, 2.0 * y_i, EPS);
+    return !fgte(flow, 2.0 * y_i, EPS);
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
@@ -110,6 +110,18 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         CPXNNZ nnz = 0;
         const double rhs = 0;
         const char sense = 'G';
+        // NOTE(dparo): 3 Jan 2022
+        //       Use CPX_USECUT_PURGE instead of the more classical
+        //       CPX_USECUT_FILTER. We do not care if CPLEX deems the GSEC cuts
+        //       to be ineffective. They define the original problem and must be
+        //       in the formulation regardless. We can allow to purge the cuts
+        //       however, because we can regenerate them fresly from any point
+        //       of the solution process.
+        // NOTE(dparo): 3 Jan 2022
+        //       Also specifying this purgeable to be CPX_USECUT_PURGE has the
+        //       extra benefit of reducing branching and thus memory
+        //       consumption. Making ESPPRC instances with high number of nodes
+        //       extremely more manageable
         const int purgeable = CPX_USECUT_PURGE;
         const int local_validity = 0; // (Globally valid)
 
