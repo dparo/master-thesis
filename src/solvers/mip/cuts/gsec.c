@@ -110,7 +110,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         CPXNNZ nnz = 0;
         const double rhs = 0;
         const char sense = 'G';
-        const int purgeable = CPX_USECUT_FILTER;
+        const int purgeable = CPX_USECUT_PURGE;
         const int local_validity = 0; // (Globally valid)
 
         double flow = 0.0;
