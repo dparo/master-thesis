@@ -52,6 +52,12 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"GSEC_FRAC_CUTS", TYPED_PARAM_BOOL, "false",
          "Enable GSEC cut separation for fractional solutions. Param "
          "`GSEC_CUTS` must also be enabled for this to take effect."},
+        {"GSEC_FRAC_CUTS", TYPED_PARAM_BOOL, "false",
+         "Enable GSEC cut separation for fractional solutions. Param "
+         "`GSEC_CUTS` must also be enabled for this to take effect."},
+        {"GLM_FRAC_CUTS", TYPED_PARAM_BOOL, "true",
+         "Enable GLM cut separation for fractional solutions. Param "
+         "`GLM_CUTS` must also be enabled for this to take effect."},
         {0},
     }};
 

@@ -1124,8 +1124,12 @@ static void enable_cuts(SolverTypedParams *tparams) {
     G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
 
     G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
+        G_cuts[GSEC_CUT_ID].enabled &&
         solver_params_get_bool(tparams, "GSEC_FRAC_CUTS");
-    G_cuts[GLM_CUT_ID].fractional_sep_enabled = G_cuts[GLM_CUT_ID].enabled;
+    G_cuts[GLM_CUT_ID].fractional_sep_enabled =
+        G_cuts[GLM_CUT_ID].enabled &&
+        solver_params_get_bool(tparams, "GLM_FRAC_CUTS");
+    ;
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance,
