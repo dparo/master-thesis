@@ -585,18 +585,6 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
 
                 gomory_hu_query(&tld->gh_tree, i, j, &tld->max_flow,
                                 &tld->gh_ctx);
-#ifndef NDEBUG
-                {
-                    // Validate the gomory hu query with a
-                    // push_relabel_max_flow2
-                    if (0) {
-                        double prev_max_flow = tld->max_flow.maxflow;
-                        push_relabel_max_flow2(&tld->gh_tree.reduced_net, i, j,
-                                               &tld->max_flow, &tld->gh_ctx.pr);
-                        assert(feq(prev_max_flow, tld->max_flow.maxflow, 1e-5));
-                    }
-                }
-#endif
                 assert(tld->max_flow.colors[i] == BLACK);
                 assert(tld->max_flow.colors[j] == WHITE);
 

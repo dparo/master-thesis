@@ -735,8 +735,8 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
         // along the path
         for (int32_t v = sink; v != source; v = ctx->ff.parent[v]) {
             int32_t u = ctx->ff.parent[v];
-            *network_flow(&tree->reduced_net, u, v) -= max_flow;
-            *network_flow(&tree->reduced_net, v, u) += max_flow;
+            *network_flow(&tree->reduced_net, u, v) += max_flow;
+            *network_flow(&tree->reduced_net, v, u) -= max_flow;
         }
     }
 
