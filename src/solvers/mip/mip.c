@@ -935,11 +935,10 @@ static bool on_solve_start(Solver *self, const Instance *instance,
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
         CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_THREAD_UP |
-        CPX_CALLBACKCONTEXT_THREAD_DOWN;
+        CPX_CALLBACKCONTEXT_THREAD_DOWN | CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS;
 
 #ifndef NDEBUG
-    contextmask |= CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS |
-                   CPX_CALLBACKCONTEXT_LOCAL_PROGRESS;
+    contextmask |= CPX_CALLBACKCONTEXT_LOCAL_PROGRESS;
 #endif
 
     if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,
@@ -1196,6 +1195,8 @@ bool cplex_setup(Solver *solver, const Instance *instance,
 
     if (solver_params_get_bool(tparams, "PRICER_MODE")) {
         solver->data->pricer_mode = true;
+    } else {
+        solver->data->pricer_mode = false;
     }
 
     log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
@@ -1321,6 +1322,22 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
                  diff_secs);
 
         timelimit = timelimit - diff_secs;
+
+        if (solver_params_get_bool(tparams,
+                                   "APPLY_POLISHING_AFTER_WARM_START")) {
+
+            log_info(
+                "%s :: CPXXsetdblparam -- Setting CPX_PARAM_POLISHAFTERTIME to "
+                "0.0 (polish the warm start solutions)",
+                __func__);
+            if (0 != CPXXsetdblparam(solver.data->env,
+                                     CPX_PARAM_POLISHAFTERTIME, 0.0)) {
+                log_fatal("%s :: CPXXsetdbparam -- Failed to setup "
+                          "CPX_PARAM_POLISHAFTERTIME "
+                          "(timelimit) to value 0.0",
+                          __func__);
+            }
+        }
     }
 
     log_info("%s :: CPXXsetdblparam -- Setting TIMELIMIT to %f", __func__,

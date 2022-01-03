@@ -46,6 +46,9 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"INS_HEUR_WARM_START", TYPED_PARAM_BOOL, "true",
          "Warm start the MIP solver by using an insertion heuristic for "
          "finding an initial solution"},
+        {"APPLY_POLISHING_AFTER_WARM_START", TYPED_PARAM_BOOL, "true",
+         "Polish the initial warm start solutions right away before beginning "
+         "the Branch&Cut procedure"},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "false", "Enable GLM cuts separation"},
         {"RCI_CUTS", TYPED_PARAM_BOOL, "false", "Enable RCI cuts separation"},
