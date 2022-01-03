@@ -47,6 +47,7 @@ doxygen_add_docs(docs
     WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
     )
 
+
 add_library(libcptp
     STATIC
     types.c
@@ -63,7 +64,7 @@ add_library(libcptp
 
     # MIP solver
     solvers/mip/mip.c
-    $<$<BOOL:CPLEX_FOUND>:
+    $<$<BOOL:${CPLEX_FOUND}>:
         solvers/mip/warm-start.c
         solvers/mip/cuts/gsec.c
         solvers/mip/cuts/glm.c
