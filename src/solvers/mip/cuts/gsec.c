@@ -93,15 +93,14 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     const int32_t source_vertex = mf->source;
     const int32_t sink_vertex = mf->sink;
 
-    assert(BLACK == mf->colors[source_vertex]);
-    assert(WHITE == mf->colors[sink_vertex]);
+    assert(mf->colors[source_vertex] == BLACK);
+    assert(mf->maxflow == 1.0 || mf->colors[sink_vertex] == WHITE);
 
     int32_t set_s_size = 0;
 
     for (int32_t i = 0; i < n; i++) {
         int32_t i_color = mf->colors[i];
-        bool i_is_customer = i > 0;
-        bool i_in_s = (i_color == depot_color) && i_is_customer;
+        bool i_in_s = i_color != depot_color;
         if (i_in_s)
             ++set_s_size;
     }
@@ -117,23 +116,28 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         double flow = 0.0;
         for (int32_t i = 0; i < n; i++) {
             int32_t i_color = mf->colors[i];
-            bool i_is_customer = i > 0;
-            bool i_in_s = (i_color == depot_color) && i_is_customer;
+            bool i_in_s = i_color != depot_color;
 
-            if (!i_in_s)
+            if (!i_in_s) {
                 continue;
+            }
 
             for (int32_t j = 0; j < n; j++) {
-                if (i == j)
+                if (i == j) {
                     continue;
+                }
 
                 int32_t j_color = mf->colors[j];
-                bool j_is_customer = j > 0;
-                bool j_in_s = (j_color == depot_color) && j_is_customer;
+                bool j_in_s = j_color != depot_color;
 
-                if (j_in_s)
+                if (j_in_s) {
                     continue;
+                }
 
+                assert(i != 0);
+                assert(i_color != j_color);
+                assert(i_color != depot_color);
+                assert(j_color == depot_color);
                 ctx->index[nnz] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                 ctx->value[nnz] = +1.0;
                 double x = vstar[get_x_mip_var_idx(instance, i, j)];
@@ -232,10 +236,11 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     assert(*comp(tour, 0) == 0);
 
+    int32_t depot_color = 0;
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
     int32_t total_num_added_cuts = 0;
 
-    // NOTE: The set S cannot cointain the depot. Component index 0 always
+    // NOTE: The set S cannot contain the depot. Component index 0 always
     // contains the depot, and always induces a non violated cut for integral
     // solutions
     for (int32_t c = 1; c < tour->num_comps; c++) {
@@ -251,19 +256,26 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             bool i_is_customer = i > 0;
             bool i_in_s = (tour->comp[i] == c) && i_is_customer;
 
-            if (!i_in_s)
+            if (!i_in_s) {
                 continue;
+            }
 
             for (int32_t j = 0; j < n; j++) {
-                if (i == j)
+                if (i == j) {
                     continue;
+                }
 
                 bool j_is_customer = j > 0;
                 bool j_in_s = (tour->comp[j] == c) && j_is_customer;
 
-                if (j_in_s)
+                if (j_in_s) {
                     continue;
+                }
 
+                assert(i != 0);
+                assert(tour->comp[i] != tour->comp[j]);
+                assert(tour->comp[i] != depot_color);
+                assert(tour->comp[j] != c);
                 ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                 ctx->value[pos] = +1.0;
                 double x = vstar[get_x_mip_var_idx(instance, i, j)];
@@ -283,8 +295,9 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             bool i_is_customer = i > 0;
             bool i_in_s = (tour->comp[i] == c) && i_is_customer;
 
-            if (!i_in_s)
+            if (!i_in_s) {
                 continue;
+            }
 
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
             assert(is_violated_cut(flow, y_i));
