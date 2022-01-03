@@ -25,7 +25,6 @@
 #include "./cuts-utils.h"
 
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
-static const char CONSTRAINT_SENSE = 'G';
 
 struct CutSeparationPrivCtx {
     CutSeparationPrivCtxCommon super;
@@ -100,14 +99,12 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                     continue;
 
                 assert(i_in_s && !j_in_s);
-                double d = demand(instance, j);
-
                 assert(i != 0);
                 assert(colors[i] != colors[j]);
                 assert(colors[i] == curr_color);
                 assert(colors[j] != curr_color);
 
-                double value = 1.0 - 2.0 * d / Q;
+                double value = 1.0 - 2.0 * demand(instance, j) / Q;
                 push_var_lhs(&ctx->super, &info, vstar, value,
                              (CPXDIM)get_x_mip_var_idx(instance, i, j));
             }
@@ -116,8 +113,9 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         for (int32_t i = 0; i < n; i++) {
             bool i_in_s = colors[i] == curr_color;
 
-            if (!i_in_s)
+            if (!i_in_s) {
                 continue;
+            }
 
             assert(i != 0);
             double value = -2.0 * demand(instance, i) / Q;
@@ -129,6 +127,9 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         info.is_violated = is_violated_cut(&ctx->super, &info, EPS);
     }
 
+    info.purgeable = CPX_USECUT_PURGE;
+    info.local_validity = 0; // (Globally valid)
+
     return info;
 }
 
@@ -137,29 +138,15 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     UNUSED_PARAM(obj_p);
 
     CutSeparationPrivCtx *ctx = self->ctx;
-    const int purgeable = CPX_USECUT_FILTER;
-    const int local_validity = 0; // (Globally valid)
-
     int32_t depot_color = mf->colors[0];
     SeparationInfo info =
         separate(self, vstar, mf->colors, depot_color == BLACK ? WHITE : BLACK,
                  mf->maxflow);
-    if (info.is_violated) {
-        log_trace("%s :: Adding GLM fractional constraint", __func__);
-
-        if (!mip_cut_fractional_sol(self, info.num_vars, info.rhs,
-                                    CONSTRAINT_SENSE, ctx->super.index,
-                                    ctx->super.value, purgeable,
-                                    local_validity)) {
-            log_fatal("%s :: Failed cut of for fractional solution solution",
-                      __func__);
-            goto failure;
-        }
+    if (!push_fractional_cut("GLM", self, &ctx->super, &info)) {
+        return false;
     }
 
     return true;
-failure:
-    return false;
 }
 
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
@@ -177,24 +164,15 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     // Start from c = 1. GLM cuts that include the depot node are NOT valid.
     for (int32_t c = 1; c < tour->num_comps; c++) {
         SeparationInfo info = separate(self, vstar, tour->comp, c, 0.0);
-        if (info.is_violated) {
-            log_trace("%s :: Adding GLM integral constraint", __func__);
-
-            if (!mip_cut_integral_sol(self, info.num_vars, info.rhs,
-                                      CONSTRAINT_SENSE, ctx->super.index,
-                                      ctx->super.value)) {
-                log_fatal("%s :: Failed cut of integral solution", __func__);
-                goto failure;
-            }
-            added_cuts += 1;
+        if (!push_integral_cut("GLM", self, &ctx->super, &info)) {
+            return false;
         }
+        ++added_cuts;
     }
 
     log_info("%s :: Created %d GLM cuts", __func__, added_cuts);
 
     return true;
-failure:
-    return false;
 }
 
 const CutSeparationIface CUT_GLM_IFACE = {
