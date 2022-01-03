@@ -23,11 +23,8 @@
 #include "solvers.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "core-utils.h"
-#include "network.h"
-#include "validation.h"
-#include "cuts.h"
-#include "warm-start.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -52,8 +49,11 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
 #include <ilcplex/cplexx.h>
 #include <ilcplex/cpxconst.h>
 
-#include <string.h>
 #include "log.h"
+#include "cuts.h"
+#include "warm-start.h"
+#include "network.h"
+#include "validation.h"
 
 ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
     (void)self;
