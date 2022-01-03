@@ -125,9 +125,10 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 
         assert(info.num_vars);
         info.is_violated = is_violated_cut(&ctx->super, &info, EPS);
+        validate_cut_info(self, &ctx->super, &info, vstar);
     }
 
-    info.purgeable = CPX_USECUT_PURGE;
+    info.purgeable = CPX_USECUT_FILTER;
     info.local_validity = 0; // (Globally valid)
 
     return info;

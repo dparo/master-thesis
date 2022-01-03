@@ -96,6 +96,24 @@ separation_info_to_str(SeparationInfo *info) {
     return result;
 }
 
+static inline void validate_cut_info(CutSeparationFunctor *functor,
+                                     CutSeparationPrivCtxCommon *ctx,
+                                     SeparationInfo *info,
+                                     const double *vstar) {
+    UNUSED_PARAM(functor);
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(info);
+#ifndef NDEBUG
+
+    double lhs = 0.0;
+    for (CPXDIM i = 0; i < info->num_vars; i++) {
+        lhs += vstar[ctx->index[i]] * ctx->value[i];
+    }
+
+    assert(feq(lhs, info->lhs, 1e-5));
+#endif
+}
+
 static inline bool push_fractional_cut(char *cut_name,
                                        CutSeparationFunctor *functor,
                                        CutSeparationPrivCtxCommon *ctx,
