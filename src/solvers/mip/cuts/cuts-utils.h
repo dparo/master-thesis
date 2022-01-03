@@ -39,6 +39,8 @@ static inline bool is_violated_cut(CutSeparationPrivCtxCommon *ctx,
 static inline void push_var_lhs(CutSeparationPrivCtxCommon *ctx,
                                 SeparationInfo *info, const double *vstar,
                                 double value, CPXDIM var_index) {
+    assert(isnan(value) == false && 0 == isinf(value));
+
     ctx->index[info->num_vars] = var_index;
     ctx->value[info->num_vars] = value;
     info->lhs += value * vstar[var_index];
@@ -53,6 +55,8 @@ static inline void push_var_rhs(CutSeparationPrivCtxCommon *ctx,
 
 static inline void add_term_rhs(CutSeparationPrivCtxCommon *ctx,
                                 SeparationInfo *info, double value) {
+    assert(isnan(value) == false && 0 == isinf(value));
+
     UNUSED_PARAM(ctx);
     info->rhs += value;
 }
