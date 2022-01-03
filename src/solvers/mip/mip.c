@@ -81,6 +81,7 @@ typedef enum {
     //         value without any holes
     GSEC_CUT_ID = 0,
     GLM_CUT_ID,
+    RCI_CUT_ID,
     NUM_CUTS,
 } CutId;
 
@@ -92,6 +93,7 @@ static struct {
 } G_cuts[] = {
     [GSEC_CUT_ID] = {&CUT_GSEC_DESCRIPTOR, true, false},
     [GLM_CUT_ID] = {&CUT_GLM_DESCRIPTOR, false, false},
+    [RCI_CUT_ID] = {&CUT_RCI_DESCRIPTOR, false, false},
 };
 
 static inline bool is_active_cut(CutId id) {
@@ -1122,6 +1124,7 @@ terminate:
 static void enable_cuts(SolverTypedParams *tparams) {
     G_cuts[GSEC_CUT_ID].enabled = solver_params_get_bool(tparams, "GSEC_CUTS");
     G_cuts[GLM_CUT_ID].enabled = solver_params_get_bool(tparams, "GLM_CUTS");
+    G_cuts[RCI_CUT_ID].enabled = solver_params_get_bool(tparams, "RCI_CUTS");
 
     G_cuts[GSEC_CUT_ID].fractional_sep_enabled =
         G_cuts[GSEC_CUT_ID].enabled &&
@@ -1129,7 +1132,9 @@ static void enable_cuts(SolverTypedParams *tparams) {
     G_cuts[GLM_CUT_ID].fractional_sep_enabled =
         G_cuts[GLM_CUT_ID].enabled &&
         solver_params_get_bool(tparams, "GLM_FRAC_CUTS");
-    ;
+    G_cuts[RCI_CUT_ID].fractional_sep_enabled =
+        G_cuts[RCI_CUT_ID].enabled &&
+        solver_params_get_bool(tparams, "RCI_FRAC_CUTS");
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance,

@@ -24,7 +24,7 @@
 #include "../cuts.h"
 
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
-const static char CONSTRAINT_SENSE = 'G';
+static const char CONSTRAINT_SENSE = 'G';
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
@@ -49,7 +49,7 @@ typedef struct {
     double rhs;
 } SeparationInfo;
 
-static inline bool is_violated_cut(double lhs, double rhs, char sense) {
+static inline bool is_violated_cut(double lhs, double rhs) {
     switch (CONSTRAINT_SENSE) {
     case 'G':
         return !fgte(lhs, rhs, EPS);
@@ -62,6 +62,138 @@ static inline bool is_violated_cut(double lhs, double rhs, char sense) {
     }
 }
 
+static inline SeparationInfo separate(CutSeparationFunctor *self,
+                                      const double obj_p, const double *vstar,
+                                      int32_t *colors, int32_t curr_color,
+                                      double max_flow) {
+    SeparationInfo info = {0};
+    CutSeparationPrivCtx *ctx = self->ctx;
+    const Instance *instance = self->instance;
+    const int32_t n = instance->num_customers + 1;
+    const double Q = instance->vehicle_cap;
+
+    // Curr color must be different from the color of the depot.
+    assert(curr_color != colors[0]);
+    assert(demand(instance, 0) == 0.0);
+
+    int32_t set_s_size = 0;
+    for (int32_t i = 0; i < n; i++) {
+        bool i_in_s = (colors[i] == curr_color);
+        if (i_in_s) {
+            ++set_s_size;
+        }
+    }
+
+    double lhs = 0.0;
+    double rhs = 0.0;
+    CPXNNZ pos = 0;
+
+    if (set_s_size >= 2) {
+        double flow = 0.0;
+        double demand_sum = 0.0;
+        double demand_rem = 0.0;
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_in_s = (colors[i] == curr_color);
+
+            if (!i_in_s) {
+                continue;
+            }
+
+            double d = demand(instance, i);
+            demand_sum += d;
+        }
+
+        demand_rem = fmod(demand_sum, Q);
+        rhs = 2.0 * ceil(demand_sum / Q);
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_in_s = (colors[i] == curr_color);
+
+            if (!i_in_s) {
+                continue;
+            }
+
+            double d = demand(instance, i);
+            rhs += -2.0 * d / demand_rem;
+        }
+
+        for (int32_t i = 0; i < n; i++) {
+            bool i_in_s = (colors[i] == curr_color);
+
+            if (!i_in_s) {
+                continue;
+            }
+
+            double d = demand(instance, i);
+
+            assert(i != 0);
+            assert(colors[i] == curr_color);
+            ctx->index[pos] = (CPXDIM)get_y_mip_var_idx(instance, i);
+            ctx->value[pos] = -2.0 * d / demand_rem;
+            ++pos;
+
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j) {
+                    continue;
+                }
+                bool j_in_s = (colors[j] == curr_color);
+
+                if (j_in_s) {
+                    continue;
+                }
+
+                assert(i != 0);
+                assert(colors[i] != colors[j]);
+                assert(colors[i] == curr_color);
+                assert(colors[j] != curr_color);
+                ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
+                ctx->value[pos] = 1.0;
+                flow += vstar[get_x_mip_var_idx(instance, i, j)];
+                ++pos;
+            }
+        }
+        assert(feq(flow, max_flow, EPS));
+    }
+
+    info.nnz = pos;
+
+    if (info.nnz) {
+        info.is_violated = is_violated_cut(lhs, rhs);
+        info.lhs = lhs;
+        info.rhs = rhs;
+    }
+
+    return info;
+}
+
+static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
+                           const double *vstar, MaxFlowResult *mf) {
+    CutSeparationPrivCtx *ctx = self->ctx;
+    const int purgeable = CPX_USECUT_FILTER;
+    const int local_validity = 0; // (Globally valid)
+
+    int32_t depot_color = mf->colors[0];
+    SeparationInfo info =
+        separate(self, obj_p, vstar, mf->colors,
+                 depot_color == BLACK ? WHITE : BLACK, mf->maxflow);
+    if (info.nnz && info.is_violated) {
+        log_trace("%s :: Adding RCI fractional constraint", __func__);
+
+        if (!mip_cut_fractional_sol(self, info.nnz, info.rhs, CONSTRAINT_SENSE,
+                                    ctx->index, ctx->value, purgeable,
+                                    local_validity)) {
+            log_fatal("%s :: Failed cut of for fractional solution solution",
+                      __func__);
+            goto failure;
+        }
+    }
+
+    return true;
+failure:
+    return false;
+}
+
 static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour) {
     if (tour->num_comps == 1) {
@@ -69,77 +201,28 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     }
 
     CutSeparationPrivCtx *ctx = self->ctx;
-    const Instance *instance = self->instance;
-    const int32_t n = instance->num_customers + 1;
-
-    const double Q = instance->vehicle_cap;
-
     int32_t added_cuts = 0;
 
-    for (int32_t c = 0; c < tour->num_comps; c++) {
-        CPXNNZ pos = 0;
-        double demand_sum = 0.0;
+    for (int32_t c = 1; c < tour->num_comps; c++) {
+        SeparationInfo info = separate(self, obj_p, vstar, tour->comp, c, 0.0);
+        if (info.nnz && info.is_violated) {
+            log_trace("%s :: Adding RCI integral constraint", __func__);
 
-        for (int32_t i = 0; i < n; i++) {
-            bool i_is_customer = i > 0;
-            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
-
-            if (i == 0)
-                assert(demand(instance, i) == 0.0);
-
-            if (!i_in_s)
-                continue;
-
-            double d = demand(instance, i);
-            demand_sum += d;
-        }
-
-        double r = fmod(demand_sum, Q);
-        double rhs = 2.0 * ceil(demand_sum / Q);
-
-        for (int32_t i = 0; i < n; i++) {
-            bool i_is_customer = i > 0;
-            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
-
-            if (!i_in_s)
-                continue;
-
-            double d = demand(instance, i);
-            rhs += -2.0 * d / r;
-        }
-
-        for (int32_t i = 0; i < n; i++) {
-            bool i_is_customer = i > 0;
-            bool i_in_s = (tour->comp[i] == c) && i_is_customer;
-
-            if (i == 0)
-                assert(demand(instance, i) == 0.0);
-
-            if (!i_in_s)
-                continue;
-
-            double d = demand(instance, i);
-
-            ctx->index[pos] = get_y_mip_var_idx(instance, i);
-            ctx->value[pos] = -2.0 * d / r;
-            ++pos;
-
-            for (int32_t j = 0; j < n; j++) {
-                if (i == j)
-                    continue;
-
-                bool j_is_customer = j > 0;
-                bool j_in_s = (tour->comp[j] == c) && j_is_customer;
-
-                if (j_in_s)
-                    continue;
-
-                ctx->index[pos] = get_x_mip_var_idx(instance, i, j);
-                ctx->value[pos] = 1.0;
-                ++pos;
+            if (!mip_cut_integral_sol(self, info.nnz, info.rhs,
+                                      CONSTRAINT_SENSE, ctx->index,
+                                      ctx->value)) {
+                log_fatal("%s :: Failed cut of integral solution", __func__);
+                goto failure;
             }
+            added_cuts += 1;
         }
     }
+
+    log_info("%s :: Created %d RCI cuts", __func__, added_cuts);
+
+    return true;
+failure:
+    return false;
 }
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
@@ -148,7 +231,6 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
     int32_t nnz_ub = get_nnz_upper_bound(instance);
 
-    int32_t n = instance->num_customers + 1;
     ctx->index = malloc(nnz_ub * sizeof(*ctx->index));
     ctx->value = malloc(nnz_ub * sizeof(*ctx->value));
 
@@ -163,6 +245,6 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 const CutSeparationIface CUT_RCI_IFACE = {
     .activate = activate,
     .deactivate = deactivate,
-    .fractional_sep = NULL,
+    .fractional_sep = fractional_sep,
     .integral_sep = integral_sep,
 };

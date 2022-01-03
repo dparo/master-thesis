@@ -105,10 +105,10 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 
     double lhs = 0.0;
     double rhs = 0.0;
-    double flow = 0.0;
     CPXNNZ pos = 0;
 
     if (set_s_size >= 2) {
+        double flow = 0.0;
 
         for (int32_t i = 0; i < n; i++) {
             bool i_in_s = colors[i] == curr_color;
@@ -160,8 +160,6 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
             lhs += x;
             ++pos;
         }
-    } else {
-        pos = 0;
     }
 
     info.nnz = pos;
@@ -209,7 +207,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     }
 
     CutSeparationPrivCtx *ctx = self->ctx;
-    const char sense = 'G';
     int32_t added_cuts = 0;
 
     // NOTE:
@@ -219,8 +216,9 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         if (info.nnz && info.is_violated) {
             log_trace("%s :: Adding GLM integral constraint", __func__);
 
-            if (!mip_cut_integral_sol(self, info.nnz, info.rhs, sense,
-                                      ctx->index, ctx->value)) {
+            if (!mip_cut_integral_sol(self, info.nnz, info.rhs,
+                                      CONSTRAINT_SENSE, ctx->index,
+                                      ctx->value)) {
                 log_fatal("%s :: Failed cut of integral solution", __func__);
                 goto failure;
             }
