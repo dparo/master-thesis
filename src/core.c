@@ -433,7 +433,7 @@ static void postprocess_solver_solution(const Instance *instance,
 typedef void (*sighandler_t)(int);
 static THREAD_LOCAL volatile Solver *sighandler_ctx_solver_ptr;
 
-/// \brief Consumes the signal and does not propage it further
+/// \brief Consumes the signal and does not propagate it further
 static void cptp_sighandler(int signum) {
     switch (signum) {
     case SIGINT:
