@@ -48,8 +48,9 @@
 #include <sha256.h>
 #include <cJSON.h>
 
+#define HASH_CSTR_LEN 65
 typedef struct {
-    char cstr[65];
+    char cstr[HASH_CSTR_LEN];
 } Hash;
 
 typedef struct {
@@ -569,6 +570,7 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     args[argidx++] = timelimit;
     args[argidx++] = "--seed";
     args[argidx++] = seed_str;
+    args[argidx++] = "-DPRICER_MODE=1";
 
     for (int32_t i = 0; solver->args[i] != NULL; i++) {
         args[argidx++] = solver->args[i];
@@ -779,72 +781,45 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
     PerfProfBatch batches[] = {
-        {1,
+        {3,
          "E-family-last-10",
          120.0,
          1,
          {"data/BAP_Instances/E-last-10"},
          DEFAULT_FILTER,
          {
-             {"My CPTP MIP solver",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-              }},
-             {"My CPTP MIP pricer",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-                  "-DPRICER_MODE=1",
-              }},
+             {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
-        {1,
+        {3,
+         "F-family-last-10",
+         120.0,
+         1,
+         {"data/BAP_Instances/F-n72-k4"},
+         DEFAULT_FILTER,
+         {
+             {"My CPTP MIP pricer", {}},
+             BAPCOD_SOLVER,
+         }},
+        {3,
          "F-family-last-10",
          120.0,
          1,
          {"data/BAP_Instances/F-last-10"},
          DEFAULT_FILTER,
          {
-             {"My CPTP MIP solver",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-              }},
-             {"My CPTP MIP pricer",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-                  "-DPRICER_MODE=1",
-
-              }},
+             {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
-        {1,
+
+        {3,
          "E-F-family-last-10",
          120.0,
          1,
          {"data/BAP_Instances/E-last-10", "data/BAP_Instances/F-last-10"},
          DEFAULT_FILTER,
          {
-             {"My CPTP MIP solver",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-              }},
-             {"My CPTP MIP pricer",
-              {
-                  "--solver",
-                  "mip",
-                  "-DGSEC_FRAC_CUTS=0",
-                  "-DPRICER_MODE=1",
-              }},
-
+             {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }}};
 
