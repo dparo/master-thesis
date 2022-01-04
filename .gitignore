@@ -7,6 +7,8 @@ gdb.txt
 .cache
 *.swp
 
+/vgcore.*
+
 /.idea
 
 /*.lp

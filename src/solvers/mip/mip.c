@@ -776,6 +776,14 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
               simplex_iterations, lower_bound, upper_bound);
 
+    // TODO:
+    // Double check this comparison. Is it enough to use a simple double `<`
+    // direct comparison with the zero_reduced_cost_threshold, or should I
+    // consider an EPSILON!?
+    //     - It depends if the BapCod already removes this EPSILON or not.
+    //     - If it doesn't, i should remove an EPSILON here to avoid generating
+    //       solutions with reduced_cost which is too small of an improvement
+    //       to be acceptable.
     if (solver->data->pricer_mode &&
         (upper_bound < instance->zero_reduced_cost_threshold)) {
         CPXXcallbackabort(context);
