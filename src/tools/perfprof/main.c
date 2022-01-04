@@ -792,7 +792,7 @@ static void main_loop(void) {
              BAPCOD_SOLVER,
          }},
         {3,
-         "F-family-last-10",
+         "F-n72-k4",
          120.0,
          1,
          {"data/BAP_Instances/F-n72-k4"},
