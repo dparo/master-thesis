@@ -1136,6 +1136,13 @@ static void enable_cuts(SolverTypedParams *tparams) {
         solver_params_get_bool(tparams, "RCI_FRAC_CUTS");
 }
 
+static inline double compute_trivial_lower_cutoff(const Instance *instance) {
+    log_warn("%s :: TODO!!!", __func__);
+    // TODO!!!!
+    UNUSED_PARAM(instance);
+    return -1e+75;
+}
+
 bool cplex_setup(Solver *solver, const Instance *instance,
                  SolverTypedParams *tparams, double timelimit,
                  int32_t randomseed) {
@@ -1216,14 +1223,39 @@ bool cplex_setup(Solver *solver, const Instance *instance,
     //        In this case i'm removing a 1e-8, implying that the
     //        zero_reduced_cost_threshold that bapcod produces is tight
 
-    if (solver_params_get_bool(tparams, "APPLY_CUTOFF")) {
+    if (solver_params_get_bool(tparams, "APPLY_UPPER_CUTOFF")) {
+        // NOTE:
+        // This parameter is effective only when the branch and bound algorithm
+        // is invoked, for example, in a mixed integer program (MIP). It does
+        // not have the expected effect when branch and bound is not invoked.
         const double cutoff_value =
             instance->zero_reduced_cost_threshold - 1e-8;
+
+        log_info("%s :: Setting UPPER_CUTOFF to %f", __func__, cutoff_value);
 
         if (0 !=
             CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTUP, cutoff_value)) {
             log_fatal(
                 "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
+                "(upper cuttoff value) to value %f",
+                __func__, cutoff_value);
+            goto fail;
+        }
+    }
+
+    if (solver_params_get_bool(tparams, "APPLY_LOWER_CUTOFF")) {
+        // NOTE:
+        // This parameter is effective only when the branch and bound algorithm
+        // is invoked, for example, in a mixed integer program (MIP). It does
+        // not have the expected effect when branch and bound is not invoked.
+
+        const double cutoff_value = compute_trivial_lower_cutoff(instance);
+        log_info("%s :: Setting LOWER_CUTOFF to %f", __func__, cutoff_value);
+
+        if (0 !=
+            CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTLO, cutoff_value)) {
+            log_fatal(
+                "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTLO "
                 "(upper cuttoff value) to value %f",
                 __func__, cutoff_value);
             goto fail;

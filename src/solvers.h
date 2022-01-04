@@ -36,9 +36,12 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"NUM_THREADS", TYPED_PARAM_INT32, "0",
          "Set the number of threads to use. Default 0, means autodetect based "
          "on the number of cores available"},
-        {"APPLY_CUTOFF", TYPED_PARAM_BOOL, "false",
-         "Apply cutoff value (CPX_PARAM_CUTUP) by using the "
+        {"APPLY_UPPER_CUTOFF", TYPED_PARAM_BOOL, "false",
+         "Apply upper cutoff value (CPX_PARAM_CUTUP) by using the "
          "zero_reduced_cost_threshold"},
+        {"APPLY_LOWER_CUTOFF", TYPED_PARAM_BOOL, "true",
+         "Apply lower cutoff value (CPX_PARAM_CUTLO) by using a "
+         "trivially computed lower bound for the objective function"},
         {"PRICER_MODE", TYPED_PARAM_BOOL, "true",
          "Behave as pricer. Terminate solution process as soon as a negative "
          "value tour is found, without proving its optimality (there may exist "
