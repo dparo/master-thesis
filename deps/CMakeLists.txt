@@ -79,6 +79,8 @@ set(ARGTABLE3_ENABLE_EXAMPLES OFF CACHE BOOL "Enable examples")
 # Set cJSON to enable sanitizers
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_ADRESS_SANITIZER)
     set(ENABLE_SANITIZERS ON CACHE INTERNAL "Enable sanitizers")
+else()
+    set(ENABLE_SANITIZERS OFF CACHE INTERNAL "Enable sanitizers")
 endif()
 
 # Set cJSON to built both shared and static libraries

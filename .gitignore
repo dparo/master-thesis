@@ -8,6 +8,7 @@ gdb.txt
 *.swp
 
 /vgcore.*
+/helgrind*
 
 /.idea
 
