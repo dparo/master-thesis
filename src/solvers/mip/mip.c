@@ -776,16 +776,8 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
               simplex_iterations, lower_bound, upper_bound);
 
-    // TODO:
-    // Double check this comparison. Is it enough to use a simple double `<`
-    // direct comparison with the zero_reduced_cost_threshold, or should I
-    // consider an EPSILON!?
-    //     - It depends if the BapCod already removes this EPSILON or not.
-    //     - If it doesn't, i should remove an EPSILON here to avoid generating
-    //       solutions with reduced_cost which is too small of an improvement
-    //       to be acceptable.
     if (solver->data->pricer_mode &&
-        (upper_bound < instance->zero_reduced_cost_threshold)) {
+        is_valid_reduced_cost(instance, upper_bound)) {
         CPXXcallbackabort(context);
     }
 
@@ -1224,20 +1216,12 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         goto fail;
     }
 
-    // TODO:
-    //     Verificare se il valore di `zero_reduced_cost_threshold` ritornato
-    //     da BapCod già include un EPSILON o meno. Se non lo include dobbiamo
-    //     togliere un EPSILON noi.
-    //        In this case i'm removing a 1e-8, implying that the
-    //        zero_reduced_cost_threshold that bapcod produces is tight
-
     if (solver_params_get_bool(tparams, "APPLY_UPPER_CUTOFF")) {
         // NOTE:
         // This parameter is effective only when the branch and bound algorithm
         // is invoked, for example, in a mixed integer program (MIP). It does
         // not have the expected effect when branch and bound is not invoked.
-        const double cutoff_value =
-            instance->zero_reduced_cost_threshold - 1e-8;
+        const double cutoff_value = get_reduced_cost_upper_bound(instance);
 
         log_info("%s :: Setting UPPER_CUTOFF to %f", __func__, cutoff_value);
 
@@ -1351,7 +1335,8 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
     // WARM start
     if (solver_params_get_bool(tparams, "INS_HEUR_WARM_START")) {
         int64_t begin_time = os_get_usecs();
-        if (!mip_ins_heur_warm_start(&solver, instance)) {
+        if (!mip_ins_heur_warm_start(&solver, instance,
+                                     solver.data->pricer_mode)) {
             log_fatal("%s :: WARM start failed", __func__);
             goto fail;
         }

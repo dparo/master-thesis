@@ -32,6 +32,7 @@ extern "C" {
 #include <stb_ds.h>
 
 #define INT32_DEAD_VAL (INT32_MIN >> 1)
+#define COST_TOLERANCE ((double)1e-6)
 
 typedef enum DistanceRounding {
     CPTP_DIST_ROUND = 0, /// default
@@ -150,6 +151,16 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        double timelimit, int32_t randomseed);
 
 void cptp_print_list_of_solvers_and_params(void);
+
+static inline double get_reduced_cost_upper_bound(const Instance *instance) {
+    return instance->zero_reduced_cost_threshold - COST_TOLERANCE;
+}
+
+static inline double is_valid_reduced_cost(const Instance *instance,
+                                           double tour_cost) {
+    // NOTE: The relative cost must be slightly below 0 (slightly negative)
+    return tour_cost - get_reduced_cost_upper_bound(instance);
+}
 
 static inline bool is_valid_instance(Instance *instance) {
     bool invalid = instance->num_customers <= 0 ||

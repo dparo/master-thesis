@@ -27,8 +27,8 @@ typedef struct InsHeurNodePair {
     int32_t u, v;
 } InsHeurNodePair;
 
-static bool register_warm_solution(Solver *solver, const Instance *instance,
-                                   const Solution *solution) {
+static bool feed_warm_solution(Solver *solver, const Instance *instance,
+                               const Solution *solution) {
     bool result = true;
     const int32_t n = instance->num_customers + 1;
     CPXNNZ beg[] = {0};
@@ -266,7 +266,13 @@ static void ins_heur(Solver *solver, const Instance *instance,
 #endif
 }
 
-bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
+static void twoopt_refine(Solver *solver, const Instance *instance,
+                          Solution *solution) {
+    log_warn("%s :: TODO!!!", __func__);
+}
+
+bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
+                             bool pricer_mode_enabled) {
     bool result = true;
     const int32_t n = instance->num_customers + 1;
     const double Q = instance->vehicle_cap;
@@ -286,13 +292,18 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance) {
                      __func__, solution.upper_bound,
                      solution.upper_bound -
                          instance->zero_reduced_cost_threshold);
+            if (!pricer_mode_enabled ||
+                !is_valid_reduced_cost(instance, solution.upper_bound)) {
+                // Try to improve the solution using 2opt
+                double prev_ub = solution.upper_bound;
+                twoopt_refine(solver, instance, &solution);
+                log_trace("%s :: two opt refine -- Improved solution from %f "
+                          "to %f (%f improvement)",
+                          __func__, prev_ub, solution.upper_bound,
+                          solution.upper_bound - prev_ub);
+            }
 
-            // TODO(dparo) 4 Jan 2022:
-            // If solution cost is not less than the
-            // zero_reduced_cost_threshold, or pricer mode is turned off => Then
-            // => 2opt_refine()
-
-            if (!register_warm_solution(solver, instance, &solution)) {
+            if (!feed_warm_solution(solver, instance, &solution)) {
                 log_fatal("%s :: register_warm_solution_failed", __func__);
                 result = false;
                 goto terminate;
