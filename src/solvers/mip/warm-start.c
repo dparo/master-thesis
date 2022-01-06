@@ -239,7 +239,8 @@ static void ins_heur(Solver *solver, const Instance *instance,
 
                 assert(!h_is_visited);
                 bool good_candidate_for_insertion =
-                    h == 0 || num_visited == 2 || delta_cost < best_delta_cost;
+                    h == 0 || num_visited == 2 ||
+                    delta_cost < (best_delta_cost - COST_TOLERANCE);
 
                 if (good_candidate_for_insertion) {
                     best_delta_cost = delta_cost;
@@ -298,40 +299,128 @@ static void ins_heur(Solver *solver, const Instance *instance,
 #endif
 }
 
+static void twoopt_exchange(Solver *solver, const Instance *instance,
+                            Tour *tour, int32_t a, int32_t b) {
+    const int32_t n = instance->num_customers + 1;
+    assert(a >= 0 && a < n);
+    assert(b >= 0 && b < n);
+
+    int32_t succ_a = tour->succ[a];
+    int32_t succ_b = tour->succ[b];
+
+    assert(succ_a >= 0 && succ_a < n);
+    assert(succ_b >= 0 && succ_b < n);
+
+    // Reverse part of the tour
+    {
+        int32_t prev = a;
+        int32_t current = succ_a;
+        assert(current >= 0 && current < n);
+
+        while (current != b) {
+            int32_t next = tour->succ[current];
+            assert(next >= 0 && next < n);
+            tour->succ[current] = prev;
+            prev = current;
+            current = next;
+        }
+    }
+
+    // Fix the edge crossing
+    tour->succ[a] = b;
+    tour->succ[succ_a] = succ_b;
+
+#ifndef NDEBUG
+    validate_tour(instance, tour);
+#endif
+}
+
 static void twoopt_refine(Solver *solver, const Instance *instance,
-                          Solution *solution, int32_t *unpacked_tour) {
-    log_warn("%s :: TODO!!!", __func__);
+                          Solution *solution) {
     const int32_t n = instance->num_customers + 1;
 
-    // Unpack the tour into an undirected data structure as
-    // to make the whole procedure faster.
-    // This allows us to do 2-OPT exhcanges without always reversing
-    // part of the tours
-    for (int32_t i = 0; i < n; i++) {
-        int32_t j = &solution->tour.succ[i];
-        if (j >= 0) {
-            // unpacked_tour[i + j * n] = j;
-            // unpacked_tour[j] = i;
+    // NOTE(dparo):
+    //      A two-opt exchange maintain feasibiliby of the original solution.
+    //      After a two-opt exchange the same set of vertices are visited,
+    //      and therefore capacity constraints remain satisfied.
+    //      On top of that profits do not change.
+    //      The only thing that changes is the cost associated with the
+    //      the travelling distance.
+
+    //
+    // While there are edges crossing (2-opt exchanges are available)
+    //
+    while (true) {
+        double best_delta_cost = 0.0;
+        int32_t best_a = -1;
+        int32_t best_b = -1;
+
+        //
+        // Scan for the best NodePair to perform the 2-opt exchange
+        //
+        for (int32_t a = 0; a < n; a++) {
+            for (int32_t b = 0; b < n; b++) {
+                if (a == b) {
+                    continue;
+                }
+
+                // Vertices a,b are valid 2opt exchange candidates only if they
+                // are visited in the tour
+                if (solution->tour.comp[a] < 0 || solution->tour.comp[b] < 0) {
+                    continue;
+                }
+
+                int32_t succ_a = solution->tour.succ[a];
+                int32_t succ_b = solution->tour.succ[b];
+
+                assert(succ_a >= 0 && succ_a < n);
+                assert(succ_b >= 0 && succ_b < n);
+                assert(succ_a != succ_b);
+
+                // Compute delta_cost
+                double delta_cost = cptp_dist(instance, a, b) +
+                                    cptp_dist(instance, succ_a, succ_b) -
+                                    cptp_dist(instance, a, succ_a) -
+                                    cptp_dist(instance, b, succ_b);
+
+                if (delta_cost < (best_delta_cost - COST_TOLERANCE)) {
+                    best_delta_cost = delta_cost;
+                    best_a = a;
+                    best_b = b;
+                }
+            }
+        }
+
+        if (best_a >= 0) {
+            assert(best_delta_cost < 0.0);
+            assert(best_b >= 0);
+
+            // Perform the two-opt exchange and reverse part of the tour
+            twoopt_exchange(solver, instance, &solution->tour, best_a, best_b);
+            solution->upper_bound += best_delta_cost;
+#ifndef NDEBUG
+            validate_solution(instance, solution);
+#endif
+        } else {
+            // NOTE(dparo): No more 2-opt exchanges are available
+            break;
         }
     }
 
-    for (int32_t a = 0; a < n; a++) {
-        for (int32_t b = 0; b < n; b++) {
-        }
-    }
+#ifndef NDEBUG
+    validate_solution(instance, solution);
+#endif
 }
 
 bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
                              bool pricer_mode_enabled) {
     bool result = true;
     const int32_t n = instance->num_customers + 1;
-    const double Q = instance->vehicle_cap;
 
     Solution solution = solution_create(instance);
     InsHeurNodePair starting_pair;
     starting_pair.u = 0;
 
-    int32_t *unpacked_tour = malloc(n * n * sizeof(*unpacked_tour));
     double min_ub_found = INFINITY;
 
     for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
@@ -355,7 +444,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
                 !is_valid_reduced_cost(instance, solution.upper_bound)) {
                 // Try to improve the solution using 2opt
                 double prev_ub = solution.upper_bound;
-                twoopt_refine(solver, instance, &solution, unpacked_tour);
+                twoopt_refine(solver, instance, &solution);
                 log_trace("%s :: two opt refine -- Improved solution from %f "
                           "to %f (%f delta improvement)",
                           __func__, prev_ub, solution.upper_bound,
@@ -387,7 +476,6 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
     }
 
 terminate:
-    free(unpacked_tour);
     solution_destroy(&solution);
     return result;
 }
