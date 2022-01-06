@@ -233,7 +233,9 @@ static void ins_heur(Solver *solver, const Instance *instance,
                 //     nodes are visited in the current tour (the MIP
                 //     formulation accepts only tours having at least 3 nodes
                 //     visited) or if it improves the previous candidate
-                //     delta_cost
+                //     delta_cost. Recall that the best_delta_cost starts from
+                //     0.0, and therefore only improving vertices will be
+                //     inserted.
 
                 assert(!h_is_visited);
                 bool good_candidate_for_insertion =
@@ -258,13 +260,14 @@ static void ins_heur(Solver *solver, const Instance *instance,
         assert(best_b >= 0 && best_b < n);
         assert(tour->succ[best_a] == best_b);
 
-        assert(best_delta_cost < 0.0 || num_visited == 2);
+        assert(best_delta_cost < 0.0 || num_visited == 2 || best_h == 0);
         cost += best_delta_cost;
         sum_demands += instance->demands[best_h];
 
         tour->comp[best_h] = 0;
         tour->succ[best_a] = best_h;
         tour->succ[best_h] = best_b;
+        ++num_visited;
 
 #ifndef NDEBUG
         if (tour->comp[0] == 0) {
