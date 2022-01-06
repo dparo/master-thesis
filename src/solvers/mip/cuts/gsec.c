@@ -23,7 +23,8 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-static const double EPS = 1e-5;
+const static double VIOLATION_TOLERANCE = 1e-2;
+const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;
@@ -52,7 +53,8 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
 }
 
 static inline bool is_violated_cut(double flow, double y_i) {
-    return !fgte(flow, 2.0 * y_i, EPS);
+    bool valid = flow >= (2.0 * y_i - VIOLATION_TOLERANCE);
+    return !valid;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {

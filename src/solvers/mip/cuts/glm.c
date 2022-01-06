@@ -24,6 +24,7 @@
 #include "../cuts.h"
 #include "./cuts-utils.h"
 
+static const double VIOLATION_TOLERANCE = 1e-2;
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
 struct CutSeparationPrivCtx {
@@ -124,7 +125,8 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         }
 
         assert(info.num_vars);
-        info.is_violated = is_violated_cut(&ctx->super, &info, EPS);
+        info.is_violated =
+            is_violated_cut(&ctx->super, &info, VIOLATION_TOLERANCE);
         validate_cut_info(self, &ctx->super, &info, vstar);
     }
 
