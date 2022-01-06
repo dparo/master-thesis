@@ -42,8 +42,8 @@ NodeInfoAnalysis analyze_node(const Instance *instance, int32_t i) {
         info.obj_ub = INFINITY;
         info.obj_lb = INFINITY;
     } else {
-        info.obj_ub = instance->duals[i];
-        info.obj_lb = instance->duals[i];
+        info.obj_ub = instance->profits[i];
+        info.obj_lb = instance->profits[i];
 
         // NOTE(dparo):
         //      Independently from the state of the current tour (eg which

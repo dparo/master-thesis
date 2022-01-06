@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
     // Generate profit section
     fprintf(fh, "PROFIT_SECTION\n");
     for (int32_t i = 0; i < instance.num_customers + 1; i++) {
-        fprintf(fh, "%d %.17g\n", i + 1, instance.duals[i]);
+        fprintf(fh, "%d %.17g\n", i + 1, instance.profits[i]);
     }
 
     instance_destroy(&instance);

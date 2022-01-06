@@ -377,8 +377,8 @@ static Hash hash_instance(const Instance *instance) {
         SHA256_UPDATE_WITH_ARRAY(&shactx, instance->demands, n);
     }
 
-    if (instance->duals) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->duals, n);
+    if (instance->profits) {
+        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->profits, n);
     }
 
     if (instance->edge_weight) {

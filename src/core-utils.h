@@ -113,13 +113,13 @@ static inline double tour_eval(const Instance *instance, Tour *tour) {
     int32_t curr_vertex = 0;
     int32_t next_vertex = -1;
 
-    profit += instance->duals[0];
+    profit += instance->profits[0];
     demands += instance->demands[0];
 
     while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
         assert(next_vertex != curr_vertex);
         cost += cptp_dist(instance, curr_vertex, next_vertex);
-        profit += instance->duals[next_vertex];
+        profit += instance->profits[next_vertex];
         demands += instance->demands[next_vertex];
         curr_vertex = next_vertex;
     }

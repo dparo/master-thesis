@@ -41,7 +41,7 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
 
     ASSERT(instance->positions);
     ASSERT(instance->demands);
-    ASSERT(instance->duals);
+    ASSERT(instance->profits);
 
     ASSERT(instance->demands[0] == 0.0);
     for (int32_t i = 1; i < instance->num_customers + 1; i++)
@@ -53,9 +53,9 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
     //       duals which are negative. Therefore not all instances pass these
     //       checks. For this reason these checks are currently disabled
     if (0) {
-        ASSERT(instance->duals[0] == 0.0);
+        ASSERT(instance->profits[0] == 0.0);
         for (int32_t i = 1; i < instance->num_customers + 1; i++)
-            ASSERT(instance->duals[i] >= 0.0);
+            ASSERT(instance->profits[i] >= 0.0);
     }
 
     PASS();
@@ -70,24 +70,24 @@ TEST parsing_single_instance(void) {
     ASSERT(instance.positions[0].x == 35);
     ASSERT(instance.positions[0].y == 35);
     ASSERT(instance.demands[0] == 0);
-    ASSERT(instance.duals[0] == 7.247);
+    ASSERT(instance.profits[0] == 7.247);
 
     ASSERT(instance.positions[1].x == 41);
     ASSERT(instance.positions[1].y == 49);
     ASSERT(instance.demands[1] == 10.0);
-    ASSERT(instance.duals[1] == 5.843);
+    ASSERT(instance.profits[1] == 5.843);
 
     int32_t n = instance.num_customers + 1;
 
     ASSERT(instance.positions[n - 2].x == 20);
     ASSERT(instance.positions[n - 2].y == 26);
     ASSERT(instance.demands[n - 2] == 9.0);
-    ASSERT(instance.duals[n - 2] == 3.546);
+    ASSERT(instance.profits[n - 2] == 3.546);
 
     ASSERT(instance.positions[n - 1].x == 18);
     ASSERT(instance.positions[n - 1].y == 18);
     ASSERT(instance.demands[n - 1] == 17.0);
-    ASSERT(instance.duals[n - 1] == 6.82);
+    ASSERT(instance.profits[n - 1] == 6.82);
 
     instance_destroy(&instance);
     PASS();

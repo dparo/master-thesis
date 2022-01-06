@@ -54,7 +54,7 @@ typedef struct Instance {
     DistanceRounding rounding_strat;
     Vec2d *positions;
     double *demands;
-    double *duals;
+    double *profits;
     double *edge_weight;
 } Instance;
 

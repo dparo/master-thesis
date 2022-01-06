@@ -42,16 +42,16 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
 
     ASSERT(instance->positions);
     ASSERT(instance->demands);
-    ASSERT(instance->duals || instance->edge_weight);
+    ASSERT(instance->profits || instance->edge_weight);
 
     ASSERT(instance->demands[0] == 0.0);
     for (int32_t i = 1; i < instance->num_customers + 1; i++)
         ASSERT(instance->demands[i] > 0.0);
 
-    if (instance->duals) {
-        ASSERT(instance->duals[0] == 0.0);
+    if (instance->profits) {
+        ASSERT(instance->profits[0] == 0.0);
         for (int32_t i = 1; i < instance->num_customers + 1; i++)
-            ASSERT(instance->duals[i] >= 0.0);
+            ASSERT(instance->profits[i] >= 0.0);
 
         // TODO: __EMAIL the professor__
         //       Double check these assertions. For some reason there are
@@ -60,9 +60,9 @@ TEST validate_instance(Instance *instance, int32_t expected_num_customers,
         //       instances pass these checks. For this reason these checks are
         //       currently disabled
         if (0) {
-            ASSERT(instance->duals[0] == 0.0);
+            ASSERT(instance->profits[0] == 0.0);
             for (int32_t i = 1; i < instance->num_customers + 1; i++)
-                ASSERT(instance->duals[i] >= 0.0);
+                ASSERT(instance->profits[i] >= 0.0);
         }
     } else if (instance->edge_weight) {
         // TODO: If there's anything todo here

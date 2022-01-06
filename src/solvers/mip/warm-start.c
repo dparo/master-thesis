@@ -183,8 +183,8 @@ static void ins_heur(Solver *solver, const Instance *instance,
     tour->succ[end] = start;
 
     double cost = cptp_dist(instance, start, end) +
-                  cptp_dist(instance, end, start) - instance->duals[start] -
-                  instance->duals[end];
+                  cptp_dist(instance, end, start) - instance->profits[start] -
+                  instance->profits[end];
     double sum_demands = instance->demands[start] + instance->demands[end];
 
     int32_t num_visited = 2;
@@ -219,7 +219,7 @@ static void ins_heur(Solver *solver, const Instance *instance,
                     double c_ah = cptp_dist(instance, a, h);
                     double c_hb = cptp_dist(instance, h, b);
                     double c_ab = cptp_dist(instance, a, b);
-                    delta_cost = c_ah + c_hb - c_ab - instance->duals[h];
+                    delta_cost = c_ah + c_hb - c_ab - instance->profits[h];
                 } else {
                     // This city requires too much demand compared to what is
                     // the remainder capacity of the truck

@@ -93,7 +93,7 @@ static inline double cost(const Instance *instance, int32_t i, int32_t j) {
 
 static inline double profit(const Instance *instance, int32_t i) {
     assert(i >= 0 && i < instance->num_customers + 1);
-    return instance->duals[i];
+    return instance->profits[i];
 }
 
 static inline double demand(const Instance *instance, int32_t i) {

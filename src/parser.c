@@ -105,7 +105,7 @@ static bool parse_simplified_vrp_line(Instance *instance, FILE *filehandle,
 
     instance->positions[idx] = (Vec2d){x, y};
     instance->demands[idx] = demand;
-    instance->duals[idx] = dual;
+    instance->profits[idx] = dual;
 
     return true;
 }
@@ -118,10 +118,10 @@ static bool prep_memory(Instance *instance) {
     instance->demands =
         calloc(instance->num_customers + 1, sizeof(*instance->demands));
 
-    instance->duals =
-        calloc(instance->num_customers + 1, sizeof(*instance->duals));
+    instance->profits =
+        calloc(instance->num_customers + 1, sizeof(*instance->profits));
 
-    return instance->positions && instance->demands && instance->duals;
+    return instance->positions && instance->demands && instance->profits;
 }
 
 static bool parse_simplified_vrp_file(Instance *instance, FILE *filehandle,
@@ -546,7 +546,7 @@ static bool parse_vrplib_demand_section(VrplibParser *p, Instance *instance) {
 static bool parse_vrplib_profit_section(VrplibParser *p, Instance *instance) {
 
     return parse_node_double_tuple_section(p, instance, "profit",
-                                           instance->duals);
+                                           instance->profits);
 }
 
 static bool parse_vrplib_depot_section(VrplibParser *p, Instance *instance) {
