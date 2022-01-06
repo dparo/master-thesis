@@ -368,15 +368,19 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
                 goto terminate;
             }
 
-            min_ub_found = MIN(min_ub_found, solution.upper_bound);
-
             // NOTE(dparo):
             //     Whenever we find a reduced cost tour and we are in pricer
             //     mode, there's no point in continuining feeding other warm
             //     start solutions, we've already found what we are looking for.
             //     Break out of the loop.
+
+            min_ub_found = MIN(min_ub_found, solution.upper_bound);
+
             if (pricer_mode_enabled &&
                 is_valid_reduced_cost(instance, min_ub_found)) {
+                log_info("%s :: Found reduced_cost tour (%f), early "
+                         "terminating warm-start feeding\n",
+                         __func__, min_ub_found);
                 break;
             }
         }
