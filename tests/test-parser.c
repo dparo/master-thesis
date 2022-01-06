@@ -77,17 +77,17 @@ TEST parsing_single_instance(void) {
     ASSERT(instance.demands[1] == 10.0);
     ASSERT(instance.duals[1] == 5.843);
 
-    int32_t n = instance.num_customers;
+    int32_t n = instance.num_customers + 1;
 
-    ASSERT(instance.positions[n - 1].x == 20);
-    ASSERT(instance.positions[n - 1].y == 26);
-    ASSERT(instance.demands[n - 1] == 9.0);
-    ASSERT(instance.duals[n - 1] == 3.546);
+    ASSERT(instance.positions[n - 2].x == 20);
+    ASSERT(instance.positions[n - 2].y == 26);
+    ASSERT(instance.demands[n - 2] == 9.0);
+    ASSERT(instance.duals[n - 2] == 3.546);
 
-    ASSERT(instance.positions[n].x == 18);
-    ASSERT(instance.positions[n].y == 18);
-    ASSERT(instance.demands[n] == 17.0);
-    ASSERT(instance.duals[n] == 6.82);
+    ASSERT(instance.positions[n - 1].x == 18);
+    ASSERT(instance.positions[n - 1].y == 18);
+    ASSERT(instance.demands[n - 1] == 17.0);
+    ASSERT(instance.duals[n - 1] == 6.82);
 
     instance_destroy(&instance);
     PASS();

@@ -25,6 +25,22 @@
 #include "types.h"
 #include <assert.h>
 
+void validate_symmetric_distances(const Instance *instance) {
+#ifndef NDEBUG
+    const int32_t n = instance->num_customers + 1;
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            double d1 = cptp_dist(instance, i, j);
+            double d2 = cptp_dist(instance, j, i);
+            assert(feq(d1, d2, 1e-5));
+        }
+    }
+#else
+    UNUSED_PARAM(instance);
+#endif
+}
+
 void validate_solution(const Instance *instance, Solution *solution) {
 #ifndef NDEBUG
 
