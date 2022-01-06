@@ -310,8 +310,8 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
     for (int32_t i = 0; i < n; i++) {
         int32_t j = &solution->tour.succ[i];
         if (j >= 0) {
-            unpacked_tour[i + j * n] = j;
-            unpacked_tour[j] = i;
+            // unpacked_tour[i + j * n] = j;
+            // unpacked_tour[j] = i;
         }
     }
 

@@ -156,10 +156,10 @@ static inline double get_reduced_cost_upper_bound(const Instance *instance) {
     return instance->zero_reduced_cost_threshold - COST_TOLERANCE;
 }
 
-static inline double is_valid_reduced_cost(const Instance *instance,
-                                           double tour_cost) {
+static inline bool is_valid_reduced_cost(const Instance *instance,
+                                         double tour_cost) {
     // NOTE: The relative cost must be slightly below 0 (slightly negative)
-    return tour_cost - get_reduced_cost_upper_bound(instance);
+    return tour_cost - get_reduced_cost_upper_bound(instance) < 0.0;
 }
 
 static inline bool is_valid_instance(Instance *instance) {
