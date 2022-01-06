@@ -435,8 +435,8 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
 
-        cJSON *columns_cost = cJSON_GetObjectItemCaseSensitive(
-            rcsp_infos, "columns-relative-cost");
+        cJSON *columns_reduced_cost =
+            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "columnsReducedCost");
 
         cJSON *itm_took =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
@@ -445,13 +445,13 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
             run->perf.time = cJSON_GetNumberValue(itm_took);
         }
 
-        if (columns_cost && cJSON_IsArray(columns_cost)) {
+        if (columns_reduced_cost && cJSON_IsArray(columns_reduced_cost)) {
             cJSON *elem = NULL;
             int32_t num_elems = 0;
-            cJSON_ArrayForEach(elem, columns_cost) { num_elems += 1; }
+            cJSON_ArrayForEach(elem, columns_reduced_cost) { num_elems += 1; }
 
             if (num_elems == 1) {
-                cJSON_ArrayForEach(elem, columns_cost) {
+                cJSON_ArrayForEach(elem, columns_reduced_cost) {
                     cJSON *itm_cost = elem;
                     if (itm_cost && cJSON_IsNumber(itm_cost)) {
                         run->perf.cost = cJSON_GetNumberValue(itm_cost);

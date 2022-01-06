@@ -50,7 +50,6 @@ typedef struct Instance {
     int32_t num_customers;
     int32_t num_vehicles;
     double vehicle_cap;
-    double zero_reduced_cost_threshold;
 
     DistanceRounding rounding_strat;
     Vec2d *positions;
@@ -153,7 +152,7 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
 void cptp_print_list_of_solvers_and_params(void);
 
 static inline double get_reduced_cost_upper_bound(const Instance *instance) {
-    return instance->zero_reduced_cost_threshold - COST_TOLERANCE;
+    return 0.0 - COST_TOLERANCE;
 }
 
 static inline bool is_valid_reduced_cost(const Instance *instance,

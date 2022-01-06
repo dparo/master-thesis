@@ -114,13 +114,6 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     double cost = tour_eval(instance, &solution->tour);
     printf("%-16s %.17g\n", "COST:", cost);
 
-    if (instance->zero_reduced_cost_threshold != 0) {
-        printf("%-16s %.17g\n",
-               "COST THRESHOLD:", instance->zero_reduced_cost_threshold);
-        printf("%-16s %.17g\n",
-               "RELATIVE COST:", cost - instance->zero_reduced_cost_threshold);
-    }
-
     printf("%-16s %s", "STARTED:", ctime(&timing.started));
     printf("%-16s %s", "ENDED:", ctime(&timing.ended));
     printf("%-16s ", "TOOK:");
@@ -184,12 +177,8 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     double cost = tour_eval(instance, &solution->tour);
     s &= cJSON_AddItemToObject(root, "cost", cJSON_CreateNumber(cost));
 
-    s &= cJSON_AddItemToObject(
-        root, "zeroReducedCostThreshold",
-        cJSON_CreateNumber(instance->zero_reduced_cost_threshold));
-    s &= cJSON_AddItemToObject(
-        root, "relativeCost",
-        cJSON_CreateNumber(cost - instance->zero_reduced_cost_threshold));
+    s &= cJSON_AddItemToObject(root, "COST_TOLERANCE",
+                               cJSON_CreateNumber(COST_TOLERANCE));
 
     char *time = ctime(&timing.started);
     // Remove newline introduced from ctime

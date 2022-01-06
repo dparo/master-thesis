@@ -443,11 +443,8 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
         }
         if (valid_starting_pair(instance, &starting_pair)) {
             ins_heur(solver, instance, &solution, starting_pair);
-            log_info("%s :: ins_heur -- found a solution of cost %f "
-                     "(relative_cost = %f)",
-                     __func__, solution.upper_bound,
-                     solution.upper_bound -
-                         instance->zero_reduced_cost_threshold);
+            log_info("%s :: ins_heur -- found a solution of cost %f", __func__,
+                     solution.upper_bound);
 
             // NOTE(dparo):
             //       Since 2opt refinements are not cheap, and may cost us
