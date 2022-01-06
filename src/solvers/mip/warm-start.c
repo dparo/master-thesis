@@ -187,6 +187,8 @@ static void ins_heur(Solver *solver, const Instance *instance,
                   instance->duals[end];
     double sum_demands = instance->demands[start] + instance->demands[end];
 
+    int32_t num_visited = 2;
+
     while (true) {
         double best_delta_cost = 0.0;
         int32_t best_h = -1;
@@ -218,9 +220,26 @@ static void ins_heur(Solver *solver, const Instance *instance,
                     double c_hb = cptp_dist(instance, h, b);
                     double c_ab = cptp_dist(instance, a, b);
                     delta_cost = c_ah + c_hb - c_ab - instance->duals[h];
+                } else {
+                    // This city requires too much demand compared to what is
+                    // the remainder capacity of the truck
+                    delta_cost = INFINITY;
                 }
 
-                if (h == 0 || delta_cost < best_delta_cost) {
+                // NOTE(dparo):
+                //     A vertex is a good candidate for insertion, considering
+                //     it is not already visited, if it is the depot (must be
+                //     visited due to the formulation of the problem), only 2
+                //     nodes are visited in the current tour (the MIP
+                //     formulation accepts only tours having at least 3 nodes
+                //     visited) or if it improves the previous candidate
+                //     delta_cost
+
+                assert(!h_is_visited);
+                bool good_candidate_for_insertion =
+                    h == 0 || num_visited == 2 || delta_cost < best_delta_cost;
+
+                if (good_candidate_for_insertion) {
                     best_delta_cost = delta_cost;
                     best_h = h;
                     best_a = a;
@@ -239,17 +258,13 @@ static void ins_heur(Solver *solver, const Instance *instance,
         assert(best_b >= 0 && best_b < n);
         assert(tour->succ[best_a] == best_b);
 
-        if (best_delta_cost < 0.0) {
-            cost += best_delta_cost;
-            sum_demands += instance->demands[best_h];
+        assert(best_delta_cost < 0.0 || num_visited == 2);
+        cost += best_delta_cost;
+        sum_demands += instance->demands[best_h];
 
-            tour->comp[best_h] = 0;
-            tour->succ[best_a] = best_h;
-            tour->succ[best_h] = best_b;
-        } else {
-            assert(tour->comp[0] == 0);
-            break;
-        }
+        tour->comp[best_h] = 0;
+        tour->succ[best_a] = best_h;
+        tour->succ[best_h] = best_b;
 
 #ifndef NDEBUG
         if (tour->comp[0] == 0) {
@@ -263,12 +278,44 @@ static void ins_heur(Solver *solver, const Instance *instance,
 #ifndef NDEBUG
     validate_tour(instance, tour);
     validate_solution(instance, solution);
+
+    // NOTE(dparo):
+    //    Due to the MIP structure of the formulation,
+    //    the MIP formulation can accept tours having at least 3 nodes visited
+    {
+        int32_t num_visited = 0;
+        for (int32_t i = 0; i < n; i++) {
+            if (tour->comp[i] >= 0) {
+                assert(tour->succ[i] >= 0);
+                ++num_visited;
+            }
+        }
+        assert(num_visited >= 2);
+    }
 #endif
 }
 
 static void twoopt_refine(Solver *solver, const Instance *instance,
-                          Solution *solution) {
+                          Solution *solution, int32_t *unpacked_tour) {
     log_warn("%s :: TODO!!!", __func__);
+    const int32_t n = instance->num_customers + 1;
+
+    // Unpack the tour into an undirected data structure as
+    // to make the whole procedure faster.
+    // This allows us to do 2-OPT exhcanges without always reversing
+    // part of the tours
+    for (int32_t i = 0; i < n; i++) {
+        int32_t j = &solution->tour.succ[i];
+        if (j >= 0) {
+            unpacked_tour[i + j * n] = j;
+            unpacked_tour[j] = i;
+        }
+    }
+
+    for (int32_t a = 0; a < n; a++) {
+        for (int32_t b = 0; b < n; b++) {
+        }
+    }
 }
 
 bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
@@ -281,6 +328,9 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
     InsHeurNodePair starting_pair;
     starting_pair.u = 0;
 
+    int32_t *unpacked_tour = malloc(n * n * sizeof(*unpacked_tour));
+    double min_ub_found = INFINITY;
+
     for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
         if (starting_pair.v == starting_pair.u) {
             continue;
@@ -292,13 +342,19 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
                      __func__, solution.upper_bound,
                      solution.upper_bound -
                          instance->zero_reduced_cost_threshold);
+
+            // NOTE(dparo):
+            //       Since 2opt refinements are not cheap, and may cost us
+            //       computation time, try to do them only when absolutely
+            //       necessary. This will keep the main execution path as
+            //       fast as possible
             if (!pricer_mode_enabled ||
                 !is_valid_reduced_cost(instance, solution.upper_bound)) {
                 // Try to improve the solution using 2opt
                 double prev_ub = solution.upper_bound;
-                twoopt_refine(solver, instance, &solution);
+                twoopt_refine(solver, instance, &solution, unpacked_tour);
                 log_trace("%s :: two opt refine -- Improved solution from %f "
-                          "to %f (%f improvement)",
+                          "to %f (%f delta improvement)",
                           __func__, prev_ub, solution.upper_bound,
                           solution.upper_bound - prev_ub);
             }
@@ -308,10 +364,23 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
                 result = false;
                 goto terminate;
             }
+
+            min_ub_found = MIN(min_ub_found, solution.upper_bound);
+
+            // NOTE(dparo):
+            //     Whenever we find a reduced cost tour and we are in pricer
+            //     mode, there's no point in continuining feeding other warm
+            //     start solutions, we've already found what we are looking for.
+            //     Break out of the loop.
+            if (pricer_mode_enabled &&
+                is_valid_reduced_cost(instance, min_ub_found)) {
+                break;
+            }
         }
     }
 
 terminate:
+    free(unpacked_tour);
     solution_destroy(&solution);
     return result;
 }
