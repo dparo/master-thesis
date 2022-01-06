@@ -190,7 +190,7 @@ static void ins_heur(Solver *solver, const Instance *instance,
     int32_t num_visited = 2;
 
     while (true) {
-        double best_delta_cost = 0.0;
+        double best_delta_cost = -COST_TOLERANCE;
         int32_t best_h = -1;
         int32_t best_a = -1;
         int32_t best_b = -1;
@@ -238,9 +238,23 @@ static void ins_heur(Solver *solver, const Instance *instance,
                 //     inserted.
 
                 assert(!h_is_visited);
+
+                // NOTE(dparo):
+                //      Marking the depot node once (best_h = 0) as a
+                //      candidate raises the best_delta_cost above 0, therefore
+                //      allowing non improving vertices to now become valid
+                //      candidate for insertions. Therefore make a smarter check
+                //      if the delta_cost: if the best_h insertion candidate is
+                //      the depot then compare the delta cost using the `0.0 -
+                //      COST_TOLERANCE` threshold, otherwise do a conventional
+                //      comparison against the previous best_delta_cost
+                bool improving_delta_cost =
+                    best_h == 0
+                        ? delta_cost < -COST_TOLERANCE
+                        : delta_cost < (best_delta_cost - COST_TOLERANCE);
+
                 bool good_candidate_for_insertion =
-                    h == 0 || num_visited == 2 ||
-                    delta_cost < (best_delta_cost - COST_TOLERANCE);
+                    h == 0 || num_visited == 2 || improving_delta_cost;
 
                 if (good_candidate_for_insertion) {
                     best_delta_cost = delta_cost;
@@ -273,6 +287,7 @@ static void ins_heur(Solver *solver, const Instance *instance,
 #ifndef NDEBUG
         if (tour->comp[0] == 0) {
             validate_tour(instance, tour);
+            assert(feq(tour_eval(instance, tour), cost, 1e-5));
         }
 #endif
     }
@@ -313,11 +328,11 @@ static void twoopt_exchange(Solver *solver, const Instance *instance,
 
     // Reverse part of the tour
     {
-        int32_t prev = a;
-        int32_t current = succ_a;
+        int32_t prev = succ_a;
+        int32_t current = tour->succ[succ_a];
         assert(current >= 0 && current < n);
 
-        while (current != b) {
+        while (current != succ_b) {
             int32_t next = tour->succ[current];
             assert(next >= 0 && next < n);
             tour->succ[current] = prev;
@@ -351,7 +366,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
     // While there are edges crossing (2-opt exchanges are available)
     //
     while (true) {
-        double best_delta_cost = 0.0;
+        double best_delta_cost = -COST_TOLERANCE;
         int32_t best_a = -1;
         int32_t best_b = -1;
 
@@ -383,7 +398,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
                                     cptp_dist(instance, a, succ_a) -
                                     cptp_dist(instance, b, succ_b);
 
-                if (delta_cost < (best_delta_cost - COST_TOLERANCE)) {
+                if (delta_cost < best_delta_cost) {
                     best_delta_cost = delta_cost;
                     best_a = a;
                     best_b = b;
@@ -417,12 +432,11 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
     bool result = true;
     const int32_t n = instance->num_customers + 1;
 
+    double min_ub_found = INFINITY;
     Solution solution = solution_create(instance);
     InsHeurNodePair starting_pair;
+
     starting_pair.u = 0;
-
-    double min_ub_found = INFINITY;
-
     for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
         if (starting_pair.v == starting_pair.u) {
             continue;
@@ -460,8 +474,8 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             // NOTE(dparo):
             //     Whenever we find a reduced cost tour and we are in pricer
             //     mode, there's no point in continuining feeding other warm
-            //     start solutions, we've already found what we are looking for.
-            //     Break out of the loop.
+            //     start solutions, we've already found what we are looking
+            //     for. Break out of the loop.
 
             min_ub_found = MIN(min_ub_found, solution.upper_bound);
 
