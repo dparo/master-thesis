@@ -949,6 +949,45 @@ static bool on_solve_start(Solver *self, const Instance *instance,
         goto fail;
     }
 
+    // NOTE:
+    // This routine enables applications to terminate CPLEX gracefully.
+    // Conventionally, your application should first call this routine to set a
+    // pointer to the termination signal. Then the application can set the
+    // termination signal to a nonzero value to tell CPLEX to abort. These
+    // conventions will terminate CPLEX even in a different thread. In other
+    // words, this routine makes it possible to handle signals such as control-C
+    // from a user interface. These conventions also enable termination within
+    // CPLEX callbacks.
+    //
+    // NOTE:  If this CPXXcallbackabort is called from a thread that currently
+    // executes speculative code, and the current context is not
+    // CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS, then the request to abort may be
+    // ignored. Use CPXXsetterminate and CPXsetterminate if you want to make
+    // sure CPLEX terminates even in that case.
+    //
+    if (0 != CPXXsetterminate(self->data->env, &self->should_terminate_int)) {
+        log_fatal("%s :: Failed CPXXsetterminate()", __func__);
+        goto fail;
+    }
+
+    return true;
+fail:
+    return false;
+}
+
+static bool on_solve_end(Solver *self, const Instance *instance,
+                         CplexCallbackCtx *callback_ctx) {
+    UNUSED_PARAM(instance);
+
+    // Reset termination signal
+    if (0 != CPXXsetterminate(self->data->env, NULL)) {
+        log_fatal("%s :: CPXXsetterminate() failed to reset termination signal",
+                  __func__);
+        goto fail;
+    }
+
+    destroy_all_callback_thread_local_data(callback_ctx);
+
     return true;
 fail:
     return false;
@@ -963,8 +1002,8 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
         }                                                                      \
     } while (0)
 
-    double gap;
-    CPXDIM num_user_cuts;
+    double gap = INFINITY;
+    CPXDIM num_user_cuts = 0;
 
     CHECKED(CPXXgetbestobjval,
             CPXXgetbestobjval(self->data->env, self->data->lp,
@@ -1015,7 +1054,9 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         return SOLVE_STATUS_ERR;
     }
 
-    destroy_all_callback_thread_local_data(&callback_ctx);
+    if (!on_solve_end(self, instance, &callback_ctx)) {
+        return SOLVE_STATUS_ERR;
+    }
 
     assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
 
@@ -1256,29 +1297,6 @@ bool cplex_setup(Solver *solver, const Instance *instance,
 
     enable_cuts(tparams);
 
-    // NOTE:
-    // This routine enables applications to terminate CPLEX gracefully.
-    // Conventionally, your application should first call this routine to set a
-    // pointer to the termination signal. Then the application can set the
-    // termination signal to a nonzero value to tell CPLEX to abort. These
-    // conventions will terminate CPLEX even in a different thread. In other
-    // words, this routine makes it possible to handle signals such as control-C
-    // from a user interface. These conventions also enable termination within
-    // CPLEX callbacks.
-    //
-    // NOTE:  If this CPXXcallbackabort is called from a thread that currently
-    // executes speculative code, and the current context is not
-    // CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS, then the request to abort may be
-    // ignored. Use CPXXsetterminate and CPXsetterminate if you want to make
-    // sure CPLEX terminates even in that case.
-    //
-    // TODO: This unfortunately does not work as expected. I'm disabling this
-    if (0) {
-        if (0 != CPXXsetterminate(solver->data->env,
-                                  &solver->should_terminate_int)) {
-            log_warn("%s :: Failed CPXXsetterminate()", __func__);
-        }
-    }
     return true;
 
 fail:
@@ -1375,9 +1393,12 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
     }
 
     return solver;
+
 fail:
-    if (solver.destroy)
+    if (solver.destroy) {
         solver.destroy(&solver);
+    }
+
     return (Solver){0};
 }
 
