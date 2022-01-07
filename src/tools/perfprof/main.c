@@ -48,6 +48,9 @@
 #include <sha256.h>
 #include <cJSON.h>
 
+#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
+#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)2.0)
+
 #define HASH_CSTR_LEN 65
 typedef struct {
     char cstr[HASH_CSTR_LEN];
@@ -197,7 +200,7 @@ STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
 static inline PerfStats make_invalidated_perf(PerfProfBatch *batch) {
     PerfStats perf = {0};
     perf.solution.feasible = true;
-    perf.solution.cost = INFINITY;
+    perf.solution.cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
     perf.time = 2 * batch->timelimit;
     return perf;
 }
@@ -300,7 +303,7 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
 
     bool valid = false;
     bool feasible = false;
-    double cost = 1e99;
+    double cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
 
     if (itm_feasible && cJSON_IsBool(itm_feasible)) {
         feasible = cJSON_IsTrue(itm_feasible);
@@ -315,9 +318,9 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
             cost = cJSON_GetNumberValue(itm_cost);
         }
     } else if (valid && !feasible) {
-        cost = 0.0;
+        cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
     } else {
-        cost = 1e99;
+        cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
     }
 
     run->perf.solution.feasible = feasible;
@@ -817,46 +820,26 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 static void main_loop(void) {
     PerfProfBatch batches[] = {
         {1,
-         "E-family-last-10",
-         120.0,
-         3,
-         {"data/BAP_Instances/E-last-10"},
+         "F-last10",
+         240.0,
+         1,
+         {"data/BAP_Instances_New/F"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
         {1,
-         "F-n72-k4",
-         120.0,
-         3,
-         {"data/BAP_Instances/F-n72-k4"},
+         "E-last10",
+         240.0,
+         1,
+         {"data/BAP_Instances_New/E"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
-        {1,
-         "F-family-last-10",
-         120.0,
-         3,
-         {"data/BAP_Instances/F-last-10"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-
-        {1,
-         "E-F-family-last-10",
-         120.0,
-         3,
-         {"data/BAP_Instances/E-last-10", "data/BAP_Instances/F-last-10"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }}};
+    };
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
         for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {
