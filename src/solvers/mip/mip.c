@@ -378,7 +378,7 @@ static bool add_depot_is_part_of_tour_constraint(Solver *self,
     return result;
 }
 
-static bool add_capacity_constraint(Solver *self, const Instance *instance) {
+static bool add_capacity_ub(Solver *self, const Instance *instance) {
     bool result = true;
 
     CPXNNZ rmatbeg[] = {0};
@@ -398,11 +398,11 @@ static bool add_capacity_constraint(Solver *self, const Instance *instance) {
     assert(demand(instance, 0) == 0.0);
 
     for (int32_t i = 0; i < nnz; i++) {
-        index[i] = get_y_mip_var_idx(instance, i);
+        index[i] = (CPXDIM)get_y_mip_var_idx(instance, i);
         value[i] = demand(instance, i);
     }
 
-    snprintf_safe(cname, ARRAY_LEN(cname), "capacity");
+    snprintf_safe(cname, ARRAY_LEN(cname), "CAP_UB");
 
     if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
                     rmatbeg, index, value, NULL, pcname)) {
@@ -412,6 +412,108 @@ static bool add_capacity_constraint(Solver *self, const Instance *instance) {
     }
 
 terminate:
+    free(index);
+    free(value);
+
+#if 0
+    if (result) {
+        show_lp_file(self);
+    }
+#endif
+    return result;
+}
+
+typedef struct {
+    int32_t i;
+    double demand;
+} NodeIdxAndDemand;
+
+int add_capacity_lb_cmp_func(const void *a, const void *b) {
+    const NodeIdxAndDemand *n1 = (const NodeIdxAndDemand *)a;
+    const NodeIdxAndDemand *n2 = (const NodeIdxAndDemand *)b;
+
+    bool greater_eq = n1->demand >= n2->demand;
+    bool less_eq = n1->demand <= n2->demand;
+
+    if (greater_eq && less_eq) {
+        return 0;
+    } else if (greater_eq) {
+        return 1;
+    } else {
+        return -1;
+    }
+}
+
+static bool add_capacity_lb(Solver *self, const Instance *instance) {
+    // NOTE(dparo):
+    //      Due to the MIP formulation, a tour must visit at least 3 vertices
+    //      (the depot + 2 customers). Sort the nodes based on their
+    //      demand in order to find the capacity lower bound
+
+    bool result = true;
+    CPXNNZ rmatbeg[] = {0};
+    CPXDIM *index = NULL;
+    double *value = NULL;
+    char cname[128];
+    const char *pcname[] = {(const char *)cname};
+
+    const int32_t n = instance->num_customers;
+    NodeIdxAndDemand *array = malloc(n * sizeof(*array));
+    if (!array) {
+        log_fatal("%s :: Failed memory allocation", __func__);
+        result = false;
+        goto terminate;
+    }
+
+    for (int32_t i = 0; i < n; i++) {
+        array[i].i = i;
+        array[i].demand = instance->demands[i];
+    }
+
+    qsort((void *)array, n, sizeof(*array), add_capacity_lb_cmp_func);
+
+    // First element should be the one having the least demand, eg the depot
+    assert(instance->demands[0] == 0.0);
+    assert(array[0].i == 0);
+    assert(array[0].demand == instance->demands[0]);
+    assert(array[1].demand >= instance->demands[0]);
+
+    //
+    // Sum the demand of the first 3 nodes having the least demand
+    //
+    double lb = 0.0;
+    for (int32_t i = 0; i < 3; i++) {
+        lb += array[i].demand;
+    }
+
+    //
+    // Now it's time to communicate the constraint to CPLEX
+    //
+    double rhs[] = {lb};
+    char sense[] = {'G'};
+
+    int32_t nnz = instance->num_customers + 1;
+
+    index = malloc(nnz * sizeof(*index));
+    value = malloc(nnz * sizeof(*value));
+
+    for (int32_t i = 0; i < nnz; i++) {
+        index[i] = (CPXDIM)get_y_mip_var_idx(instance, i);
+        value[i] = demand(instance, i);
+    }
+
+    snprintf_safe(cname, ARRAY_LEN(cname), "CAP_LB");
+
+    // Add rows
+    if (CPXXaddrows(self->data->env, self->data->lp, 0, 1, nnz, rhs, sense,
+                    rmatbeg, index, value, NULL, pcname)) {
+        log_fatal("%s :: CPXXaddrows failure", __func__);
+        result = false;
+        goto terminate;
+    }
+
+terminate:
+    free(array);
     free(index);
     free(value);
 
@@ -502,8 +604,13 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
                   __func__);
         return false;
     }
-    if (!add_capacity_constraint(self, instance)) {
-        log_fatal("%s :: add_capacity_constraint failed", __func__);
+    if (!add_capacity_ub(self, instance)) {
+        log_fatal("%s :: add_capacity_ub constraint failed", __func__);
+        return false;
+    }
+
+    if (!add_capacity_lb(self, instance)) {
+        log_fatal("%s :: add_capacity_lb constraint failed", __func__);
         return false;
     }
 
@@ -861,7 +968,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     //      https://www.ibm.com/docs/en/icos/12.8.0.0?topic=c-cpxxcallbacksetfunc-cpxcallbacksetfunc
     switch (contextid) {
     case CPX_CALLBACKCONTEXT_BRANCHING: {
-        int statind;
+        int statind = 0;
         CPXXcallbackgetrelaxationstatus(cplex_cb_ctx, &statind, 0);
         if (statind == CPX_STAT_OPTIMAL || statind == CPX_STAT_OPTIMAL_INFEAS) {
             result =
