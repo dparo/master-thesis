@@ -96,6 +96,7 @@ typedef struct {
 static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
                              Instance *instance, Solution *solution,
                              SolveStatus status, Timing timing) {
+    bool feasible = is_feasible_solve_status(status);
     bool valid = is_valid_solve_status(status);
 
     fprintf(fh, "%-16s %s\n", "SOLVER:", ctx->solver);
@@ -103,7 +104,9 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     fprintf(fh, "%-16s %d\n", "SEED:", ctx->randomseed);
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
 
-    if (valid) {
+    fprintf(fh, "%-16s %s\n", "STATUS:", ENUM_TO_STR(SolveStatus, status));
+
+    if (feasible && valid) {
         printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
                solution->upper_bound);
         print_tour(&solution->tour);
@@ -111,8 +114,10 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
         printf("%-16s Could not solve\n", "ERR:");
     }
 
-    double cost = tour_eval(instance, &solution->tour);
-    printf("%-16s %.17g\n", "COST:", cost);
+    if (feasible) {
+        double cost = tour_eval(instance, &solution->tour);
+        printf("%-16s %.17g\n", "TOUR COST:", cost);
+    }
 
     printf("%-16s %s", "STARTED:", ctime(&timing.started));
     printf("%-16s %s", "ENDED:", ctime(&timing.ended));
@@ -146,6 +151,9 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
         return;
     }
 
+    bool feasible = is_feasible_solve_status(status);
+    bool valid = is_valid_solve_status(status);
+
     bool s = true;
     s &= cJSON_AddItemToObject(root, "solverName",
                                cJSON_CreateString(ctx->solver));
@@ -170,12 +178,20 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     s &= cJSON_AddItemToObject(root, "numVehicles",
                                cJSON_CreateNumber(instance->num_vehicles));
 
+    s &= cJSON_AddItemToObject(
+        root, "status", cJSON_CreateString(ENUM_TO_STR(SolveStatus, status)));
+
+    s &= cJSON_AddItemToObject(root, "valid", cJSON_CreateBool(valid));
+
+    s &= cJSON_AddItemToObject(root, "feasible",
+                               cJSON_CreateBool(feasible && valid));
+
     double obj[2] = {solution->lower_bound, solution->upper_bound};
     s &= cJSON_AddItemToObject(root, "obj",
                                cJSON_CreateDoubleArray(obj, ARRAY_LEN(obj)));
 
     double cost = tour_eval(instance, &solution->tour);
-    s &= cJSON_AddItemToObject(root, "cost", cJSON_CreateNumber(cost));
+    s &= cJSON_AddItemToObject(root, "tourCost", cJSON_CreateNumber(cost));
 
     s &= cJSON_AddItemToObject(root, "COST_TOLERANCE",
                                cJSON_CreateNumber(COST_TOLERANCE));

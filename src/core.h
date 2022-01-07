@@ -115,6 +115,17 @@ typedef enum SolveStatus {
     SOLVE_STATUS_OPTIMAL,
 } SolveStatus;
 
+static const ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_ERR),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INVALID),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_FEASIBLE),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
+};
+
 typedef struct Solver {
     SolverData *data;
     volatile bool should_terminate;
@@ -174,10 +185,15 @@ static inline bool is_aborted_solve_status(SolveStatus status) {
            status == SOLVE_STATUS_ABORTED_ERR;
 }
 
-static inline bool is_valid_solve_status(SolveStatus status) {
+static inline bool is_feasible_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_OPTIMAL;
+}
+
+static inline bool is_valid_solve_status(SolveStatus status) {
+    return is_feasible_solve_status(status) ||
+           status == SOLVE_STATUS_INFEASIBLE;
 }
 
 #if __cplusplus

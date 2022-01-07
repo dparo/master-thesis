@@ -376,17 +376,6 @@ terminate:
 }
 
 static void log_solve_status(SolveStatus status, const char *solver_name) {
-    static ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_ERR),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INVALID),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_FEASIBLE),
-        ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
-    };
-
     log_info("Solver `%s` returned with solve status: %s", solver_name,
              ENUM_TO_STR(SolveStatus, status));
 }
