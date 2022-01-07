@@ -55,7 +55,7 @@ def get_plt_ticks(lb, ub, cnt):
         ub = lb + 1.0
     return np.array(
         [
-            round(x, 2)
+            round(x, 3)
             for x in remove_duplicates_from_list(
                 [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
             )
