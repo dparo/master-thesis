@@ -110,11 +110,11 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
         printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
                solution->upper_bound);
         print_tour(&solution->tour);
-    } else {
+    } else if (!valid) {
         printf("%-16s Could not solve\n", "ERR:");
     }
 
-    if (feasible) {
+    if (feasible && valid) {
         double cost = tour_eval(instance, &solution->tour);
         printf("%-16s %.17g\n", "TOUR COST:", cost);
     }

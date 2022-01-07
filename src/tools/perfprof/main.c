@@ -80,8 +80,13 @@ typedef enum StatKind {
 } StatKind;
 
 typedef struct {
-    double time;
+    bool feasible;
     double cost;
+} SolverComputedCost;
+
+typedef struct {
+    double time;
+    SolverComputedCost solution;
 } PerfStats;
 
 typedef struct {
@@ -191,7 +196,8 @@ STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
 
 static inline PerfStats make_invalidated_perf(PerfProfBatch *batch) {
     PerfStats perf = {0};
-    perf.cost = INFINITY;
+    perf.solution.feasible = true;
+    perf.solution.cost = INFINITY;
     perf.time = 2 * batch->timelimit;
     return perf;
 }
@@ -207,10 +213,10 @@ static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
 void insert_run_into_table(PerfProfInputUniqueId *uid, PerfProfRun *run) {
     printf("Inserting run into table. Instance hash: %d:%s. Run ::: "
            "solver_name = %s, "
-           "time = %.17g, obj_ub "
+           "time = %.17g, feasible = %d, obj_ub "
            "= %.17g\n",
            uid->seedidx, uid->hash.cstr, run->solver_name, run->perf.time,
-           run->perf.cost);
+           run->perf.solution.feasible, run->perf.solution.cost);
 
     PerfTblKey key = {0};
     memcpy(&key.uid, uid, sizeof(key.uid));
@@ -284,14 +290,38 @@ static void my_sighandler(int signum) {
 
 void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
-    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
+    cJSON *itm_feasible = cJSON_GetObjectItemCaseSensitive(root, "feasible");
+    cJSON *itm_valid = cJSON_GetObjectItemCaseSensitive(root, "valid");
+    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "tourCost");
 
     if (itm_took && cJSON_IsNumber(itm_took)) {
         run->perf.time = cJSON_GetNumberValue(itm_took);
     }
-    if (itm_cost && cJSON_IsNumber(itm_cost)) {
-        run->perf.cost = cJSON_GetNumberValue(itm_cost);
+
+    bool valid = false;
+    bool feasible = false;
+    double cost = 1e99;
+
+    if (itm_feasible && cJSON_IsBool(itm_feasible)) {
+        feasible = cJSON_IsTrue(itm_feasible);
     }
+
+    if (itm_valid && cJSON_IsBool(itm_valid)) {
+        valid = cJSON_IsTrue(itm_valid);
+    }
+
+    if (valid && feasible) {
+        if (itm_cost && cJSON_IsNumber(itm_cost)) {
+            cost = cJSON_GetNumberValue(itm_cost);
+        }
+    } else if (valid && !feasible) {
+        cost = 0.0;
+    } else {
+        cost = 1e99;
+    }
+
+    run->perf.solution.feasible = feasible;
+    run->perf.solution.cost = cost;
 }
 
 void update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
@@ -433,6 +463,9 @@ Hash compute_run_hash(const Hash *exe_hash, const PerfProfInput *input,
 
 void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
+
+    run->perf.solution.feasible = true;
+
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
 
         cJSON *columns_reduced_cost =
@@ -454,7 +487,8 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
                 cJSON_ArrayForEach(elem, columns_reduced_cost) {
                     cJSON *itm_cost = elem;
                     if (itm_cost && cJSON_IsNumber(itm_cost)) {
-                        run->perf.cost = cJSON_GetNumberValue(itm_cost);
+                        run->perf.solution.cost =
+                            cJSON_GetNumberValue(itm_cost);
                     }
                     break;
                 }
@@ -989,7 +1023,7 @@ static inline double get_timeval_for_csv(double timeval, double base_ref_val,
 
 static inline double get_raw_val_from_perf(PerfProfRun *run,
                                            bool is_time_profile) {
-    return is_time_profile ? run->perf.time : run->perf.cost;
+    return is_time_profile ? run->perf.time : run->perf.solution.cost;
 }
 
 static inline double get_baked_val_from_perf(PerfProfRun *run,
