@@ -284,7 +284,7 @@ static void my_sighandler(int signum) {
 
 void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
-    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "relativeCost");
+    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "cost");
 
     if (itm_took && cJSON_IsNumber(itm_took)) {
         run->perf.time = cJSON_GetNumberValue(itm_took);
