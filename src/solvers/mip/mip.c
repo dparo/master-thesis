@@ -883,8 +883,7 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
               simplex_iterations, lower_bound, upper_bound);
 
-    if (solver->data->pricer_mode &&
-        is_valid_reduced_cost(instance, upper_bound)) {
+    if (solver->data->pricer_mode && is_valid_reduced_cost(upper_bound)) {
         CPXXcallbackabort(context);
     }
 
@@ -1369,7 +1368,7 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         // This parameter is effective only when the branch and bound algorithm
         // is invoked, for example, in a mixed integer program (MIP). It does
         // not have the expected effect when branch and bound is not invoked.
-        const double cutoff_value = get_reduced_cost_upper_bound(instance);
+        const double cutoff_value = get_reduced_cost_upper_bound();
 
         log_info("%s :: Setting UPPER_CUTOFF to %f", __func__, cutoff_value);
 

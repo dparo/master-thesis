@@ -452,7 +452,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             //       necessary. This will keep the main execution path as
             //       fast as possible
             if (!pricer_mode_enabled ||
-                !is_valid_reduced_cost(instance, solution.upper_bound)) {
+                !is_valid_reduced_cost(solution.upper_bound)) {
                 // Try to improve the solution using 2opt
                 double prev_ub = solution.upper_bound;
                 twoopt_refine(solver, instance, &solution);
@@ -476,8 +476,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
 
             min_ub_found = MIN(min_ub_found, solution.upper_bound);
 
-            if (pricer_mode_enabled &&
-                is_valid_reduced_cost(instance, min_ub_found)) {
+            if (pricer_mode_enabled && is_valid_reduced_cost(min_ub_found)) {
                 log_info("%s :: Found reduced_cost tour (%f), early "
                          "terminating warm-start feeding\n",
                          __func__, min_ub_found);

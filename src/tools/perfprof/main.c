@@ -42,6 +42,7 @@
 #include "os.h"
 #include "parser.h"
 #include "core-utils.h"
+#include "core.h"
 
 #include <ftw.h>
 
