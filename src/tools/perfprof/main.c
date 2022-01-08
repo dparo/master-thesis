@@ -49,12 +49,12 @@
 #include <sha256.h>
 #include <cJSON.h>
 
-#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
+#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)0.0)
 
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the computation resource limits
 /// specified (eg timelimit)
-#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)2.0)
+#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)10.0)
 
 #define HASH_CSTR_LEN 65
 typedef struct {
