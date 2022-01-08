@@ -50,6 +50,10 @@
 #include <cJSON.h>
 
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
+
+/// Default cost value attributed to a crashed solver, or a solver
+/// which cannot produce any cost within the computation resource limits
+/// specified (eg timelimit)
 #define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)2.0)
 
 #define HASH_CSTR_LEN 65
@@ -838,16 +842,6 @@ static void main_loop(void) {
          240.0,
          1,
          {"data/BAP_Instances_New/F"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "A-last10",
-         240.0,
-         1,
-         {"data/BAP_Instances_New/A"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
