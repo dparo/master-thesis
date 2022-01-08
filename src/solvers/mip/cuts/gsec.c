@@ -23,7 +23,7 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-const static double VIOLATION_TOLERANCE = 1e-2;
+const static double FRACTIONAL_VIOLATION_TOLERANCE = 2.0 - 1e-2;
 const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
@@ -53,7 +53,7 @@ static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
 }
 
 static inline bool is_violated_cut(double flow, double y_i) {
-    bool valid = flow >= (2.0 * y_i - VIOLATION_TOLERANCE);
+    bool valid = flow >= (2.0 * y_i - FRACTIONAL_VIOLATION_TOLERANCE);
     return !valid;
 }
 
@@ -314,7 +314,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
 
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
-            assert(is_violated_cut(flow, y_i));
             assert(*comp(tour, i) >= 1);
 
             ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);

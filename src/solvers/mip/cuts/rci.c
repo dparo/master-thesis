@@ -24,7 +24,8 @@
 #include "../cuts.h"
 #include "./cuts-utils.h"
 
-static const double VIOLATION_TOLERANCE = 1e-2;
+static const double FRACTIONAL_VIOLATION_TOLERANCE = 1e-3;
+static const double INTEGRAL_VIOLATION_TOLERANCE = 1e-2;
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
 struct CutSeparationPrivCtx {
@@ -44,7 +45,8 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
 
 static inline SeparationInfo separate(CutSeparationFunctor *self,
                                       const double *vstar, int32_t *colors,
-                                      int32_t curr_color, double max_flow) {
+                                      int32_t curr_color, double max_flow,
+                                      double tolerance) {
     SeparationInfo info = {0};
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
@@ -123,8 +125,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         }
 
         assert(info.num_vars);
-        info.is_violated =
-            is_violated_cut(&ctx->super, &info, VIOLATION_TOLERANCE);
+        info.is_violated = is_violated_cut(&ctx->super, &info, tolerance);
         validate_cut_info(self, &ctx->super, &info, vstar);
     }
 
@@ -142,7 +143,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     int32_t depot_color = mf->colors[0];
     SeparationInfo info =
         separate(self, vstar, mf->colors, depot_color == BLACK ? WHITE : BLACK,
-                 mf->maxflow);
+                 mf->maxflow, FRACTIONAL_VIOLATION_TOLERANCE);
     if (!push_fractional_cut("RCI", self, &ctx->super, &info)) {
         return false;
     }
@@ -164,7 +165,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     // NOTE:
     // Start from c = 1. RCI cuts that include the depot node are NOT valid.
     for (int32_t c = 1; c < tour->num_comps; c++) {
-        SeparationInfo info = separate(self, vstar, tour->comp, c, 0.0);
+        SeparationInfo info = separate(self, vstar, tour->comp, c, 0.0,
+                                       INTEGRAL_VIOLATION_TOLERANCE);
         if (!push_integral_cut("RCI", self, &ctx->super, &info)) {
             return false;
         }
