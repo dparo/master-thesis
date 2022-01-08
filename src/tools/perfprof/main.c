@@ -478,6 +478,9 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
         cJSON *itm_took =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
 
+        cJSON *pricer_success =
+            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "pricerSuccess");
+
         if (itm_took && cJSON_IsNumber(itm_took)) {
             run->perf.time = cJSON_GetNumberValue(itm_took);
         }
@@ -497,6 +500,16 @@ void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
                     break;
                 }
             }
+        }
+
+        //
+        // Replace the cost if it is non valid negative reduced cost,
+        // or if the solver crashed in the process.
+        //
+        if (pricer_success && cJSON_IsFalse(pricer_success)) {
+            run->perf.solution.cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
+        } else if (!is_valid_reduced_cost(run->perf.solution.cost)) {
+            run->perf.solution.cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
         }
     }
 }
