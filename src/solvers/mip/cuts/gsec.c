@@ -48,19 +48,26 @@
 //                  for solving the root
 //                - CPLEX is an high engineered piece of software.
 //                  Maybe if it deems the cut
-//                  to be ineffective is probably better to branch instead.
+//                  to be ineffective is probably better to take in
+//                  consideration its decision.
 //          - When CPX_USECUT_FILTER is used:
 //              - PROS:
 //                - Anticipates branching, allowing more cores to be used.
+//                - Potentially avoids spending too much time separating cuts
+//                  which are ineffective, wasting tremendous amount of time
+//                  at the root LP node
 //              - CONS:
-//                - Drastically increases memory consumption upon branching,
-//                  especially if GSEC cuts are separated using a very small
-//                  violation tolerance
-//                - Due to the high memory usage, it becomes almost mandatory
-//                  to separate GSEC cuts only when they are exteremely violated
+//                - Drastically increases memory consumption due to many nodes
+//                  being generated (especially for big instances)
+//                - Tradeoff: Due to CPLEX scoring each GSEC cut,
+//                  generating many GSEC cuts
+//                  (eg FRACTIONAL_VIOLATION_TOLERANCE is low), costs
+//                  more time per fractional separation iteration.
+//                  But using FRACTIONAL_VIOLATION_TOLERANCE high results
+//                  in much more branching
 #define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
 
-const static double FRACTIONAL_VIOLATION_TOLERANCE = 1.8;
+const static double FRACTIONAL_VIOLATION_TOLERANCE = 0.5;
 const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
