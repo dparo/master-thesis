@@ -1330,6 +1330,8 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 4);
     }
 
+    CPXXsetintparam(solver->data->env, CPX_PARAM_VARSEL, CPX_VARSEL_STRONG);
+
     // Clamp the number of available cores to MAX_NUM_CORES
     {
         if (CPXXgetnumcores(solver->data->env, &solver->data->numcores) != 0) {
