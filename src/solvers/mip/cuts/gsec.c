@@ -57,14 +57,14 @@
 //                  which are ineffective, wasting tremendous amount of time
 //                  at the root LP node
 //              - CONS:
-//                - Drastically increases memory consumption due to many nodes
+//                - Increases memory consumption due to B&B nodes
 //                  being generated (especially for big instances)
 //                - Tradeoff: Due to CPLEX scoring each GSEC cut,
 //                  generating many GSEC cuts
-//                  (eg FRACTIONAL_VIOLATION_TOLERANCE is low), costs
+//                  (eg FRACTIONAL_VIOLATION_TOLERANCE low), costs
 //                  more time per fractional separation iteration.
-//                  But using FRACTIONAL_VIOLATION_TOLERANCE high results
-//                  in much more branching
+//                  Instead, setting FRACTIONAL_VIOLATION_TOLERANCE to a high
+//                  value results in more branching
 #define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
 
 static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.5;
@@ -144,14 +144,33 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     int32_t set_s_size = 0;
 
+    // No way anything will be violated, so don't pay the cost
+    // of the function
+    if (mf->maxflow >= 2.0) {
+        return true;
+    }
+
+    // Track if any city violates a GSEC cut.
+    // If none, there's no need to fill
+    // the index,value array with a cut that will never
+    // be violated
+    bool any_violated = false;
+
     for (int32_t i = 0; i < n; i++) {
         int32_t i_color = mf->colors[i];
         bool i_in_s = i_color != depot_color;
-        if (i_in_s)
+        if (i_in_s) {
             ++set_s_size;
+            double y_i = vstar[get_y_mip_var_idx(instance, i)];
+
+            if (is_violated_fractional_cut(mf->maxflow, y_i)) {
+                any_violated = true;
+            }
+        }
     }
 
-    if (set_s_size >= 2) {
+    // Again do not pay the cost of generating
+    if (any_violated && set_s_size >= 2) {
         // Separate the cut
         CPXNNZ nnz = 0;
         const double rhs = 0;
