@@ -337,7 +337,7 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
         if (is_valid_reduced_cost(primal_bound)) {
             cost = primal_bound;
         } else {
-            cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
+            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
         }
     } else if (valid && !feasible) {
         // NOTE(dparo):
