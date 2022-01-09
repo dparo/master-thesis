@@ -67,8 +67,8 @@
 //                  in much more branching
 #define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
 
-const static double FRACTIONAL_VIOLATION_TOLERANCE = 1e-2;
-const static double EPS = 1e-5;
+static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.5;
+static const double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
     CPXDIM *index;

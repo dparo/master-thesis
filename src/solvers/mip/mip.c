@@ -1380,16 +1380,17 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         // This parameter is effective only when the branch and bound algorithm
         // is invoked, for example, in a mixed integer program (MIP). It does
         // not have the expected effect when branch and bound is not invoked.
-        const double cutoff_value = get_reduced_cost_upper_bound();
+        const double upper_cutoff_value = 0.0;
 
-        log_info("%s :: Setting UPPER_CUTOFF to %f", __func__, cutoff_value);
+        log_info("%s :: Setting UPPER_CUTOFF to %f", __func__,
+                 upper_cutoff_value);
 
-        if (0 !=
-            CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTUP, cutoff_value)) {
+        if (0 != CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTUP,
+                                 upper_cutoff_value)) {
             log_fatal(
                 "%s :: CPXXsetdblparam -- Failed to setup CPX_PARAM_CUTUP "
                 "(upper cuttoff value) to value %f",
-                __func__, cutoff_value);
+                __func__, upper_cutoff_value);
             goto fail;
         }
     }
