@@ -23,7 +23,44 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-const static double FRACTIONAL_VIOLATION_TOLERANCE = 1e-2;
+// NOTE(dparo): 8 Jan 2022
+//       There is a thade off between which cut purgeability to use for GSEC:
+//       Mainly we have 2 choices which are:
+//         - CPX_USECUT_PURGE
+//         - CPX_USECUT_FILTER
+//          The latter one (CPX_USECUT_FILTER), tells CPLEX to score the cut
+//       and use it only if it deems it be strong enough. If it does not
+//       believe any GSEC cut is strong enough, it either resolve back
+//       to its own internal cuts, are fall backs to branching.
+//          The first one (CPX_USECUT_PURGE), tells CPLEX to always use
+//       GSEC cuts even if they are deemed ineffective. Notice, however, that
+//       CPLEX is still allowed to purge old GSEC cuts, thus the separation
+//       procedure should be able to regenrete old cuts at any point.
+//
+//       When to prefer one or another:
+//          - When CPX_USECUT_PURGE is used:
+//              - PROS:
+//                - The MIP model can be solved at the root LP node without
+//                  incuring in any branching.
+//              - CONS:
+//                - Less use of available cores (CPLEX can't use maximum
+//                  number of cores)
+//                  for solving the root
+//                - CPLEX is an high engineered piece of software.
+//                  Maybe if it deems the cut
+//                  to be ineffective is probably better to branch instead.
+//          - When CPX_USECUT_FILTER is used:
+//              - PROS:
+//                - Anticipates branching, allowing more cores to be used.
+//              - CONS:
+//                - Drastically increases memory consumption upon branching,
+//                  especially if GSEC cuts are separated using a very small
+//                  violation tolerance
+//                - Due to the high memory usage, it becomes almost mandatory
+//                  to separate GSEC cuts only when they are exteremely violated
+#define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
+
+const static double FRACTIONAL_VIOLATION_TOLERANCE = 1.8;
 const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
@@ -112,19 +149,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         CPXNNZ nnz = 0;
         const double rhs = 0;
         const char sense = 'G';
-        // NOTE(dparo): 3 Jan 2022
-        //       Use CPX_USECUT_PURGE instead of the more classical
-        //       CPX_USECUT_FILTER. We do not care if CPLEX deems the GSEC cuts
-        //       to be ineffective. They define the original problem and must be
-        //       in the formulation regardless. We can allow to purge the cuts
-        //       however, because we can regenerate them fresly from any point
-        //       of the solution process.
-        // NOTE(dparo): 3 Jan 2022
-        //       Also specifying this purgeable to be CPX_USECUT_PURGE has the
-        //       extra benefit of reducing branching and thus memory
-        //       consumption. Making ESPPRC instances with high number of nodes
-        //       extremely more manageable
-        const int purgeable = CPX_USECUT_FILTER;
+        const int purgeable = FRACTIONAL_CUT_PURGEABILITY;
         const int local_validity = 0; // (Globally valid)
 
         double flow = 0.0;
