@@ -67,7 +67,7 @@
 //                  in much more branching
 #define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
 
-const static double FRACTIONAL_VIOLATION_TOLERANCE = 0.5;
+const static double FRACTIONAL_VIOLATION_TOLERANCE = 1e-2;
 const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
@@ -195,6 +195,14 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         assert(feq(flow, mf->maxflow, EPS));
         validate_index_array(ctx, nnz - 1);
 
+        // Scan for the city that violates the cut the most,
+        // and report a single city per section S as to reduce
+        // the number of processing/scoring per cut that CPLEX needs to
+        // do
+
+        int32_t best_violated_idx = -1;
+        double violation_amt = INFINITY;
+
         for (int32_t i = 0; i < n; i++) {
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
             int32_t bp_i = mf->colors[i];
@@ -206,26 +214,36 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
                 continue;
             }
 
-            if (is_violated_fractional_cut(mf->maxflow, y_i)) {
-                ctx->index[nnz] = (CPXDIM)get_y_mip_var_idx(instance, i);
-                ctx->value[nnz] = -2.0;
-
-                log_trace("%s :: Adding GSEC fractional constraint (%g >= "
-                          "2.0 * %g)"
-                          " (nnz = %lld)",
-                          __func__, mf->maxflow, y_i, nnz);
-
-                if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
-                                            ctx->value, purgeable,
-                                            local_validity)) {
-                    log_fatal("%s :: Failed to generate cut for fractional "
-                              "solution",
-                              __func__);
-                    goto failure;
-                }
-
-                added_cuts += 1;
+            double diff = mf->maxflow - 2 * y_i;
+            if (is_violated_fractional_cut(mf->maxflow, y_i) &&
+                diff < violation_amt) {
+                violation_amt = diff;
+                best_violated_idx = i;
             }
+        }
+
+        if (best_violated_idx >= 0) {
+            double y_i = vstar[get_y_mip_var_idx(instance, best_violated_idx)];
+
+            ctx->index[nnz] =
+                (CPXDIM)get_y_mip_var_idx(instance, best_violated_idx);
+            ctx->value[nnz] = -2.0;
+
+            log_trace("%s :: Adding GSEC fractional constraint (%g >= "
+                      "2.0 * %g)"
+                      " (nnz = %lld)",
+                      __func__, mf->maxflow, y_i, nnz);
+
+            if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
+                                        ctx->value, purgeable,
+                                        local_validity)) {
+                log_fatal("%s :: Failed to generate cut for fractional "
+                          "solution",
+                          __func__);
+                goto failure;
+            }
+
+            added_cuts += 1;
         }
     }
 
