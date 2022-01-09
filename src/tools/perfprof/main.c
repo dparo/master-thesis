@@ -49,7 +49,7 @@
 #include <sha256.h>
 #include <cJSON.h>
 
-#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)0.0)
+#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the computation resource limits
@@ -300,7 +300,9 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
     cJSON *itm_feasible = cJSON_GetObjectItemCaseSensitive(root, "feasible");
     cJSON *itm_valid = cJSON_GetObjectItemCaseSensitive(root, "valid");
-    cJSON *itm_cost = cJSON_GetObjectItemCaseSensitive(root, "tourCost");
+    cJSON *itm_dual_bound = cJSON_GetObjectItemCaseSensitive(root, "dualBound");
+    cJSON *itm_primal_bound =
+        cJSON_GetObjectItemCaseSensitive(root, "primalBound");
 
     if (itm_took && cJSON_IsNumber(itm_took)) {
         run->perf.time = cJSON_GetNumberValue(itm_took);
@@ -308,7 +310,6 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
 
     bool valid = false;
     bool feasible = false;
-    double cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
 
     if (itm_feasible && cJSON_IsBool(itm_feasible)) {
         feasible = cJSON_IsTrue(itm_feasible);
@@ -318,13 +319,40 @@ void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
         valid = cJSON_IsTrue(itm_valid);
     }
 
+    double cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
+    double primal_bound = INFINITY;
+    double dual_bound = INFINITY;
+
+    if (itm_primal_bound && cJSON_IsNumber(itm_primal_bound)) {
+        primal_bound = cJSON_GetNumberValue(itm_primal_bound);
+    }
+    if (itm_dual_bound && cJSON_IsNumber(itm_dual_bound)) {
+        dual_bound = cJSON_GetNumberValue(itm_dual_bound);
+    }
+
+    bool primal_bound_equal_dual_bound =
+        feq(primal_bound, dual_bound, COST_TOLERANCE);
+
     if (valid && feasible) {
-        if (itm_cost && cJSON_IsNumber(itm_cost)) {
-            cost = cJSON_GetNumberValue(itm_cost);
+        if (is_valid_reduced_cost(primal_bound)) {
+            cost = primal_bound;
+        } else {
+            cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
         }
     } else if (valid && !feasible) {
-        cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+        // NOTE(dparo):
+        //    A solution may be infeasible for two reasons:
+        //    1. Given the timelimit we weren't unable to find one (which is
+        //    bad!!)
+        //    2. We proved to optimality that no solution exist (which is
+        //    good!!!)
+        if (primal_bound_equal_dual_bound) {
+            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+        } else {
+            cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
+        }
     } else {
+        assert(!valid);
         cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
     }
 

@@ -186,9 +186,11 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     s &= cJSON_AddItemToObject(root, "feasible",
                                cJSON_CreateBool(feasible && valid));
 
-    double obj[2] = {solution->lower_bound, solution->upper_bound};
-    s &= cJSON_AddItemToObject(root, "obj",
-                               cJSON_CreateDoubleArray(obj, ARRAY_LEN(obj)));
+    s &= cJSON_AddItemToObject(root, "dualBound",
+                               cJSON_CreateNumber(solution->lower_bound));
+
+    s &= cJSON_AddItemToObject(root, "primalBound",
+                               cJSON_CreateNumber(solution->upper_bound));
 
     double cost = tour_eval(instance, &solution->tour);
     s &= cJSON_AddItemToObject(root, "tourCost", cJSON_CreateNumber(cost));
