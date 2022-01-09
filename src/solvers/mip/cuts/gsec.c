@@ -23,7 +23,7 @@
 #include "../mip.h"
 #include "../cuts.h"
 
-const static double FRACTIONAL_VIOLATION_TOLERANCE = 1.5;
+const static double FRACTIONAL_VIOLATION_TOLERANCE = 1e-2;
 const static double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
@@ -124,7 +124,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         //       extra benefit of reducing branching and thus memory
         //       consumption. Making ESPPRC instances with high number of nodes
         //       extremely more manageable
-        const int purgeable = CPX_USECUT_PURGE;
+        const int purgeable = CPX_USECUT_FILTER;
         const int local_validity = 0; // (Globally valid)
 
         double flow = 0.0;
