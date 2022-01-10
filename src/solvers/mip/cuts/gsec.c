@@ -31,11 +31,11 @@
 //          The latter one (CPX_USECUT_FILTER), tells CPLEX to score the cut
 //       and use it only if it deems it be strong enough. If it does not
 //       believe any GSEC cut is strong enough, it either resolve back
-//       to its own internal cuts, are fall backs to branching.
+//       to its own internal cuts, or it fall backs to branching.
 //          The first one (CPX_USECUT_PURGE), tells CPLEX to always use
-//       GSEC cuts even if they are deemed ineffective. Notice, however, that
+//       GSEC cuts even if they are deemed ineffective. Notice however, that
 //       CPLEX is still allowed to purge old GSEC cuts, thus the separation
-//       procedure should be able to regenrete old cuts at any point.
+//       procedure should be able to regenerate old cuts at any point.
 //
 //       When to prefer one or another:
 //          - When CPX_USECUT_PURGE is used:
@@ -43,9 +43,9 @@
 //                - The MIP model can be solved at the root LP node without
 //                  incuring in any branching.
 //              - CONS:
-//                - Less use of available cores (CPLEX can't use maximum
-//                  number of cores)
-//                  for solving the root
+//                - Less use of available cores. CPLEX can make high use
+//                  of parallelization only when multiple B&B nodes are
+//                  opened
 //                - CPLEX is an high engineered piece of software.
 //                  Maybe if it deems the cut
 //                  to be ineffective is probably better to take in
