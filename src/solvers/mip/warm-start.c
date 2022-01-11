@@ -161,8 +161,8 @@ static bool random_insheur_starting_pair(const Instance *instance,
     return true;
 }
 
-static void ins_heur(Solver *solver, const Instance *instance,
-                     Solution *solution, InsHeurNodePair starting_pair) {
+static void ins_heur(const Instance *instance, Solution *solution,
+                     InsHeurNodePair starting_pair) {
     Tour *const tour = &solution->tour;
 
     const int32_t n = instance->num_customers + 1;
@@ -442,7 +442,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             continue;
         }
         if (valid_starting_pair(instance, &starting_pair)) {
-            ins_heur(solver, instance, &solution, starting_pair);
+            ins_heur(instance, &solution, starting_pair);
             log_info("%s :: ins_heur -- found a solution of cost %f", __func__,
                      solution.upper_bound);
 
