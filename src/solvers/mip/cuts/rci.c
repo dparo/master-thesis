@@ -59,6 +59,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
     assert(demand(instance, 0) == 0.0);
 
     double demand_sum = 0.0;
+    double inv_demand_sum = 0.0;
     int32_t set_s_size = 0;
 
     for (int32_t i = 0; i < n; i++) {
@@ -66,14 +67,26 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         if (i_in_s) {
             ++set_s_size;
             demand_sum += demand(instance, i);
+            inv_demand_sum += demand(instance, i) *
+                              (1 - vstar[get_y_mip_var_idx(instance, i)]);
         }
     }
 
     double demand_rem = fmod(demand_sum, Q);
 
     if (demand_rem > 0.0 && set_s_size >= 2) {
+        // Short circuit function as fast as possible (without iterating all the
+        // N^2 nodes) if we can determine the cut will not be separated.
+        {
+            double rhs = 2.0 * ceil(demand_sum / Q) -
+                         2.0 * (inv_demand_sum) / demand_rem;
 
-        demand_rem = fmod(demand_sum, Q);
+            bool is_violated = !(max_flow >= (rhs - tolerance));
+            if (!is_violated) {
+                return info;
+            }
+        }
+
         add_term_rhs(&ctx->super, &info, 2.0 * ceil(demand_sum / Q));
 
         for (int32_t i = 0; i < n; i++) {
