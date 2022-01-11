@@ -84,6 +84,14 @@ static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
     return INFINITY;
 }
 
+static inline double cptp_reduced_cost_arc_val(const Instance *instance,
+                                               int32_t i, int32_t j) {
+    double dist = cptp_dist(instance, i, j);
+    double pi = instance->profits[i];
+    double pj = instance->profits[j];
+    return dist - (pi + pj) / 2.0;
+}
+
 static inline int32_t *tsucc(Tour *tour, int32_t customer_idx) {
     return veci32_access(tour->succ, customer_idx, tour->num_customers + 1);
 }

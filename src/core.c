@@ -582,3 +582,76 @@ double solver_params_get_double(SolverTypedParams *params, char *key) {
     TypedParam *p = solver_params_get_val(params, key, TYPED_PARAM_DOUBLE);
     return p->dval;
 }
+
+Instance instance_copy(const Instance *instance, bool allocate,
+                       bool deep_copy) {
+    Instance result = {0};
+    int32_t n = instance->num_customers + 1;
+
+    result.num_customers = instance->num_customers;
+    result.num_vehicles = instance->num_vehicles;
+    result.vehicle_cap = instance->vehicle_cap;
+
+    if (allocate) {
+        if (instance->edge_weight) {
+            result.edge_weight =
+                malloc(sizeof(*instance->edge_weight) * hm_nentries(n));
+        }
+
+        result.profits = malloc(n * sizeof(*result.profits));
+        result.demands = malloc(n * sizeof(*result.demands));
+
+        result.name = strdup(instance->name);
+        result.comment = strdup(instance->comment);
+    }
+
+    if (deep_copy) {
+        memcpy(result.profits, instance->profits, n * sizeof(*result.profits));
+        memcpy(result.demands, instance->demands, n * sizeof(*result.demands));
+        if (instance->edge_weight) {
+            memcpy(result.edge_weight, instance->edge_weight,
+                   hm_nentries(n) * sizeof(*result.edge_weight));
+        }
+    }
+
+    return result;
+}
+
+void generate_dual_instance(const Instance *instance, Instance *out,
+                            double lagrangian_multiplier_lb,
+                            double lagrangian_multiplier_ub) {
+
+    const double u = lagrangian_multiplier_ub;
+    const double b = lagrangian_multiplier_lb;
+
+    int32_t n = instance->num_customers + 1;
+
+    if (!out->profits || !out->demands) {
+        instance_destroy(out);
+        *out = instance_copy(instance, true, false);
+    } else {
+        *out = instance_copy(instance, false, false);
+    }
+
+    out->edge_weight = malloc(sizeof(*out->edge_weight) * hm_nentries(n));
+
+    for (int32_t i = 0; i < n; i++) {
+        // NOTE(dparo):
+        //     In the dual formulation all profits associated to each
+        //     city are cleared, and are instead encoded in the reduced
+        //     cost associated to each arc.
+        out->profits[i] = 0.0;
+        // demands are instead copied as is
+        out->demands[i] = instance->demands[i];
+    }
+
+    for (int32_t i = 0; i < n; i++) {
+        double di = instance->demands[i];
+        for (int32_t j = 0; j < n; j++) {
+            double dj = instance->demands[j];
+            double rc = cptp_reduced_cost_arc_val(instance, i, j);
+            double v = rc + (u - b) * 0.5 * (di + dj);
+            out->edge_weight[sxpos(n, i, j)] = v;
+        }
+    }
+}
