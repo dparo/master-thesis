@@ -54,6 +54,7 @@ add_library(libcptp
     parser.c
     parsing-utils.c
     core.c
+    duality.c
     os.c
     validation.c
     visualization.c
@@ -66,7 +67,6 @@ add_library(libcptp
     solvers/mip/mip.c
     $<$<BOOL:${CPLEX_FOUND}>:
         solvers/mip/warm-start.c
-        solvers/mip/analyze-and-optimize.c
         solvers/mip/cuts/gsec.c
         solvers/mip/cuts/glm.c
         solvers/mip/cuts/rci.c

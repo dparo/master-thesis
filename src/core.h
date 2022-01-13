@@ -155,9 +155,6 @@ bool resolve_params(const SolverParams *params, const SolverDescriptor *desc,
                     SolverTypedParams *out);
 
 Instance instance_copy(const Instance *instance, bool allocate, bool deep_copy);
-void generate_dual_instance(const Instance *instance, Instance *out,
-                            double lagrangian_multiplier_lb,
-                            double lagrangian_multiplier_ub);
 
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
