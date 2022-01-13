@@ -649,7 +649,7 @@ void generate_dual_instance(const Instance *instance, Instance *out,
         double di = instance->demands[i];
         for (int32_t j = 0; j < n; j++) {
             double dj = instance->demands[j];
-            double rc = cptp_reduced_cost_arc_val(instance, i, j);
+            double rc = cptp_reduced_cost(instance, i, j);
             double v = rc + (u - b) * 0.5 * (di + dj);
             out->edge_weight[sxpos(n, i, j)] = v;
         }

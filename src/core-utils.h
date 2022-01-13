@@ -84,8 +84,8 @@ static inline double cptp_dist(const Instance *instance, int32_t i, int32_t j) {
     return INFINITY;
 }
 
-static inline double cptp_reduced_cost_arc_val(const Instance *instance,
-                                               int32_t i, int32_t j) {
+static inline double cptp_reduced_cost(const Instance *instance, int32_t i,
+                                       int32_t j) {
     double dist = cptp_dist(instance, i, j);
     double pi = instance->profits[i];
     double pj = instance->profits[j];
