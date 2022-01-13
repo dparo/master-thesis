@@ -78,6 +78,4 @@ This project makes use of thirdy party projects (located under `deps`) licensed 
 7. [johthepro/doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) [**MIT license**](https://github.com/jothepro/doxygen-awesome-css/blob/main/LICENSE)
 
 ## Funding
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J47WJB2) 
-<a href="https://www.buymeacoffee.com/dparo" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee" style="height: 41px !important;width: 174px !important;box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;-webkit-box-shadow: 0px 3px 2px 0px rgba(190, 190, 190, 0.5) !important;" ></a> 
-
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J47WJB2)
