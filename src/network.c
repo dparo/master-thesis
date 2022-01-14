@@ -789,8 +789,8 @@ void dijkstra_ctx_destroy(DijkstraCtx *ctx) {
     memset(ctx, 0, sizeof(*ctx));
 }
 
-double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
-                DijkstraCtx *ctx) {
+void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
+              DijkstraCtx *ctx) {
     const int32_t n = net->nnodes;
     assert(result->nnodes == net->nnodes);
 
@@ -807,8 +807,6 @@ double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
         }
     }
 #endif
-
-    double cost = INFINITY;
 
     for (int32_t i = 0; i < n; i++) {
         ctx->dist[i] = INFINITY;
@@ -875,11 +873,8 @@ double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
 
     if (result) {
         result->nnodes = net->nnodes;
-        result->cost = cost;
         result->source = source_vertex;
     }
-
-    return cost;
 }
 
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {

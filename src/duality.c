@@ -23,6 +23,7 @@
 #include "duality.h"
 #include "core.h"
 #include "validation.h"
+#include "network.h"
 
 void generate_dual_instance(const Instance *instance, Instance *out,
                             CptpLagrangianMultipliers lm) {
@@ -94,7 +95,53 @@ static void validate_dual_problem_solution(const Instance *instance,
 static double solve_dual_problem(const Instance *instance,
                                  CptpLagrangianMultipliers lm,
                                  Solution *solution) {
+    const int32_t n = instance->num_customers + 1;
     validate_duality_distance_is_positive(instance, lm);
+
+    // Create one extra dummy node
+    Network net = network_create(n, false);
+    DijkstraCtx ctx = dijkstra_ctx_create(n);
+
+    // Initialize the network weights
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i != j) {
+                double w = cptp_duality_dist(instance, lm, i, j);
+                *network_weight(&net, i, j) = w;
+            }
+        }
+    }
+
+    dijkstra(&net, 0, NULL, &ctx);
+
+    // dijkstra finds shortest path, not tours.
+    // Therefore, bruteforce all the possible combination assuming we know
+    // the last visited vertex prior to coming back to the depot and recompute
+    // the cost of the tour
+    double min_cost = INFINITY;
+    int32_t last_visited_vertex = -1;
+    for (int32_t i = 1; i < n; i++) {
+        // Skip vertices being at depth 1 or less to create elementary solutions
+        if (ctx.depth[i] <= 1) {
+            continue;
+        }
+
+        double cost = ctx.dist[i] + cptp_duality_dist(instance, lm, i, 0);
+        if (cost < min_cost) {
+            min_cost = cost;
+            last_visited_vertex = i;
+        }
+    }
+
+    assert(last_visited_vertex >= 0);
+    printf("%s :: dijkstra find min_cost = %f, with last_visited_vertex = %d\n",
+           __func__, min_cost, last_visited_vertex);
+
+    solution->lower_bound = min_cost;
+
+    network_destroy(&net);
+    dijkstra_ctx_destroy(&ctx);
+
     return INFINITY;
 }
 

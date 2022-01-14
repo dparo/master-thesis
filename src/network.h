@@ -60,7 +60,6 @@ typedef struct {
 typedef struct {
     int32_t nnodes;
     int32_t source;
-    double cost;
     int32_t succ;
 } ShortestPath;
 
@@ -151,8 +150,8 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
 DijkstraCtx dijkstra_ctx_create(int32_t nnodes);
 void dijkstra_ctx_destroy(DijkstraCtx *ctx);
 
-double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
-                DijkstraCtx *ctx);
+void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
+              DijkstraCtx *ctx);
 
 static inline double *network_weight(Network *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);
