@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "core-utils.h"
+#include "duality.h"
 
 #ifndef COMPILED_WITH_CPLEX
 
@@ -1394,6 +1395,8 @@ bool cplex_setup(Solver *solver, const Instance *instance,
             goto fail;
         }
     }
+
+    duality_subgradient_find_lower_bound(instance, 0.0, 0.0);
 
     if (solver_params_get_bool(tparams, "APPLY_LOWER_CUTOFF")) {
         // NOTE:

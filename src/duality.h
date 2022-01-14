@@ -43,9 +43,12 @@ static inline double cptp_duality_dist(const Instance *instance,
     double result = rc + (lm.cap_ub - lm.cap_lb) * 0.5 * (di + dj);
     return result;
 }
-
 void generate_dual_instance(const Instance *instance, Instance *out,
                             CptpLagrangianMultipliers lm);
+
+double duality_subgradient_find_lower_bound(const Instance *instance,
+                                            double best_primal_bound,
+                                            double cap_lb);
 
 #if __cplusplus
 }

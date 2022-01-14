@@ -792,7 +792,6 @@ void dijkstra_ctx_destroy(DijkstraCtx *ctx) {
 void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
               DijkstraCtx *ctx) {
     const int32_t n = net->nnodes;
-    assert(result->nnodes == net->nnodes);
 
 #ifndef NDEBUG
     // - Validate that the network is composed only of positive weights
@@ -833,6 +832,8 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
             u = min_index;
         }
 
+        assert(u >= 0);
+
         // Update dist[v] only if is not visited, there is an edge from u to v,
         // and the total weight of path from src to v through u is smaller
         // than current value of dist
@@ -872,6 +873,8 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
 #endif
 
     if (result) {
+        assert(result->nnodes == net->nnodes);
+
         result->nnodes = net->nnodes;
         result->source = source_vertex;
     }
