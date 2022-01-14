@@ -82,7 +82,7 @@ static void validate_dual_problem_solution(const Instance *instance,
 #ifndef NDEBUG
     Instance dual_instance = {0};
     generate_dual_instance(instance, &dual_instance, lm);
-    validate_solution(&dual_instance, dual_solution);
+    validate_solution(&dual_instance, dual_solution, 2);
     instance_destroy(&dual_instance);
 #else
     UNUSED_PARAM(instance);
@@ -100,7 +100,7 @@ static double solve_dual_problem(const Instance *instance,
 
 static double compute_feasible_primal_bound(const Instance *instance,
                                             Solution *solution) {
-    validate_tour(instance, &solution->tour);
+    validate_tour(instance, &solution->tour, 2);
     double result = 0.0;
 
     int32_t curr_vertex = 0;

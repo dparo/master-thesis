@@ -41,10 +41,11 @@ void validate_symmetric_distances(const Instance *instance) {
 #endif
 }
 
-void validate_solution(const Instance *instance, Solution *solution) {
+void validate_solution(const Instance *instance, Solution *solution,
+                       int32_t min_num_customers_served) {
 #ifndef NDEBUG
 
-    validate_tour(instance, &solution->tour);
+    validate_tour(instance, &solution->tour, min_num_customers_served);
 
     // Upper bound should be bigger than lower bound
     double gap = solution_relgap(solution);
@@ -58,10 +59,12 @@ void validate_solution(const Instance *instance, Solution *solution) {
 #else
     UNUSED_PARAM(instance);
     UNUSED_PARAM(solution);
+    UNUSED_PARAM(min_num_customers_served);
 #endif
 }
 
-void validate_tour(const Instance *instance, Tour *tour) {
+void validate_tour(const Instance *instance, Tour *tour,
+                   int32_t min_num_customers_served) {
 #ifndef NDEBUG
     int32_t n = tour->num_customers + 1;
 
@@ -100,9 +103,12 @@ void validate_tour(const Instance *instance, Tour *tour) {
     //       - Vertices cannot be visited twice
     //
     {
+        int32_t num_visited = 0;
         bool *visited = calloc(n, sizeof(*visited));
         if (*tcomp(tour, 0) >= 0) {
+            assert(*tsucc(tour, 0) >= 0 && *tcomp(tour, 0) >= 0);
             visited[0] = true;
+
             int32_t curr_vertex = 0;
             int32_t next_vertex;
 
@@ -111,10 +117,13 @@ void validate_tour(const Instance *instance, Tour *tour) {
                 assert(next_vertex >= 0 && next_vertex < n);
                 assert(visited[next_vertex] == false);
                 visited[next_vertex] = true;
+                num_visited += 1;
                 curr_vertex = next_vertex;
             }
         }
         free(visited);
+
+        assert(num_visited - 1 >= (min_num_customers_served));
     }
 
     //

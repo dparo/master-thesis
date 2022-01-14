@@ -23,6 +23,8 @@
 #include "warm-start.h"
 #include "validation.h"
 
+#define WARM_START_MIN_NUM_CUSTOMERS_SERVED (2)
+
 typedef struct InsHeurNodePair {
     int32_t u, v;
 } InsHeurNodePair;
@@ -77,7 +79,7 @@ static bool feed_warm_solution(Solver *solver, const Instance *instance,
     {
         Tour t = tour_create(instance);
         unpack_mip_solution(instance, &t, vstar);
-        validate_tour(instance, &t);
+        validate_tour(instance, &t, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
         assert(t.num_comps == 1);
         for (int32_t i = 0; i < n; i++) {
             assert(t.comp[i] == solution->tour.comp[i]);
@@ -286,7 +288,7 @@ static void ins_heur(const Instance *instance, Solution *solution,
 
 #ifndef NDEBUG
         if (tour->comp[0] == 0) {
-            validate_tour(instance, tour);
+            validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
             assert(feq(tour_eval(instance, tour), cost, 1e-5));
         }
 #endif
@@ -295,8 +297,8 @@ static void ins_heur(const Instance *instance, Solution *solution,
     solution->upper_bound = cost;
 
 #ifndef NDEBUG
-    validate_tour(instance, tour);
-    validate_solution(instance, solution);
+    validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
+    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 
     // NOTE(dparo):
     //    Due to the MIP structure of the formulation,
@@ -346,7 +348,7 @@ static void twoopt_exchange(Solver *solver, const Instance *instance,
     tour->succ[succ_a] = succ_b;
 
 #ifndef NDEBUG
-    validate_tour(instance, tour);
+    validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
 }
 
@@ -414,7 +416,8 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
             twoopt_exchange(solver, instance, &solution->tour, best_a, best_b);
             solution->upper_bound += best_delta_cost;
 #ifndef NDEBUG
-            validate_solution(instance, solution);
+            validate_solution(instance, solution,
+                              WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
         } else {
             // NOTE(dparo): No more 2-opt exchanges are available
@@ -423,7 +426,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
     }
 
 #ifndef NDEBUG
-    validate_solution(instance, solution);
+    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
 }
 

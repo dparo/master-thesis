@@ -404,7 +404,7 @@ static void postprocess_solver_solution(const Instance *instance,
     case SOLVE_STATUS_ABORTED_FEASIBLE:
     case SOLVE_STATUS_FEASIBLE:
     case SOLVE_STATUS_OPTIMAL:
-        validate_solution(instance, solution);
+        validate_solution(instance, solution, 1);
 
         if (status == SOLVE_STATUS_OPTIMAL) {
 #ifndef NDEBUG
