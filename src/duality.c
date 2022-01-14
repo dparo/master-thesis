@@ -1,25 +1,27 @@
 /*
  * Copyright (c) 2022 Davide Paro
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #include "duality.h"
+#include "validation.h"
 
 void generate_dual_instance(const Instance *instance, Instance *out,
                             CptpLagrangianMultipliers lm) {
@@ -50,4 +52,139 @@ void generate_dual_instance(const Instance *instance, Instance *out,
                 cptp_duality_dist(instance, lm, i, j);
         }
     }
+}
+
+static void
+validate_duality_distance_is_positive(const Instance *instance,
+                                      CptpLagrangianMultipliers lm) {
+#ifndef NDEBUG
+    const int32_t n = instance->num_customers + 1;
+
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i == j) {
+                continue;
+            }
+            assert(cptp_duality_dist(instance, lm, i, j) >= 0.0);
+        }
+    }
+
+#else
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(lm);
+#endif
+}
+
+static double solve_dual_problem(const Instance *instance,
+                                 CptpLagrangianMultipliers lm,
+                                 Solution *solution) {
+    validate_duality_distance_is_positive(instance, lm);
+    return INFINITY;
+}
+
+static double compute_feasible_primal_bound(const Instance *instance,
+                                            Solution *solution) {
+    validate_tour(instance, &solution->tour);
+    double result = 0.0;
+
+    int32_t curr_vertex = 0;
+
+    do {
+        int32_t next_vertex = solution->tour.succ[curr_vertex];
+        result += cptp_reduced_cost(instance, curr_vertex, next_vertex);
+        curr_vertex = next_vertex;
+    } while (curr_vertex != 0);
+
+    return result;
+}
+
+double duality_subgradient_find_lower_bound(const Instance *instance,
+                                            double best_primal_bound,
+                                            double cap_lb) {
+    const int32_t n = instance->num_customers + 1;
+
+    // NOTE(dparo):
+    //      From
+    //           Beasley, J.E., Christofides, N., 1989. An algorithm for the
+    //           resource constrained shortest path problem. Networks 19,
+    //           379–394. https://doi.org/10.1002/net.3230190402
+    //      they claim from their ""limited"" (whatever that means)
+    //      computational experience that these constants value
+    //      yielded good results
+    const int32_t MAX_NUM_SUBGRAD_ITERS = 10;
+    const double STEP_SIZE_SCALE_FAC = 0.25;
+
+    Solution curr_solution = solution_create(instance);
+
+    double best_dual_bound = -INFINITY;
+    CptpLagrangianMultipliers lm = {0};
+    for (int32_t subgrad_it = 0; subgrad_it < MAX_NUM_SUBGRAD_ITERS;
+         subgrad_it++) {
+
+        // Fix the lagrangian multiplier associated with the vehicle capacity
+        // upper bound, such we generate a Network with positive associated
+        // weights, which can be easily solved with Dijkstra algorithm in
+        // Theta(n^2)
+
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = 0; j < n; j++) {
+                if (i == j) {
+                    continue;
+                }
+                double avg_demand =
+                    (instance->demands[i] + instance->demands[j]) / 2.0;
+                double min_cap_ub =
+                    lm.cap_lb - cptp_reduced_cost(instance, i, j) / avg_demand;
+                lm.cap_ub = MAX(lm.cap_ub, min_cap_ub);
+            }
+        }
+
+        solve_dual_problem(instance, lm, &curr_solution);
+        double feasible_dual_bound = curr_solution.lower_bound;
+        double feasible_primal_bound =
+            compute_feasible_primal_bound(instance, &curr_solution);
+
+        if (feasible_primal_bound < best_primal_bound) {
+            best_primal_bound = feasible_primal_bound;
+        }
+
+        if (feasible_dual_bound > best_dual_bound) {
+            best_dual_bound = feasible_dual_bound;
+        }
+
+        bool reached_optimality =
+            is_valid_reduced_cost(best_primal_bound) &&
+            best_dual_bound >= (best_primal_bound - COST_TOLERANCE);
+
+        if (reached_optimality) {
+            break;
+        }
+
+        // Calculate subgradients
+        double g = cap_lb;
+        double h = -instance->vehicle_cap;
+        {
+            int32_t curr_vertex = 0;
+            do {
+                int32_t next_vertex = curr_solution.tour.succ[curr_vertex];
+                double di = instance->demands[curr_vertex];
+                double dj = instance->demands[next_vertex];
+                double avg_demand = 0.5 * (di + dj);
+                g += -avg_demand;
+                h += +avg_demand;
+
+            } while (curr_vertex != 0);
+        }
+
+        double dy = best_primal_bound - feasible_dual_bound;
+        double dx = g * g + h * h;
+        double step_size = STEP_SIZE_SCALE_FAC * (dx / dy);
+
+        // Update the multipliers:
+        lm.cap_lb = MAX(0.0, lm.cap_lb + step_size * g);
+        lm.cap_ub = MAX(0.0, lm.cap_ub + step_size * h);
+    }
+
+    solution_destroy(&curr_solution);
+    return best_dual_bound;
 }
