@@ -130,9 +130,6 @@ static double solve_dual_problem(const Instance *instance,
         }
     }
 
-    printf("%s :: dijkstra find min_cost = %f, with last_visited_vertex = %d\n",
-           __func__, min_cost, last_visited_vertex);
-
     assert(last_visited_vertex >= 0);
 
     solution->upper_bound = min_cost;
@@ -228,19 +225,25 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
         validate_dual_problem_solution(instance, lm, &curr_dual_solution);
 #endif
 
-        double feasible_dual_bound = curr_dual_solution.upper_bound;
+        const double cap_ub = instance->vehicle_cap;
+
+        const double dual_bound_offset =
+            (lm.cap_lb * cap_lb - lm.cap_ub * cap_ub);
+        double curr_feasible_dual_bound =
+            curr_dual_solution.upper_bound + dual_bound_offset;
+
         double feasible_primal_bound =
             compute_feasible_primal_bound(instance, &curr_dual_solution);
 
         printf("%s :: feasible_dual_bound = %f, feasible_primal_bound = %f\n",
-               __func__, feasible_dual_bound, feasible_primal_bound);
+               __func__, curr_feasible_dual_bound, feasible_primal_bound);
 
         if (feasible_primal_bound < best_primal_bound) {
             best_primal_bound = feasible_primal_bound;
         }
 
-        if (feasible_dual_bound > best_dual_bound) {
-            best_dual_bound = feasible_dual_bound;
+        if (curr_feasible_dual_bound > best_dual_bound) {
+            best_dual_bound = curr_feasible_dual_bound;
         }
 
         bool reached_optimality =
@@ -267,13 +270,19 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
             } while (curr_vertex != 0);
         }
 
-        double dy = best_primal_bound - feasible_dual_bound;
+        double dy = best_primal_bound - curr_feasible_dual_bound;
         double dx = g * g + h * h;
         double step_size = STEP_SIZE_SCALE_FAC * (dx / dy);
+
+        printf("%s :: subgradients = {g = %f, h = %f}, step_size = %f\n",
+               __func__, g, h, step_size);
 
         // Update the multipliers:
         lm.cap_lb = MAX(0.0, lm.cap_lb + step_size * g);
         lm.cap_ub = MAX(0.0, lm.cap_ub + step_size * h);
+
+        printf("%s :: new lagrangians = {lb = %f, ub = %f}\n", __func__,
+               lm.cap_lb, lm.cap_ub);
     }
 
     solution_destroy(&curr_dual_solution);

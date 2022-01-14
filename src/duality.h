@@ -37,10 +37,10 @@ typedef struct {
 static inline double cptp_duality_dist(const Instance *instance,
                                        CptpLagrangianMultipliers lm, int32_t i,
                                        int32_t j) {
-    double di = instance->demands[i];
-    double dj = instance->demands[j];
+    double qi = instance->demands[i];
+    double qj = instance->demands[j];
     double rc = cptp_reduced_cost(instance, i, j);
-    double result = rc + (lm.cap_ub - lm.cap_lb) * 0.5 * (di + dj);
+    double result = rc + (lm.cap_ub - lm.cap_lb) * 0.5 * (qi + qj);
     return result;
 }
 void generate_dual_instance(const Instance *instance, Instance *out,
