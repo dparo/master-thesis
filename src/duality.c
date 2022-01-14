@@ -21,6 +21,7 @@
  */
 
 #include "duality.h"
+#include "core.h"
 #include "validation.h"
 
 void generate_dual_instance(const Instance *instance, Instance *out,
@@ -75,6 +76,21 @@ validate_duality_distance_is_positive(const Instance *instance,
 #endif
 }
 
+static void validate_dual_problem_solution(const Instance *instance,
+                                           CptpLagrangianMultipliers lm,
+                                           Solution *dual_solution) {
+#ifndef NDEBUG
+    Instance dual_instance = {0};
+    generate_dual_instance(instance, &dual_instance, lm);
+    validate_solution(&dual_instance, dual_solution);
+    instance_destroy(&dual_instance);
+#else
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(lm);
+    UNUSED_PARAM(dual_solution);
+#endif
+}
+
 static double solve_dual_problem(const Instance *instance,
                                  CptpLagrangianMultipliers lm,
                                  Solution *solution) {
@@ -114,17 +130,17 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
     const int32_t MAX_NUM_SUBGRAD_ITERS = 10;
     const double STEP_SIZE_SCALE_FAC = 0.25;
 
-    Solution curr_solution = solution_create(instance);
+    Solution curr_dual_solution = solution_create(instance);
 
     double best_dual_bound = -INFINITY;
     CptpLagrangianMultipliers lm = {0};
     for (int32_t subgrad_it = 0; subgrad_it < MAX_NUM_SUBGRAD_ITERS;
          subgrad_it++) {
 
-        // Fix the lagrangian multiplier associated with the vehicle capacity
-        // upper bound, such we generate a Network with positive associated
-        // weights, which can be easily solved with Dijkstra algorithm in
-        // Theta(n^2)
+        // Fix the lagrangian multiplier associated with the vehicle
+        // capacity upper bound, such we generate a Network with positive
+        // associated weights, which can be easily solved with Dijkstra
+        // algorithm in Theta(n^2)
 
         for (int32_t i = 0; i < n; i++) {
             for (int32_t j = 0; j < n; j++) {
@@ -133,16 +149,25 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
                 }
                 double avg_demand =
                     (instance->demands[i] + instance->demands[j]) / 2.0;
-                double min_cap_ub =
+
+                // Min lagrangian multiplier ub for achieving >= 0 cost
+                // for this edge
+                double min_lm_cap_ub =
                     lm.cap_lb - cptp_reduced_cost(instance, i, j) / avg_demand;
-                lm.cap_ub = MAX(lm.cap_ub, min_cap_ub);
+
+                // Raise the lagrangian multiplier
+                lm.cap_ub = MAX(lm.cap_ub, min_lm_cap_ub);
             }
         }
 
-        solve_dual_problem(instance, lm, &curr_solution);
-        double feasible_dual_bound = curr_solution.lower_bound;
+        solve_dual_problem(instance, lm, &curr_dual_solution);
+#ifndef NDEBUG
+        validate_dual_problem_solution(instance, lm, &curr_dual_solution);
+#endif
+
+        double feasible_dual_bound = curr_dual_solution.lower_bound;
         double feasible_primal_bound =
-            compute_feasible_primal_bound(instance, &curr_solution);
+            compute_feasible_primal_bound(instance, &curr_dual_solution);
 
         if (feasible_primal_bound < best_primal_bound) {
             best_primal_bound = feasible_primal_bound;
@@ -166,7 +191,7 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
         {
             int32_t curr_vertex = 0;
             do {
-                int32_t next_vertex = curr_solution.tour.succ[curr_vertex];
+                int32_t next_vertex = curr_dual_solution.tour.succ[curr_vertex];
                 double di = instance->demands[curr_vertex];
                 double dj = instance->demands[next_vertex];
                 double avg_demand = 0.5 * (di + dj);
@@ -185,6 +210,6 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
         lm.cap_ub = MAX(0.0, lm.cap_ub + step_size * h);
     }
 
-    solution_destroy(&curr_solution);
+    solution_destroy(&curr_dual_solution);
     return best_dual_bound;
 }
