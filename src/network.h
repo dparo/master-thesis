@@ -31,6 +31,11 @@ extern "C" {
 
 typedef struct {
     int32_t nnodes;
+    double *weights;
+} Network;
+
+typedef struct {
+    int32_t nnodes;
     double *flow;
     double *cap;
 } FlowNetwork;
@@ -51,6 +56,13 @@ typedef struct {
     double maxflow;
     int32_t *colors;
 } MaxFlowResult;
+
+typedef struct {
+    int32_t nnodes;
+    int32_t source;
+    double cost;
+    int32_t succ;
+} ShortestPath;
 
 /// For debug only
 typedef struct {
@@ -88,11 +100,21 @@ typedef struct {
     MaxFlowResult mf;
 } GomoryHuTreeCtx;
 
+typedef struct {
+    int32_t nnodes;
+    int32_t *depth;
+    int32_t *pred;
+    double *dist;
+} DijkstraCtx;
+
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {
     bool result =
         ctx->height && ctx->excess_flow && ctx->curr_neigh && ctx->list;
     return result;
 }
+
+Network network_create(int32_t nnodes, bool clear_weights);
+void network_destroy(Network *network);
 
 FlowNetwork flow_network_create(int32_t nnodes);
 void flow_network_clear(FlowNetwork *net, bool clear_cap);
@@ -125,6 +147,18 @@ GomoryHuTree gomory_hu_tree_create(int32_t nnodes);
 void gomory_hu_tree_destroy(GomoryHuTree *tree);
 double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
                        MaxFlowResult *result, GomoryHuTreeCtx *ctx);
+
+DijkstraCtx dijkstra_ctx_create(int32_t nnodes);
+void dijkstra_ctx_destroy(DijkstraCtx *ctx);
+
+double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
+                DijkstraCtx *ctx);
+
+static inline double *network_weight(Network *net, int32_t i, int32_t j) {
+    assert(i >= 0 && i < net->nnodes);
+    assert(j >= 0 && j < net->nnodes);
+    return &net->weights[i * net->nnodes + j];
+}
 
 static inline double *network_flow(FlowNetwork *net, int32_t i, int32_t j) {
     assert(i >= 0 && i < net->nnodes);

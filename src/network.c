@@ -754,6 +754,134 @@ double gomory_hu_query(GomoryHuTree *tree, int32_t source, int32_t sink,
 #endif
 }
 
+Network network_create(int32_t nnodes, bool clear_weights) {
+    Network result = {0};
+    result.nnodes = nnodes;
+
+    if (clear_weights) {
+        result.weights = calloc(nnodes * nnodes, sizeof(*result.weights));
+    } else {
+        result.weights = malloc(nnodes * nnodes * sizeof(*result.weights));
+    }
+    return result;
+}
+
+void network_destroy(Network *network) {
+    free(network->weights);
+    memset(network, 0, sizeof(*network));
+}
+
+DijkstraCtx dijkstra_ctx_create(int32_t nnodes) {
+    DijkstraCtx result = {0};
+    result.nnodes = nnodes;
+
+    result.depth = malloc(nnodes * sizeof(*result.depth));
+    result.dist = malloc(nnodes * sizeof(*result.dist));
+    result.pred = malloc(nnodes * sizeof(*result.pred));
+
+    return result;
+}
+
+void dijkstra_ctx_destroy(DijkstraCtx *ctx) {
+    free(ctx->depth);
+    free(ctx->dist);
+    free(ctx->pred);
+    memset(ctx, 0, sizeof(*ctx));
+}
+
+double dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
+                DijkstraCtx *ctx) {
+    const int32_t n = net->nnodes;
+    assert(result->nnodes == net->nnodes);
+
+#ifndef NDEBUG
+    // - Validate that the network is composed only of positive weights
+    // - Assert symmetry
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i != j) {
+                assert(*network_weight(net, i, j) >= 0);
+                assert(*network_weight(net, i, j) ==
+                       *network_weight(net, j, i));
+            }
+        }
+    }
+#endif
+
+    double cost = INFINITY;
+
+    for (int32_t i = 0; i < n; i++) {
+        ctx->dist[i] = INFINITY;
+        ctx->depth[i] = -1;
+        ctx->pred[i] = -1;
+    }
+
+    ctx->dist[source_vertex] = 0;
+    ctx->depth[source_vertex] = 0;
+
+    // Find shortest path for all vertices
+    for (int32_t count = 0; count < n - 1; count++) {
+        // Find vertex u achieving minimum distance cost
+        int32_t u = -1;
+        {
+            double min = INFINITY;
+            int32_t min_index = -1;
+            for (int32_t v = 0; v < n; v++) {
+                if (ctx->depth[v] < 0 && ctx->dist[v] < min) {
+                    min_index = v;
+                    min = ctx->dist[v];
+                }
+            }
+            u = min_index;
+        }
+
+        // Update dist[v] only if is not visited, there is an edge from u to v,
+        // and the total weight of path from src to v through u is smaller
+        // than current value of dist
+        for (int32_t v = 0; v < n; v++) {
+            if (ctx->depth[v] < 0) {
+                double w = *network_weight(net, u, v);
+                double d = ctx->dist[v] + w;
+                if (d < ctx->dist[v]) {
+                    ctx->dist[v] = ctx->dist[u] + w;
+                    ctx->pred[v] = u;
+                    ctx->depth[v] = ctx->depth[u] + 1;
+                }
+            }
+        }
+
+        assert(u >= 0 && u < n);
+    }
+
+#ifndef NDEBUG
+    // Validate depth consistency
+    for (int32_t sink = 0; sink < n; sink++) {
+        // Walk the pred array backward to count the number of nodes
+        double dist = 0.0;
+        int32_t num_nodes = 0;
+
+        for (int32_t curr = sink; curr >= 0 && curr != source_vertex;
+             curr = ctx->pred[curr]) {
+            ++num_nodes;
+            if (ctx->pred[curr] >= 0) {
+                dist += *network_weight(net, curr, ctx->pred[curr]);
+            }
+        }
+
+        assert(num_nodes == ctx->depth[sink]);
+        assert(feq(ctx->dist[sink], dist, 1e-5));
+    }
+#endif
+
+    if (result) {
+        result->nnodes = net->nnodes;
+        result->cost = cost;
+        result->source = source_vertex;
+    }
+
+    return cost;
+}
+
 bool gomory_hu_tree(FlowNetwork *net, GomoryHuTree *output) {
     GomoryHuTreeCtx ctx = {0};
 
