@@ -778,6 +778,7 @@ DijkstraCtx dijkstra_ctx_create(int32_t nnodes) {
     result.depth = malloc(nnodes * sizeof(*result.depth));
     result.dist = malloc(nnodes * sizeof(*result.dist));
     result.pred = malloc(nnodes * sizeof(*result.pred));
+    result.visited = malloc(nnodes * sizeof(*result.visited));
 
     return result;
 }
@@ -786,6 +787,7 @@ void dijkstra_ctx_destroy(DijkstraCtx *ctx) {
     free(ctx->depth);
     free(ctx->dist);
     free(ctx->pred);
+    free(ctx->visited);
     memset(ctx, 0, sizeof(*ctx));
 }
 
@@ -807,14 +809,18 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
     }
 #endif
 
-    for (int32_t i = 0; i < n; i++) {
-        ctx->dist[i] = INFINITY;
-        ctx->depth[i] = -1;
-        ctx->pred[i] = -1;
-    }
-
     ctx->dist[source_vertex] = 0;
     ctx->depth[source_vertex] = 0;
+    ctx->visited[source_vertex] = true;
+
+    for (int32_t i = 0; i < n; i++) {
+        if (i != source_vertex) {
+            ctx->dist[i] = *network_weight(net, source_vertex, i);
+            ctx->pred[i] = source_vertex;
+            ctx->depth[i] = 1;
+            ctx->visited[i] = false;
+        }
+    }
 
     // Find shortest path for all vertices
     for (int32_t count = 0; count < n - 1; count++) {
@@ -824,7 +830,7 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
             double min = INFINITY;
             int32_t min_index = -1;
             for (int32_t v = 0; v < n; v++) {
-                if (ctx->depth[v] < 0 && ctx->dist[v] < min) {
+                if (!ctx->visited[v] && ctx->dist[v] < min) {
                     min_index = v;
                     min = ctx->dist[v];
                 }
@@ -832,13 +838,14 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
             u = min_index;
         }
 
-        assert(u >= 0);
+        ctx->visited[u] = true;
+        assert(u >= 0 && u < n);
 
         // Update dist[v] only if is not visited, there is an edge from u to v,
         // and the total weight of path from src to v through u is smaller
         // than current value of dist
         for (int32_t v = 0; v < n; v++) {
-            if (ctx->depth[v] < 0) {
+            if (!ctx->visited[v]) {
                 double w = *network_weight(net, u, v);
                 double d = ctx->dist[v] + w;
                 if (d < ctx->dist[v]) {
@@ -848,11 +855,19 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
                 }
             }
         }
-
-        assert(u >= 0 && u < n);
     }
 
 #ifndef NDEBUG
+
+    // Validate that all nodes have a depth set, are visited and have a
+    // predecessor set
+    for (int32_t i = 0; i < n; i++) {
+        assert(ctx->depth[i] >= 0);
+        assert(ctx->visited[i]);
+        if (i != source_vertex) {
+            assert(ctx->pred[i] >= 0);
+        }
+    }
     // Validate depth consistency
     for (int32_t sink = 0; sink < n; sink++) {
         // Walk the pred array backward to count the number of nodes

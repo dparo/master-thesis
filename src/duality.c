@@ -50,8 +50,10 @@ void generate_dual_instance(const Instance *instance, Instance *out,
 
     for (int32_t i = 0; i < n; i++) {
         for (int32_t j = 0; j < n; j++) {
-            out->edge_weight[sxpos(n, i, j)] =
-                cptp_duality_dist(instance, lm, i, j);
+            if (i != j) {
+                out->edge_weight[sxpos(n, i, j)] =
+                    cptp_duality_dist(instance, lm, i, j);
+            }
         }
     }
 }
@@ -83,7 +85,7 @@ static void validate_dual_problem_solution(const Instance *instance,
 #ifndef NDEBUG
     Instance dual_instance = {0};
     generate_dual_instance(instance, &dual_instance, lm);
-    validate_solution(&dual_instance, dual_solution, 2);
+    validate_solution(&dual_instance, dual_solution, 1);
     instance_destroy(&dual_instance);
 #else
     UNUSED_PARAM(instance);
@@ -95,6 +97,7 @@ static void validate_dual_problem_solution(const Instance *instance,
 static double solve_dual_problem(const Instance *instance,
                                  CptpLagrangianMultipliers lm,
                                  Solution *solution) {
+    solution_clear(solution);
     const int32_t n = instance->num_customers + 1;
     validate_duality_distance_is_positive(instance, lm);
 
@@ -113,7 +116,6 @@ static double solve_dual_problem(const Instance *instance,
     }
 
     dijkstra(&net, 0, NULL, &ctx);
-
     // dijkstra finds shortest path, not tours.
     // Therefore, bruteforce all the possible combination assuming we know
     // the last visited vertex prior to coming back to the depot and recompute
@@ -121,11 +123,6 @@ static double solve_dual_problem(const Instance *instance,
     double min_cost = INFINITY;
     int32_t last_visited_vertex = -1;
     for (int32_t i = 1; i < n; i++) {
-        // Skip vertices being at depth 1 or less to create elementary solutions
-        if (ctx.depth[i] <= 1) {
-            continue;
-        }
-
         double cost = ctx.dist[i] + cptp_duality_dist(instance, lm, i, 0);
         if (cost < min_cost) {
             min_cost = cost;
@@ -133,11 +130,30 @@ static double solve_dual_problem(const Instance *instance,
         }
     }
 
-    assert(last_visited_vertex >= 0);
     printf("%s :: dijkstra find min_cost = %f, with last_visited_vertex = %d\n",
            __func__, min_cost, last_visited_vertex);
 
-    solution->lower_bound = min_cost;
+    assert(last_visited_vertex >= 0);
+
+    solution->upper_bound = min_cost;
+    solution->lower_bound = -INFINITY;
+    solution->tour.num_comps = 1;
+
+    // Output the tour
+
+    solution->tour.comp[0] = 0;
+    {
+        // NOTE(dparo):
+        //      The tour is actually reported in reversed order, but it doesn't
+        //      make much difference
+        for (int32_t curr_vertex = last_visited_vertex; curr_vertex > 0;
+             curr_vertex = ctx.pred[curr_vertex]) {
+            solution->tour.comp[curr_vertex] = 0;
+            assert(ctx.pred[curr_vertex] >= 0);
+            solution->tour.succ[curr_vertex] = ctx.pred[curr_vertex];
+        }
+    }
+    solution->tour.succ[0] = last_visited_vertex;
 
     network_destroy(&net);
     dijkstra_ctx_destroy(&ctx);
@@ -147,7 +163,7 @@ static double solve_dual_problem(const Instance *instance,
 
 static double compute_feasible_primal_bound(const Instance *instance,
                                             Solution *solution) {
-    validate_tour(instance, &solution->tour, 2);
+    validate_tour(instance, &solution->tour, 1);
     double result = 0.0;
 
     int32_t curr_vertex = 0;
@@ -212,9 +228,12 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
         validate_dual_problem_solution(instance, lm, &curr_dual_solution);
 #endif
 
-        double feasible_dual_bound = curr_dual_solution.lower_bound;
+        double feasible_dual_bound = curr_dual_solution.upper_bound;
         double feasible_primal_bound =
             compute_feasible_primal_bound(instance, &curr_dual_solution);
+
+        printf("%s :: feasible_dual_bound = %f, feasible_primal_bound = %f\n",
+               __func__, feasible_dual_bound, feasible_primal_bound);
 
         if (feasible_primal_bound < best_primal_bound) {
             best_primal_bound = feasible_primal_bound;

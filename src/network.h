@@ -104,6 +104,7 @@ typedef struct {
     int32_t *depth;
     int32_t *pred;
     double *dist;
+    bool *visited;
 } DijkstraCtx;
 
 static inline bool push_relabel_ctx_is_valid(PushRelabelCtx *ctx) {

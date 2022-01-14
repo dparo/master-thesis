@@ -108,6 +108,7 @@ void validate_tour(const Instance *instance, Tour *tour,
         if (*tcomp(tour, 0) >= 0) {
             assert(*tsucc(tour, 0) >= 0 && *tcomp(tour, 0) >= 0);
             visited[0] = true;
+            ++num_visited;
 
             int32_t curr_vertex = 0;
             int32_t next_vertex;
@@ -117,7 +118,7 @@ void validate_tour(const Instance *instance, Tour *tour,
                 assert(next_vertex >= 0 && next_vertex < n);
                 assert(visited[next_vertex] == false);
                 visited[next_vertex] = true;
-                num_visited += 1;
+                ++num_visited;
                 curr_vertex = next_vertex;
             }
         }
