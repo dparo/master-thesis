@@ -31,7 +31,7 @@
 
 static bool expect_newline(FILE *filehandle, const char *filepath,
                            int32_t line_cnt) {
-    char c = ' ';
+    int c = ' ';
     do {
         c = fgetc(filehandle);
     } while (c == ' ' || c == '\t');
@@ -72,10 +72,10 @@ static bool parse_simplified_vrp_hdr(Instance *instance, FILE *filehandle,
 static bool parse_simplified_vrp_line(Instance *instance, FILE *filehandle,
                                       const char *filepath, int32_t *line_cnt) {
 
-    int32_t idx;
-    double x, y;
-    double demand;
-    double dual;
+    int32_t idx = 0;
+    double x = 0.0, y = 0.0;
+    double demand = 0.0;
+    double dual = 0.0;
 
     int32_t num_read =
         fscanf(filehandle, "%d %lf %lf %lf %lf", &idx, &x, &y, &demand, &dual);
@@ -180,11 +180,11 @@ typedef struct VrplibParser {
     EdgeWeightFormat edgew_format;
 } VrplibParser;
 
-static inline int32_t parser_remainder_size(const VrplibParser *p) {
+static inline size_t parser_remainder_size(const VrplibParser *p) {
     return p->base - p->at + p->size;
 }
 
-static inline void parser_adv(VrplibParser *p, int32_t amt) {
+static inline void parser_adv(VrplibParser *p, size_t amt) {
     assert(amt != 0);
     amt = MIN(amt, parser_remainder_size(p));
     p->at += amt;
@@ -228,7 +228,7 @@ static bool parser_match_newline(VrplibParser *p) {
 }
 
 static void parser_eat_all_blanks(VrplibParser *p) {
-    char *at;
+    char *at = NULL;
     do {
         at = p->at;
         parser_eat_whitespaces(p);
@@ -239,7 +239,7 @@ static void parser_eat_all_blanks(VrplibParser *p) {
 
 static bool parser_match_string(VrplibParser *p, char *string) {
     parser_eat_whitespaces(p);
-    int32_t len = MIN(parser_remainder_size(p), (int32_t)strlen(string));
+    size_t len = MIN(parser_remainder_size(p), strlen(string));
     bool result = (0 == strncmp(string, p->at, len));
 
     if (result) {
