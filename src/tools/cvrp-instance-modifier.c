@@ -23,6 +23,7 @@
 #include <argtable3.h>
 #include "core.h"
 #include "parser.h"
+#include "render.h"
 
 enum {
     MAX_NUMBER_OF_ERRORS_TO_DISPLAY = 16,
@@ -46,36 +47,6 @@ Instance process_instance(const Instance *instance, const AppCtx *ctx) {
     return result;
 }
 
-void dump_cvrp_instance(FILE *fh, const Instance *instance) {
-    fprintf(fh, "NAME : %s\n", instance->name);
-    fprintf(fh, "COMMENT : %s\n", instance->comment ? instance->comment : "");
-    fprintf(fh, "TYPE : %s\n", "CVRP");
-    fprintf(fh, "DIMENSION : %d\n", instance->num_customers + 1);
-    fprintf(fh, "VEHICLES : %d\n", instance->num_vehicles);
-    fprintf(fh, "CAPACITY : %g\n", instance->vehicle_cap);
-    fprintf(fh, "EDGE_WEIGHT_TYPE : %s\n", "EUC_2D");
-
-    // Generate node coordinate section
-    fprintf(fh, "NODE_COORD_SECTION\n");
-
-    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        fprintf(fh, "%d %g %g\n", i + 1, instance->positions[i].x,
-                instance->positions[i].y);
-    }
-
-    // Generate demand section
-    fprintf(fh, "DEMAND_SECTION\n");
-    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-        fprintf(fh, "%d %g\n", i + 1, instance->demands[i]);
-    }
-
-    // Generate depot section
-    fprintf(fh, "DEPOT_SECTION\n");
-    fprintf(fh, "%d\n", 1);
-    fprintf(fh, "%d\n", -1);
-    fprintf(fh, "EOF");
-}
-
 int main2(const AppCtx *ctx) {
     Instance instance = parse(ctx->input);
 
@@ -89,7 +60,6 @@ int main2(const AppCtx *ctx) {
         instance.num_vehicles = ctx->num_vehicles;
     }
 
-    printf("instance.num_vehciles = %d\n", instance.num_vehicles);
     if (!is_valid_instance(&instance)) {
         fprintf(stderr, "%s: failed to parse\n", ctx->input);
         instance_destroy(&instance);
@@ -104,11 +74,10 @@ int main2(const AppCtx *ctx) {
     }
 
     Instance new_instance = process_instance(&instance, ctx);
-    dump_cvrp_instance(fh, &new_instance);
+    render_instance_into_vrplib_file(fh, &new_instance, false);
 
     instance_destroy(&instance);
     instance_destroy(&new_instance);
-
     fclose(fh);
     return EXIT_SUCCESS;
 }
@@ -131,7 +100,8 @@ int main(int argc, char **argv) {
 
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
-    void *argtable[] = {help, input, output, num_vehicles, end};
+    void *argtable[] = {help, input, output, num_vehicles, cap_scale_factor,
+                        end};
 
     /* verify the argtable[] entries were allocated successfully */
     if (arg_nullcheck(argtable) != 0) {

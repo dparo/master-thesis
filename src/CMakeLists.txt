@@ -57,7 +57,7 @@ add_library(libcptp
     duality.c
     os.c
     validation.c
-    visualization.c
+    render.c
     network.c
 
     # Stub solver

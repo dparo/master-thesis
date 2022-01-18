@@ -30,7 +30,7 @@
 #include "parser.h"
 #include "types.h"
 #include "version.h"
-#include "visualization.h"
+#include "render.h"
 
 #include <argtable3.h>
 #include <cJSON.h>
@@ -269,7 +269,8 @@ static int main2(AppCtx *ctx) {
                 writeout_json_report(ctx, &instance, &solution, status, timing);
 
                 if (ctx->vis_path) {
-                    tour_plot(ctx->vis_path, &instance, &solution.tour, NULL);
+                    render_tour_image(ctx->vis_path, &instance, &solution.tour,
+                                      NULL);
                 }
             }
         }
