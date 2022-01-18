@@ -33,54 +33,23 @@ static void print_usage(FILE *fh, char *progname) {
     exit(EXIT_FAILURE);
 }
 
-int main(int argc, char **argv) {
-    int exitcode = EXIT_SUCCESS;
-    struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
+typedef struct {
+    const char *input;
+    const char *output;
+} AppCtx;
 
-    struct arg_file *input = arg_file1("i", NULL, NULL, "input instance file");
-
-    struct arg_file *output =
-        arg_file1("o", NULL, NULL, "output instance file");
-    struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
-
-    void *argtable[] = {help, input, output, end};
-
-    /* verify the argtable[] entries were allocated sucessfully */
-    if (arg_nullcheck(argtable) != 0) {
-        printf("%s: insufficient memory\n", progname);
-        exitcode = 1;
-        goto exit;
-    }
-
-    {
-        int nerrors = arg_parse(argc, argv, argtable);
-
-        if (nerrors > 0) {
-            arg_print_errors(stdout, end, progname);
-            print_use_help_for_more_information(progname);
-            exitcode = 1;
-            goto exit;
-        }
-    }
-
-    if (help->count > 0) {
-        arg_print_syntax(stdout, argtable, "\n");
-        arg_print_glossary(stdout, argtable, "  %-32s %s\n");
-        exitcode = 0;
-        goto exit;
-    }
-
-    Instance instance = parse(input);
+int main2(const AppCtx *ctx) {
+    Instance instance = parse(ctx->input);
     if (!is_valid_instance(&instance)) {
-        fprintf(stderr, "%s: failed to parse\n", input);
-        exit(EXIT_FAILURE);
+        fprintf(stderr, "%s: failed to parse\n", ctx->input);
+        return EXIT_FAILURE;
     }
 
-    FILE *fh = fopen(output, "w");
+    FILE *fh = fopen(ctx->output, "w");
     if (!fh) {
-        fprintf(stderr, "%s: failed to open file for writing\n", output);
+        fprintf(stderr, "%s: failed to open file for writing\n", ctx->output);
         instance_destroy(&instance);
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
     fprintf(fh, "NAME : %s\n", instance.name);
@@ -117,12 +86,52 @@ int main(int argc, char **argv) {
     }
 
     instance_destroy(&instance);
-    arg_freetable(argtable, ARRAY_LEN(argtable));
 
-    if (log_file_handle) {
-        fclose(log_file_handle);
-        log_file_handle = NULL;
+    fclose(fh);
+    return EXIT_SUCCESS;
+}
+
+int main(int argc, char **argv) {
+    char *progname = argv[0];
+    int exitcode = EXIT_SUCCESS;
+    struct arg_lit *help = arg_lit0(NULL, "help", "print this help and exit");
+
+    struct arg_file *input = arg_file1("i", NULL, NULL, "input instance file");
+
+    struct arg_file *output =
+        arg_file1("o", NULL, NULL, "output instance file");
+    struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
+
+    void *argtable[] = {help, input, output, end};
+
+    /* verify the argtable[] entries were allocated successfully */
+    if (arg_nullcheck(argtable) != 0) {
+        printf("%s: insufficient memory\n", progname);
+        exitcode = 1;
+        goto exit;
     }
+
+    {
+        int nerrors = arg_parse(argc, argv, argtable);
+
+        /* special case: '--help' takes precedence over error reporting */
+        if (help->count > 0) {
+            printf("Usage: %s", progname);
+            arg_print_syntax(stdout, argtable, "\n");
+            arg_print_glossary(stdout, argtable, "  %-32s %s\n");
+            exitcode = 0;
+            goto exit;
+        }
+
+        if (nerrors > 0) {
+            arg_print_errors(stdout, end, progname);
+            exitcode = 1;
+            goto exit;
+        }
+    }
+
+    AppCtx ctx = {.input = input->filename[0], .output = output->filename[0]};
+    exitcode = main2(&ctx);
 
 exit:
     arg_freetable(argtable, ARRAY_LEN(argtable));

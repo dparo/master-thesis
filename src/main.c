@@ -353,7 +353,7 @@ int main(int argc, char **argv) {
 
     int exitcode = 0;
 
-    /* verify the argtable[] entries were allocated sucessfully */
+    /* verify the argtable[] entries were allocated successfully */
     if (arg_nullcheck(argtable) != 0) {
         printf("%s: insufficient memory\n", progname);
         exitcode = 1;
@@ -378,23 +378,23 @@ int main(int argc, char **argv) {
     {
         int nerrors = arg_parse(argc, argv, argtable);
 
+        /* special case: '--help' takes precedence over error reporting */
+        if (help->count > 0) {
+            print_brief_description(progname);
+            printf("Usage: %s", progname);
+            arg_print_syntax(stdout, argtable, "\n");
+            arg_print_glossary(stdout, argtable, "  %-32s %s\n");
+            cptp_print_list_of_solvers_and_params();
+            exitcode = 0;
+            goto exit;
+        }
+
         if (nerrors > 0) {
             arg_print_errors(stdout, end, progname);
             print_use_help_for_more_information(progname);
             exitcode = 1;
             goto exit;
         }
-    }
-
-    /* special case: '--help' takes precedence over error reporting */
-    if (help->count > 0) {
-        print_brief_description(progname);
-        printf("Usage: %s", progname);
-        arg_print_syntax(stdout, argtable, "\n");
-        arg_print_glossary(stdout, argtable, "  %-32s %s\n");
-        cptp_print_list_of_solvers_and_params();
-        exitcode = 0;
-        goto exit;
     }
 
     /* special case: '--version' takes precedence error reporting */
