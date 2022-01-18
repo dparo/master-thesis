@@ -28,19 +28,21 @@ enum {
     MAX_NUMBER_OF_ERRORS_TO_DISPLAY = 16,
 };
 
-static void print_usage(FILE *fh, char *progname) {
-    fprintf(fh, "%s [INPUT-TEST-INSTANCE] [OUTPUT-TEST-INSTANCE]\n", progname);
-    exit(EXIT_FAILURE);
-}
-
 typedef struct {
     const char *input;
     const char *output;
     int32_t num_vehicles;
+    double cap_scale_factor;
 } AppCtx;
 
 Instance process_instance(const Instance *instance, const AppCtx *ctx) {
     Instance result = instance_copy(instance, true, true);
+
+    result.vehicle_cap = result.vehicle_cap * ctx->cap_scale_factor;
+    result.num_vehicles =
+        (int32_t)(ceil(result.num_vehicles / ctx->cap_scale_factor));
+    result.num_vehicles = MAX(1, result.num_vehicles);
+
     return result;
 }
 
@@ -124,6 +126,9 @@ int main(int argc, char **argv) {
     struct arg_int *num_vehicles =
         arg_int1("k", "num-vehicles", NULL, "force number of vehicles");
 
+    struct arg_dbl *cap_scale_factor = arg_double0(
+        "f", "cap-scale-factor", NULL, "scale factor for the vehicle capacity");
+
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
 
     void *argtable[] = {help, input, output, num_vehicles, end};
@@ -134,6 +139,8 @@ int main(int argc, char **argv) {
         exitcode = 1;
         goto exit;
     }
+
+    cap_scale_factor->dval[0] = 1.0;
 
     {
         int nerrors = arg_parse(argc, argv, argtable);
@@ -156,7 +163,8 @@ int main(int argc, char **argv) {
 
     AppCtx ctx = {.input = input->filename[0],
                   .output = output->filename[0],
-                  .num_vehicles = num_vehicles->ival[0]};
+                  .num_vehicles = num_vehicles->ival[0],
+                  .cap_scale_factor = cap_scale_factor->dval[0]};
     exitcode = main2(&ctx);
 
 exit:
