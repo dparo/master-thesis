@@ -40,7 +40,7 @@ Instance process_instance(const Instance *instance, const AppCtx *ctx) {
 
     result.vehicle_cap = result.vehicle_cap * ctx->cap_scale_factor;
     result.num_vehicles =
-        (int32_t)(ceil(result.num_vehicles / ctx->cap_scale_factor));
+        (int32_t)(ceil((double)result.num_vehicles / ctx->cap_scale_factor));
     result.num_vehicles = MAX(1, result.num_vehicles);
 
     return result;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     struct arg_int *num_vehicles =
         arg_int1("k", "num-vehicles", NULL, "force number of vehicles");
 
-    struct arg_dbl *cap_scale_factor = arg_double0(
+    struct arg_dbl *cap_scale_factor = arg_dbl0(
         "f", "cap-scale-factor", NULL, "scale factor for the vehicle capacity");
 
     struct arg_end *end = arg_end(MAX_NUMBER_OF_ERRORS_TO_DISPLAY);
