@@ -351,7 +351,6 @@ int main(int argc, char **argv) {
                         solver,
                         end};
 
-    int nerrors;
     int exitcode = 0;
 
     /* verify the argtable[] entries were allocated sucessfully */
@@ -376,7 +375,16 @@ int main(int argc, char **argv) {
     // Contain only fatal&warning log messages by default
     loglvl->ival[0] = 0;
 
-    nerrors = arg_parse(argc, argv, argtable);
+    {
+        int nerrors = arg_parse(argc, argv, argtable);
+
+        if (nerrors > 0) {
+            arg_print_errors(stdout, end, progname);
+            print_use_help_for_more_information(progname);
+            exitcode = 1;
+            goto exit;
+        }
+    }
 
     /* special case: '--help' takes precedence over error reporting */
     if (help->count > 0) {
@@ -393,14 +401,6 @@ int main(int argc, char **argv) {
     if (version->count > 0) {
         print_version();
         exitcode = 0;
-        goto exit;
-    }
-
-    /* If the parser returned any errors then display them and exit */
-    if (nerrors > 0) {
-        arg_print_errors(stdout, end, progname);
-        print_use_help_for_more_information(progname);
-        exitcode = 1;
         goto exit;
     }
 
