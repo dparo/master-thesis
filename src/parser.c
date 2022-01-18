@@ -159,15 +159,15 @@ static bool parse_simplified_vrp_file(Instance *instance, FILE *filehandle,
 
 typedef enum EdgeWeightFormat {
     EDGE_WEIGHT_FORMAT_FUNCTION = 0,
-    EDGE_WEIGHT_FORMAT_UPPER_ROW = 1,
-} EdgeWeightFormat;
+    EDGE_WEIGHT_FORMAT_EXPLICIT = 1,
+} EdgeWeightType;
 
 static struct {
     char *name;
-    EdgeWeightFormat fmt;
-} const G_supported_edgew_fmt[] = {
+    EdgeWeightType fmt;
+} const G_supported_edgew_types[] = {
     {"EUC_2D", EDGE_WEIGHT_FORMAT_FUNCTION},
-    {"UPPER_ROW", EDGE_WEIGHT_FORMAT_UPPER_ROW},
+    {"EXPLICIT", EDGE_WEIGHT_FORMAT_EXPLICIT},
 };
 
 typedef struct VrplibParser {
@@ -177,7 +177,7 @@ typedef struct VrplibParser {
     int32_t curline;
     size_t size;
 
-    EdgeWeightFormat edgew_format;
+    EdgeWeightType edgew_format;
 } VrplibParser;
 
 static inline size_t parser_remainder_size(const VrplibParser *p) {
@@ -260,7 +260,7 @@ static void parse_error(VrplibParser *p, char *fmt, ...) {
 }
 
 static bool parser_needs_edge_section(VrplibParser *p) {
-    return p->edgew_format == EDGE_WEIGHT_FORMAT_UPPER_ROW;
+    return p->edgew_format == EDGE_WEIGHT_FORMAT_EXPLICIT;
 }
 
 static char *parse_hdr_field(VrplibParser *p, char *fieldname) {
@@ -350,11 +350,11 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
             instance->num_vehicles = MAX(0, num_vehicles);
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
             bool is_supported = false;
-            for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_supported_edgew_fmt);
+            for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_supported_edgew_types);
                  i++) {
-                if (0 == strcmp(value, G_supported_edgew_fmt[i].name)) {
+                if (0 == strcmp(value, G_supported_edgew_types[i].name)) {
                     is_supported = true;
-                    p->edgew_format = G_supported_edgew_fmt[i].fmt;
+                    p->edgew_format = G_supported_edgew_types[i].fmt;
                     break;
                 }
             }
@@ -367,7 +367,7 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
             if (0 == strcmp(value, "FUNCTION")) {
                 p->edgew_format = EDGE_WEIGHT_FORMAT_FUNCTION;
             } else if (0 == strcmp(value, "UPPER_ROW")) {
-                p->edgew_format = EDGE_WEIGHT_FORMAT_UPPER_ROW;
+                p->edgew_format = EDGE_WEIGHT_FORMAT_EXPLICIT;
             } else {
                 parse_error(p, "unsupported format `%s` for EDGE_WEIGHT_FORMAT",
                             value);
