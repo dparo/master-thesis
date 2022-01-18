@@ -76,3 +76,6 @@ This project makes use of thirdy party projects (located under `deps`) licensed 
 5. [scottt/debugbreak](https://github.com/scottt/debugbreak) [**BSD2 license**](https://github.com/scottt/debugbreak/blob/master/COPYING)
 6. [B-Con/crypto-algorithms](https://github.com/B-Con/crypto-algorithms) **Public domain**
 7. [johthepro/doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) [**MIT license**](https://github.com/jothepro/doxygen-awesome-css/blob/main/LICENSE)
+
+## Funding
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J47WJB2)
