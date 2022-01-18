@@ -175,7 +175,7 @@ typedef struct VrplibParser {
     char *base;
     char *at;
     int32_t curline;
-    int32_t size;
+    size_t size;
 
     EdgeWeightFormat edgew_format;
 } VrplibParser;
@@ -680,7 +680,7 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
     parser.at = buffer;
     parser.size = filesize;
 
-    // First extract the header informations
+    // First extract the header information
     if (!parse_vrplib_hdr(&parser, instance)) {
         result = false;
         goto terminate;

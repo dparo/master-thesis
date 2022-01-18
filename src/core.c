@@ -600,6 +600,7 @@ Instance instance_copy(const Instance *instance, bool allocate,
 
         result.profits = malloc(n * sizeof(*result.profits));
         result.demands = malloc(n * sizeof(*result.demands));
+        result.positions = malloc(n * sizeof(*result.positions));
 
         result.name = strdup(instance->name);
         result.comment = strdup(instance->comment);
@@ -608,6 +609,9 @@ Instance instance_copy(const Instance *instance, bool allocate,
     if (deep_copy) {
         memcpy(result.profits, instance->profits, n * sizeof(*result.profits));
         memcpy(result.demands, instance->demands, n * sizeof(*result.demands));
+        memcpy(result.positions, instance->positions,
+               n * sizeof(*result.positions));
+
         if (instance->edge_weight) {
             memcpy(result.edge_weight, instance->edge_weight,
                    hm_nentries(n) * sizeof(*result.edge_weight));
