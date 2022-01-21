@@ -25,7 +25,7 @@ fi
 for family in "A" "B" "E" "F" "M" "P" "X"; do
     find "./data/CVRP/$family" -type f -print0 |
         while IFS= read -r -d '' line; do
-            for amt in "1.0" "2.0" "3.0" "4.0" "5.0" "10.0" "20.0" "100.0"; do
+            for amt in "1.0" "1.5" "2.0" "2.5" "3.0" "3.5" "4.0" "4.5" "5.0" "6.5" "8.0" "10.0" "15.5" "20.0" "100.0"; do
                 out_dir="./data/CVRP-scaled-${amt}/${family}"
                 mkdir -p "$out_dir"
                 in="$line"
