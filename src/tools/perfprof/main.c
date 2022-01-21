@@ -577,9 +577,9 @@ static void handle_bapcod_solver(PerfProfRunHandle *handle) {
 
     char json_output_file[OS_MAX_PATH];
 
-    snprintf_safe(json_output_file, ARRAY_LEN(json_output_file),
-                  "%s/%.*s.info.json", dirname,
-                  (int)(os_get_fext(basename) - basename - 1), basename);
+    snprintf_safe(json_output_file, ARRAY_LEN(json_output_file), "%s/%.*s.json",
+                  dirname, (int)(os_get_fext(basename) - basename - 1),
+                  basename);
 
     if (!os_fexists(json_output_file)) {
         log_warn("%s: BapCod JSON output file does not exist!!!\n",
@@ -734,7 +734,6 @@ static bool is_filtered_instance(Filter *f, const Instance *instance) {
 
 int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
                  struct FTW *ftwbuf) {
-    UNUSED_PARAM(ftwbuf);
     if (typeflag == FTW_F || typeflag == FTW_SL) {
         // Is a regular file
         const char *ext = os_get_fext(fpath);
