@@ -1296,10 +1296,12 @@ static void enable_cuts(SolverTypedParams *tparams) {
 }
 
 static inline double compute_trivial_lower_cutoff(const Instance *instance) {
-    log_warn("%s :: TODO!!!", __func__);
-    // TODO!!!!
-    UNUSED_PARAM(instance);
-    return -1e+75;
+    const int32_t n = instance->num_customers + 1;
+    double sum = 0.0;
+    for (int32_t i = 0; i < n; i++) {
+        sum -= instance->profits[i];
+    }
+    return sum;
 }
 
 bool cplex_setup(Solver *solver, const Instance *instance,
