@@ -34,7 +34,7 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    return (n * n + 2 * n + 1) / 4;
+    return ((n + 1) * (n + 1)) / 4;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
@@ -59,45 +59,33 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
     assert(demand(instance, 0) == 0.0);
 
     double demand_sum = 0.0;
-    double inv_demand_sum = 0.0;
     int32_t set_s_size = 0;
+    double served_demand = 0.0;
 
     for (int32_t i = 0; i < n; i++) {
         bool i_in_s = (colors[i] == curr_color);
         if (i_in_s) {
             ++set_s_size;
             demand_sum += demand(instance, i);
-            inv_demand_sum += demand(instance, i) *
-                              (1 - vstar[get_y_mip_var_idx(instance, i)]);
+            served_demand =
+                demand(instance, i) * vstar[get_y_mip_var_idx(instance, i)];
         }
     }
 
-    double demand_rem = fmod(demand_sum, Q);
+    double Qr = fmod(demand_sum, Q);
 
-    if (demand_rem > 0.0 && set_s_size >= 2) {
+    if (Qr > 0.0 && set_s_size >= 2) {
         // Short circuit function as fast as possible (without iterating all the
         // N^2 nodes) if we can determine the cut will not be separated.
         {
-            double rhs = 2.0 * ceil(demand_sum / Q) -
-                         2.0 * (inv_demand_sum) / demand_rem;
+            double rhs = 2.0 * (ceil(demand_sum / Q) - (demand_sum / Qr));
 
-            bool is_violated = !(max_flow >= (rhs - tolerance));
+            bool is_violated =
+                !((max_flow - (2.0 * served_demand) / Qr) >= (rhs - tolerance));
             if (!is_violated) {
                 return info;
             }
-        }
-
-        add_term_rhs(&ctx->super, &info, 2.0 * ceil(demand_sum / Q));
-
-        for (int32_t i = 0; i < n; i++) {
-            bool i_in_s = (colors[i] == curr_color);
-
-            if (!i_in_s) {
-                continue;
-            }
-
-            double d = demand(instance, i);
-            add_term_rhs(&ctx->super, &info, -2.0 * d / demand_rem);
+            add_term_rhs(&ctx->super, &info, rhs);
         }
 
         for (int32_t i = 0; i < n; i++) {
@@ -112,7 +100,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
             assert(i != 0);
             assert(colors[i] == curr_color);
 
-            double value = -2.0 * d / demand_rem;
+            double value = -2.0 * d / Qr;
             push_var_lhs(&ctx->super, &info, vstar, value,
                          (CPXDIM)get_y_mip_var_idx(instance, i));
 
