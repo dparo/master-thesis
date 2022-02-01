@@ -414,6 +414,43 @@ double push_relabel_max_flow2(FlowNetwork *net, int32_t source_vertex,
     return max_flow;
 }
 
+// TODO TODO TODO
+void karger_algorithm(FlowNetwork *net, KargerAlgoCtx *ctx,
+                      MaxFlowResult *result) {
+    const int32_t n = net->nnodes;
+
+    result->nnodes = n;
+
+    for (int32_t i = 0; i < n; i++) {
+        ctx->contraction[i] = i;
+    }
+
+    // TODO TODO TODO
+    for (int32_t it = 0; it < n - 2; it++) {
+        int32_t u = -1, v = -1;
+        u = rand() % n;
+        do {
+            v = rand() % n;
+        } while (v == u && ctx->contraction[v] == ctx->contraction[u]);
+
+        assert(u != v);
+        assert(u >= 0 && u < n);
+        assert(v >= 0 && v < n);
+        assert(ctx->contraction[u] != ctx->contraction[v]);
+
+        // Contract u, v
+        ctx->contraction[u] = MIN(ctx->contraction[u], ctx->contraction[v]);
+        ctx->contraction[v] = MIN(ctx->contraction[u], ctx->contraction[v]);
+    }
+
+    // TODO TODO TODO
+    result->maxflow = 100000.0;
+
+    for (int32_t i = 0; i < n; i++) {
+        result->colors[i] = ctx->contraction[i] == 0 ? BLACK : WHITE;
+    }
+}
+
 PushRelabelCtx push_relabel_ctx_create(int32_t nnodes) {
     PushRelabelCtx ctx = {0};
     ctx.height = malloc(nnodes * sizeof(*ctx.height));

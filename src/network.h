@@ -71,6 +71,10 @@ typedef struct {
 } BruteforceMaxFlowResult;
 
 typedef struct {
+    int32_t *contraction;
+} KargerAlgoCtx;
+
+typedef struct {
     int32_t source_vertex;
     int32_t sink_vertex;
     int32_t *height;
@@ -122,6 +126,9 @@ void flow_network_destroy(FlowNetwork *net);
 
 MaxFlowResult max_flow_result_create(int32_t nnodes);
 void max_flow_result_destroy(MaxFlowResult *m);
+
+void karger_algorithm(FlowNetwork *net, KargerAlgoCtx *ctx,
+                      MaxFlowResult *result);
 
 PushRelabelCtx push_relabel_ctx_create(int32_t nnodes);
 void push_relabel_ctx_destroy(PushRelabelCtx *ctx);

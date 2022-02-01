@@ -684,7 +684,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
 
     const bool any_fractional = is_any_fractional_cut_enabled(tld);
     const bool do_fractional_sep =
-        (tld->fractional_sep_it >= 100 &&
+        (tld->fractional_sep_it > 0 &&
          tld->fractional_sep_it % FRACTIONAL_SEP_FREQ == 0);
 
     if (any_fractional && do_fractional_sep) {
