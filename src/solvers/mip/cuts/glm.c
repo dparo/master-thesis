@@ -107,6 +107,10 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 assert(colors[i] == curr_color);
                 assert(colors[j] != curr_color);
 
+                if (j == 0) {
+                    assert(demand(instance, j) == 0.0);
+                }
+
                 double value = 1.0 - 2.0 * demand(instance, j) / Q;
                 push_var_lhs(&ctx->super, &info, vstar, value,
                              (CPXDIM)get_x_mip_var_idx(instance, i, j));
