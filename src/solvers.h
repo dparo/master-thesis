@@ -42,7 +42,7 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"APPLY_LOWER_CUTOFF", TYPED_PARAM_BOOL, "true",
          "Apply lower cutoff value (CPX_PARAM_CUTLO) by using a "
          "trivially computed lower bound for the objective function"},
-        {"PRICER_MODE", TYPED_PARAM_BOOL, "true",
+        {"PRICER_MODE", TYPED_PARAM_BOOL, "false",
          "Behave as pricer. Terminate solution process as soon as a negative "
          "value tour is found, without proving its optimality (there may exist "
          "more optimal tours) "},
