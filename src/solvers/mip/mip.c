@@ -26,6 +26,8 @@
 #include <string.h>
 #include "core-utils.h"
 
+#define FRACTIONAL_SEP_FREQ 100
+
 #ifndef COMPILED_WITH_CPLEX
 
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
@@ -106,6 +108,7 @@ static inline bool is_fractional_cut_active(CutId id) {
 }
 
 typedef struct {
+    size_t fractional_sep_it;
     bool valid;
     double *vstar;
     FlowNetwork network;
@@ -679,8 +682,12 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         goto terminate;
     }
 
-    bool any_fractional = is_any_fractional_cut_enabled(tld);
-    if (any_fractional) {
+    const bool any_fractional = is_any_fractional_cut_enabled(tld);
+    const bool do_fractional_sep =
+        (tld->fractional_sep_it >= 100 &&
+         tld->fractional_sep_it % FRACTIONAL_SEP_FREQ == 0);
+
+    if (any_fractional && do_fractional_sep) {
         FlowNetwork *net = &tld->network;
         init_flow_network(net, instance, vstar);
 
@@ -704,11 +711,11 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                             G_cuts[cut_id].descr->iface;
                         if (iface->fractional_sep) {
                             const int64_t begin_time = os_get_usecs();
-                            // NOTE: We need to reset the cplex_cb_ctx since it
-                            // might change during the execution. The same
-                            // threadid id, is not guaranteed to have the same
-                            // cplex_cb_ctx for the entire duration of the
-                            // thread
+                            // NOTE: We need to reset the cplex_cb_ctx since
+                            // it might change during the execution. The
+                            // same threadid id, is not guaranteed to have
+                            // the same cplex_cb_ctx for the entire duration
+                            // of the thread
                             functor->internal.cplex_cb_ctx = cplex_cb_ctx;
                             bool separation_success = iface->fractional_sep(
                                 functor, obj_p, vstar, &tld->max_flow);
@@ -716,9 +723,9 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                 os_get_usecs() - begin_time;
 
                             if (!separation_success) {
-                                log_fatal(
-                                    "Separation of integral `%s` cuts failed",
-                                    "GSEC");
+                                log_fatal("Separation of integral `%s` "
+                                          "cuts failed",
+                                          "GSEC");
                                 goto terminate;
                             }
                         }
@@ -727,6 +734,8 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
             }
         }
     }
+
+    ++tld->fractional_sep_it;
 
     return 0;
 terminate:
