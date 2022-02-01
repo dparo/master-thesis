@@ -34,7 +34,7 @@ struct CutSeparationPrivCtx {
 
 static inline CPXNNZ get_nnz_upper_bound(const Instance *instance) {
     int32_t n = instance->num_customers + 1;
-    return 4 * (n * n * n) / 27;
+    return ((n + 1) * (n + 1)) / 4;
 }
 
 static void deactivate(CutSeparationPrivCtx *ctx) {
