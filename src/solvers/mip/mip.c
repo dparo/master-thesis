@@ -26,8 +26,6 @@
 #include <string.h>
 #include "core-utils.h"
 
-#define FRACTIONAL_SEP_FREQ 100
-
 #ifndef COMPILED_WITH_CPLEX
 
 Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
@@ -685,7 +683,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     const bool any_fractional = is_any_fractional_cut_enabled(tld);
     const bool do_fractional_sep =
         (tld->fractional_sep_it > 0 &&
-         tld->fractional_sep_it % FRACTIONAL_SEP_FREQ == 0);
+         tld->fractional_sep_it % (instance->num_customers + 1) == 0);
 
     if (any_fractional && do_fractional_sep) {
         FlowNetwork *net = &tld->network;
@@ -693,16 +691,15 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
 
         gomory_hu_tree2(net, &tld->gh_tree, &tld->gh_ctx);
 
-        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-            for (int32_t j = 0; j < instance->num_customers + 1; j++) {
-                if (i == j) {
+        for (int32_t s = 0; s < instance->num_customers + 1; s++) {
+            for (int32_t t = 0; t < instance->num_customers + 1; t++) {
+                if (s == t) {
                     continue;
                 }
-
-                gomory_hu_query(&tld->gh_tree, i, j, &tld->max_flow,
+                gomory_hu_query(&tld->gh_tree, s, t, &tld->max_flow,
                                 &tld->gh_ctx);
-                assert(tld->max_flow.colors[i] == BLACK);
-                assert(tld->max_flow.colors[j] == WHITE);
+                assert(tld->max_flow.colors[s] == BLACK);
+                assert(tld->max_flow.colors[t] == WHITE);
 
                 for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
                     if (is_fractional_cut_active(cut_id)) {
