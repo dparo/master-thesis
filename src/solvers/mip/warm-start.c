@@ -34,8 +34,22 @@ static bool feed_warm_solution(Solver *solver, const Instance *instance,
     bool result = true;
     const int32_t n = instance->num_customers + 1;
     CPXNNZ beg[] = {0};
+
+    // NOTE(dparo):
+    //         Technically, our warm start solutions should always be feasible,
+    //         therefore asking CPLEX to check for feasibility (i.e.
+    //         CPX_MIPSTART_CHECKFEAS), is technically a waste of time. We could
+    //         use instead the unsafe CPX_MIPSTART_NOCHECK parameter,
+    //         where CPLEX does not verify the feasibility.
+    //         In this case CPLEX assume the warm start solution is feasible
+    //         regardless. If for a bug in the code, the produced warm start
+    //         solution is not feasible, CPLEX may output a wrong
+    //         solution for the CPTP problem. Since checking for feasiblity
+    //         (CPX_MIPSTART_CHECKFEAS), does not constitute a major runtime
+    //         bottleneck, for safety reasons it is better to leave it enabled,
+    //         at least in DEBUG builds.
     int effortlevel[] = {CPX_MIPSTART_CHECKFEAS};
-    // int *effortlevel = NULL;
+
     CPXDIM *varindices =
         malloc(solver->data->num_mip_vars * sizeof(*varindices));
 
