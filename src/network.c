@@ -828,8 +828,13 @@ void dijkstra_ctx_destroy(DijkstraCtx *ctx) {
     memset(ctx, 0, sizeof(*ctx));
 }
 
-void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
-              DijkstraCtx *ctx) {
+void shortest_path_destroy(ShortestPath *path) {
+    free(path->succ);
+    memset(path, 0, sizeof(*path));
+}
+
+void dijkstra(Network *net, int32_t source_vertex, int32_t sink_vertex,
+              ShortestPath *result, DijkstraCtx *ctx) {
     const int32_t n = net->nnodes;
 
 #ifndef NDEBUG
@@ -927,8 +932,25 @@ void dijkstra(Network *net, int32_t source_vertex, ShortestPath *result,
     if (result) {
         assert(result->nnodes == net->nnodes);
 
+        if (result->nnodes != 0) {
+            assert(result->nnodes == net->nnodes);
+        }
         result->nnodes = net->nnodes;
         result->source = source_vertex;
+
+        if (!result->succ) {
+            result->succ = malloc(n * sizeof(*result->succ));
+        }
+
+        for (int32_t i = 0; i < n; i++) {
+            result->succ[i] = -1;
+        }
+
+        int32_t curr = sink_vertex;
+        do {
+            int32_t pred = ctx->pred[curr];
+            result->succ[pred] = curr;
+        } while (ctx->pred[curr] != source_vertex);
     }
 }
 

@@ -102,35 +102,28 @@ static double solve_dual_problem(const Instance *instance,
     validate_duality_distance_is_positive(instance, lm);
 
     // Create one extra dummy node
-    Network net = network_create(n, false);
-    DijkstraCtx ctx = dijkstra_ctx_create(n);
+    Network net = network_create(n + 1, false);
+    DijkstraCtx ctx = dijkstra_ctx_create(n + 1);
+    ShortestPath path = {0};
 
     // Initialize the network weights
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            if (i != j) {
-                double w = cptp_duality_dist(instance, lm, i, j);
-                *network_weight(&net, i, j) = w;
+    {
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = 0; j < n; j++) {
+                if (i != j) {
+                    double w = cptp_duality_dist(instance, lm, i, j);
+                    *network_weight(&net, i, j) = w;
+                }
             }
         }
-    }
 
-    dijkstra(&net, 0, NULL, &ctx);
-    // dijkstra finds shortest path, not tours.
-    // Therefore, bruteforce all the possible combination assuming we know
-    // the last visited vertex prior to coming back to the depot and recompute
-    // the cost of the tour
-    double min_cost = INFINITY;
-    int32_t last_visited_vertex = -1;
-    for (int32_t i = 1; i < n; i++) {
-        double cost = ctx.dist[i] + cptp_duality_dist(instance, lm, i, 0);
-        if (cost < min_cost) {
-            min_cost = cost;
-            last_visited_vertex = i;
+        for (int32_t i = 1; i < n; i++) {
+            double w = cptp_duality_dist(instance, lm, i, 0);
+            *network_weight(&net, i, n) = w;
         }
     }
 
-    assert(last_visited_vertex >= 0);
+    dijkstra(&net, 0, n, &path, &ctx);
 
     solution->upper_bound = min_cost;
     solution->lower_bound = -INFINITY;
@@ -154,6 +147,7 @@ static double solve_dual_problem(const Instance *instance,
 
     network_destroy(&net);
     dijkstra_ctx_destroy(&ctx);
+    shortest_path_destroy(&path);
 
     return INFINITY;
 }
