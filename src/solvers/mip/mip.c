@@ -720,9 +720,9 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                 os_get_usecs() - begin_time;
 
                             if (!separation_success) {
-                                log_fatal("Separation of integral `%s` "
-                                          "cuts failed",
-                                          "GSEC");
+                                log_fatal("Separation of fractional cut `%s` "
+                                          "failed",
+                                          G_cuts[cut_id].descr->name);
                                 goto terminate;
                             }
                         }
@@ -826,8 +826,9 @@ static int cplex_on_new_candidate_point(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                         os_get_usecs() - begin_time;
 
                     if (!separation_success) {
-                        log_fatal("Separation of integral `%s` cuts failed",
-                                  "GSEC");
+                        log_fatal("Separation of integral cut `%s` "
+                                  "failed",
+                                  G_cuts[cut_id].descr->name);
                         goto terminate;
                     }
                 }
