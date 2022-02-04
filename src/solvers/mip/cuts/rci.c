@@ -74,7 +74,9 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 
     double Qr = fmod(demand_sum, Q);
 
-    if (Qr > 0.0 && set_s_size >= 2) {
+    assert(set_s_size >= 1);
+
+    if (Qr > 0.0 && set_s_size >= 1) {
         // Short circuit function as fast as possible (without iterating all the
         // N^2 nodes) if we can determine the cut will not be separated.
         {

@@ -83,6 +83,8 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         }
     }
 
+    assert(set_s_size >= 1);
+
     if (set_s_size >= 2) {
         for (int32_t i = 0; i < n; i++) {
             bool i_in_s = colors[i] == curr_color;

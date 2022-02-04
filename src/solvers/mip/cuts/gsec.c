@@ -174,6 +174,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         }
     }
 
+    assert(set_s_size >= 1);
+
     // NOTE(dparo): 9 Jan 2022
     //      Report to CPLEX a single GSEC per set S. The one that is violated
     //      the most. The reason is to reduce the processing/scoring that CPLEX
@@ -260,9 +262,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     //   Generalized Subtour Elimination Constraints (GSECs) separation based on
     //   the connected components
 
-    // NOTE: In alternative, see function CCcut_connect_component of Concorde to
-    // use a more efficient function
-    // No separation is needed
+    // NOTE: In alternative, see function CCcut_connect_component of Concorde
 
     if (tour->num_comps == 1) {
         return true;

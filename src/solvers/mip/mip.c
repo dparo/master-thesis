@@ -696,8 +696,32 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                 if (s == t) {
                     continue;
                 }
+
+                //
+                // NOTE(dparo):
+                //      Since the network formulation is symmetric,
+                //      it is guaranteed that maxflow(s, t) == maxflow(t, s).
+                //      BUT!!!!
+                //      It is important to note that while the maxflows are
+                //      identical, the induced bipartitions, may not. Thus
+                //      solving two maxflows  (s, t), (t, s) could produce two
+                //      totally different bipartitions which are not
+                //      complementary with one another
+                //      ======================================================
+                //      Example (a single path network):
+                //            0 [--0--] 1 [--10--] 2 [--10--] 3 [--0--] 4
+                //      where [--c--] denotes an edge with capacity c.
+                //
+                //      - Solving maxflow(0, 4) finds bipartition:
+                //            [{0}, {1, 2, 3, 4}]
+                //      - While solving maxflow(4, 0) finds bipartition:
+                //           [{4}, {0, 1, 2, 3}]
+                //
+                //      which are not complementary!!
+                //
                 gomory_hu_query(&tld->gh_tree, s, t, &tld->max_flow,
                                 &tld->gh_ctx);
+
                 assert(tld->max_flow.colors[s] == BLACK);
                 assert(tld->max_flow.colors[t] == WHITE);
 

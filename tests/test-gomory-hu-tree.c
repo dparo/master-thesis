@@ -128,8 +128,10 @@ TEST random_symm_networks(void) {
             int32_t source_vertex = st_pair.u;
             int32_t sink_vertex = st_pair.v;
 
-            double max_flow1;
-            double max_flow2;
+            double max_flow1 = -1.0;
+            double max_flow2 = -2.0;
+
+            // Validate flow symmetry between max flows (s, t) vs (t, s)
             {
                 max_flow1 = push_relabel_max_flow(
                     &network, source_vertex, sink_vertex, &max_flow_result1);
