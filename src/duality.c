@@ -25,16 +25,8 @@
 #include "validation.h"
 #include "network.h"
 
-// NOTE(dparo):
-//      From
-//           Beasley, J.E., Christofides, N., 1989. An algorithm for the
-//           resource constrained shortest path problem. Networks 19,
-//           379–394. https://doi.org/10.1002/net.3230190402
-//      they claim from their ""limited"" (whatever that means)
-//      computational experience that these constants value
-//      yielded good results
-static const int32_t NUM_SUBGRAD_ITERS = 10;
-static const double STEP_SIZE_SCALE_FAC = 0.25;
+static const int32_t NUM_SUBGRAD_ITERS = 100;
+static const double STEP_SIZE_SCALE_FAC = 1e-4;
 
 typedef struct {
     int32_t nnodes;
@@ -106,7 +98,7 @@ void espp_result_unpack_into_cptp_tour(const Instance *instance,
     }
 
 #ifndef NDEBUG
-    validate_tour(instance, tour, 2);
+    validate_tour(instance, tour, 1);
 #endif
 }
 
@@ -150,34 +142,55 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
     ctx->visited[s] = true;
 
     // Visit customers connected to the source_vertex
-    for (int32_t i = 0; i < n - 1; i++) {
+    for (int32_t i = 0; i < n; i++) {
         if (i != s) {
-            assert(i != t);
             ctx->dist[i] = *network_weight(net, s, i);
             ctx->pred[i] = s;
             ctx->depth[i] = 1;
             ctx->visited[i] = false;
         }
     }
+    ctx->dist[t] = INFINITY;
+    ctx->visited[t] = false;
+    ctx->depth[t] = -1;
 
-    // Find shortest path for all vertices, but by making sure that at least
-    // 2 customers are visited
+    // Find shortest path for all vertices
     for (int32_t count = 0; count < n - 1; count++) {
-        // Find vertex u achieving minimum distance cost
+
+        //
+        // Find not processed node having least distance from the source
+        //
         int32_t u = -1;
         {
             double min = INFINITY;
             int32_t min_index = -1;
-            for (int32_t v = 0; v < n; v++) {
-                if (!ctx->visited[v] && ctx->dist[v] < min) {
-                    min_index = v;
-                    min = ctx->dist[v];
+            for (int32_t i = 0; i < n; i++) {
+                if (!ctx->visited[i]) {
+                    bool improves = ctx->dist[i] < min;
+
+                    bool good_candidate = false;
+
+                    if (improves) {
+                        good_candidate = true;
+                    } else if (i == t && min_index == -1) {
+                        good_candidate = true;
+                    }
+
+                    if (good_candidate) {
+                        min_index = i;
+                        min = ctx->dist[i];
+                    }
                 }
             }
             u = min_index;
         }
 
         assert(u >= 0 && u < n);
+
+        //
+        // Process it: i.e. visit it, set's it's pred, and update nodes distance
+        // of incident nodes
+        //
         ctx->visited[u] = true;
 
         // Update dist[v] only if is not visited, there is an edge from u to v,
@@ -194,19 +207,7 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
                 // Pay careful attention on how we update the sink vertex.
                 // The sink vertex can be updated only if it is trying to be
                 // visited from a node which has a depth 2 or above.
-                if (v == t) {
-                    if (ctx->depth[u] <= 1) {
-                        update = false;
-                    } else if (improving) {
-                        update = true;
-                    } else {
-                        update = false;
-                    }
-                    // Revert, u is not yet visited
-                    if (update == false) {
-                        ctx->visited[u] = false;
-                    }
-                } else if (improving) {
+                if (improving) {
                     update = true;
                 }
 
@@ -219,7 +220,7 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
         }
     }
 
-    assert(ctx->depth[t] >= 3);
+    assert(ctx->depth[t] >= 2);
 
 #ifndef NDEBUG
 
@@ -268,8 +269,6 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
 
     assert(result->succ[s] > 0);
     assert(result->succ[t] < 0);
-    // Assert that at least two customers are visited
-    assert(result->succ[result->succ[s]] != t);
 
     result->cost = cost;
     return cost;
@@ -288,7 +287,7 @@ static void init_espp_network_weights(Network *net, const Instance *instance,
             bool valid_espp_edge = (i != j) && (i_is_customer && j_is_customer);
             if (valid_espp_edge) {
                 double w = cptp_duality_dist(instance, lm, i, j);
-                *network_weight(net, i, j) = w;
+                *network_weight(net, i, j) = MAX(0.0, w);
             } else {
                 *network_weight(net, i, j) = INFINITY;
             }
@@ -300,7 +299,7 @@ static void init_espp_network_weights(Network *net, const Instance *instance,
     for (int32_t i = 1; i < n - 1; i++) {
         assert(i != n - 1);
         double w = cptp_duality_dist(instance, lm, 0, i);
-        *network_weight(net, 0, i) = w;
+        *network_weight(net, 0, i) = MAX(0.0, w);
     }
 
     // Set weight for ingoing edges for the sink vertex,
@@ -308,7 +307,7 @@ static void init_espp_network_weights(Network *net, const Instance *instance,
     for (int32_t i = 1; i < n - 1; i++) {
         assert(i != 0);
         double w = cptp_duality_dist(instance, lm, i, n - 1);
-        *network_weight(net, i, n - 1) = w;
+        *network_weight(net, i, n - 1) = MAX(0.0, w);
     }
 }
 
@@ -406,8 +405,8 @@ static void update_lagrange_multipliers(const Instance *instance,
     // Update the multipliers:
     // lm->l0 = MAX(0.0, lm->l0 + step_size * g);
     // lm->l1 = MAX(0.0, lm->l1 + step_size * h);
-    lm->l0 = lm->l0 + step_size * g;
-    lm->l1 = lm->l1 + step_size * h;
+    lm->l0 = MAX(0.0, lm->l0 + step_size * g);
+    lm->l1 = MAX(0.0, lm->l1 + step_size * h);
 
     printf("%s :: new lagrangians after update = {lb = %f, ub = %f}\n",
            __func__, lm->l0, lm->l1);
@@ -419,7 +418,7 @@ static double get_primal_bound(const Instance *instance,
     const double Q = instance->vehicle_cap;
     const int32_t n = instance->num_customers + 1;
 
-    assert(espp_result->length >= 3);
+    assert(espp_result->length >= 2);
     assert(espp_result->succ[0] > 0);
     assert(espp_result->succ[n] < 0);
 
@@ -469,7 +468,7 @@ static double get_primal_bound(const Instance *instance,
         espp_result_unpack_into_cptp_tour(instance, espp_result,
                                           &solution.tour);
 
-        validate_solution(instance, &solution, 2);
+        validate_solution(instance, &solution, 1);
         solution_destroy(&solution);
     }
 #endif
@@ -489,7 +488,7 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
     EsppResult espp_result = espp_result_create(n + 1);
 
     double best_dual_bound = -INFINITY;
-    CptpLagrangianMultipliers lm = {0};
+    CptpLagrangianMultipliers lm = {10.0, 10.0};
 
     for (int32_t sg_it = 0; sg_it < NUM_SUBGRAD_ITERS; sg_it++) {
         // Fix the lagrangian multiplier associated with the vehicle
@@ -527,8 +526,6 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
     network_destroy(&net);
     espp_ctx_destroy(&ctx);
     espp_result_destroy(&espp_result);
-
-    exit(0);
 
     return best_dual_bound;
 }

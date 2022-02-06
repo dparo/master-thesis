@@ -37,7 +37,8 @@ package-lock.json
 /.vscode
 .lite_workspace.lua
 
-CMakeLists.txt.user
+/CMakeLists.txt.user*
+
 CMakeCache.txt
 CMakeFiles
 CMakeScripts
