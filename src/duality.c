@@ -83,21 +83,27 @@ void espp_result_destroy(EsppResult *result) {
 
 void espp_result_unpack_into_cptp_tour(const Instance *instance,
                                        const EsppResult *espp, Tour *tour) {
-    const int32_t n = instance->num_customers;
+    const int32_t n = instance->num_customers + 1;
 
     assert(espp->succ[0] > 0);
     assert(espp->succ[n] < 0);
 
-    int32_t curr = 0;
-    do {
-        if (curr == n) {
-            continue;
-        }
+    int32_t s = 0;
+    int32_t t = n;
 
-        int32_t next = espp->succ[curr];
-        tour->succ[curr] = next;
-        tour->comp[curr] = 0;
-    } while ((curr = espp->succ[curr]) >= 0);
+    int32_t curr = s;
+    while (curr != t) {
+        int32_t i = curr;
+        int32_t j = espp->succ[curr];
+        j = j == n ? 0 : j;
+
+        assert(i >= 0 && i < n);
+        assert(j >= 0 && j < n);
+        tour->succ[i] = j;
+        tour->comp[i] = 0;
+
+        curr = espp->succ[curr];
+    }
 
 #ifndef NDEBUG
     validate_tour(instance, tour, 2);
@@ -109,13 +115,24 @@ void espp_result_unpack_into_cptp_tour(const Instance *instance,
 // 2 customers
 double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
     const int32_t n = net->nnodes;
-    const int32_t source_vertex = 0;
-    const int32_t sink_vertex = net->nnodes + 1;
+    const int32_t s = 0;
+    const int32_t t = net->nnodes - 1;
 
 #ifndef NDEBUG
     {
         // 1. Validate that the network is composed only of positive weights
         // 2. Assert symmetry for customers edges
+
+        for (int32_t i = 1; i < n; i++) {
+            assert(*network_weight(net, s, i) >= 0);
+            assert(*network_weight(net, i, s) == INFINITY);
+        }
+
+        for (int32_t i = 1; i < n; i++) {
+            assert(*network_weight(net, i, t) >= 0);
+            assert(*network_weight(net, t, i) == INFINITY);
+        }
+
         for (int32_t i = 1; i < n - 1; i++) {
             for (int32_t j = 1; j < n - 1; j++) {
                 if (i != j) {
@@ -128,22 +145,23 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
     }
 #endif
 
-    ctx->dist[source_vertex] = 0;
-    ctx->depth[source_vertex] = 0;
-    ctx->visited[source_vertex] = true;
+    ctx->dist[s] = 0;
+    ctx->depth[s] = 0;
+    ctx->visited[s] = true;
 
     // Visit customers connected to the source_vertex
-    for (int32_t i = 0; i < n; i++) {
-        if (i != source_vertex) {
-            ctx->dist[i] = *network_weight(net, source_vertex, i);
-            ctx->pred[i] = source_vertex;
+    for (int32_t i = 0; i < n - 1; i++) {
+        if (i != s) {
+            assert(i != t);
+            ctx->dist[i] = *network_weight(net, s, i);
+            ctx->pred[i] = s;
             ctx->depth[i] = 1;
             ctx->visited[i] = false;
         }
     }
 
-    // Find shortest path for all vertices,
-    // by ensuring that the sink vertex is visited at least depth >= 3
+    // Find shortest path for all vertices, but by making sure that at least
+    // 2 customers are visited
     for (int32_t count = 0; count < n - 1; count++) {
         // Find vertex u achieving minimum distance cost
         int32_t u = -1;
@@ -168,10 +186,29 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
         for (int32_t v = 0; v < n; v++) {
             if (!ctx->visited[v]) {
                 double w = *network_weight(net, u, v);
-                double d = ctx->dist[v] + w;
+                double d = ctx->dist[u] + w;
 
-                bool update = d < ctx->dist[v] ||
-                              (v == sink_vertex && ctx->depth[sink_vertex] < 3);
+                bool improving = d < ctx->dist[v];
+                bool update = false;
+
+                // Pay careful attention on how we update the sink vertex.
+                // The sink vertex can be updated only if it is trying to be
+                // visited from a node which has a depth 2 or above.
+                if (v == t) {
+                    if (ctx->depth[u] <= 1) {
+                        update = false;
+                    } else if (improving) {
+                        update = true;
+                    } else {
+                        update = false;
+                    }
+                    // Revert, u is not yet visited
+                    if (update == false) {
+                        ctx->visited[u] = false;
+                    }
+                } else if (improving) {
+                    update = true;
+                }
 
                 if (update) {
                     ctx->dist[v] = ctx->dist[u] + w;
@@ -182,7 +219,7 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
         }
     }
 
-    assert(ctx->depth[sink_vertex] >= 3);
+    assert(ctx->depth[t] >= 3);
 
 #ifndef NDEBUG
 
@@ -191,7 +228,7 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
     for (int32_t i = 0; i < n; i++) {
         assert(ctx->depth[i] >= 0);
         assert(ctx->visited[i]);
-        if (i != source_vertex) {
+        if (i != s) {
             assert(ctx->pred[i] >= 0);
         }
     }
@@ -201,11 +238,11 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
         double dist = 0.0;
         int32_t num_nodes = 0;
 
-        for (int32_t curr = sink; curr >= 0 && curr != source_vertex;
+        for (int32_t curr = sink; curr >= 0 && curr != s;
              curr = ctx->pred[curr]) {
             ++num_nodes;
             if (ctx->pred[curr] >= 0) {
-                dist += *network_weight(net, curr, ctx->pred[curr]);
+                dist += *network_weight(net, ctx->pred[curr], curr);
             }
         }
 
@@ -220,18 +257,19 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
         result->succ[i] = -1;
     }
 
-    int32_t curr = sink_vertex;
+    int32_t curr = t;
     do {
         int32_t pred = ctx->pred[curr];
         result->succ[pred] = curr;
         cost += *network_weight(net, pred, curr);
         ++result->length;
-    } while (ctx->pred[curr] != source_vertex);
+        curr = pred;
+    } while (curr != s);
 
-    assert(result->succ[source_vertex] > 0);
-    assert(result->succ[sink_vertex] < 0);
+    assert(result->succ[s] > 0);
+    assert(result->succ[t] < 0);
     // Assert that at least two customers are visited
-    assert(result->succ[result->succ[source_vertex]] != sink_vertex);
+    assert(result->succ[result->succ[s]] != t);
 
     result->cost = cost;
     return cost;
@@ -366,11 +404,13 @@ static void update_lagrange_multipliers(const Instance *instance,
            g, h, step_size);
 
     // Update the multipliers:
-    lm->l0 = MAX(0.0, lm->l0 + step_size * g);
-    lm->l1 = MAX(0.0, lm->l1 + step_size * h);
+    // lm->l0 = MAX(0.0, lm->l0 + step_size * g);
+    // lm->l1 = MAX(0.0, lm->l1 + step_size * h);
+    lm->l0 = lm->l0 + step_size * g;
+    lm->l1 = lm->l1 + step_size * h;
 
-    printf("%s :: new lagrangians = {lb = %f, ub = %f}\n", __func__, lm->l0,
-           lm->l1);
+    printf("%s :: new lagrangians after update = {lb = %f, ub = %f}\n",
+           __func__, lm->l0, lm->l1);
 }
 
 static double get_primal_bound(const Instance *instance,
@@ -386,13 +426,25 @@ static double get_primal_bound(const Instance *instance,
     double cost = 0.0;
     double demand_sum = 0.0;
 
-    for (int32_t i = 0; i < n; i++) {
-        if (espp_result->succ[i] > 0) {
-            int32_t j = espp_result->succ[i];
-            cost += cptp_dist(instance, i, j);
-            cost -= instance->profits[i];
-            demand_sum += instance->demands[i];
-        }
+    int32_t s = 0;
+    int32_t t = n;
+
+    int32_t curr = s;
+    while (curr != t) {
+        int32_t i = curr;
+        int32_t j = espp_result->succ[i];
+        assert(j > 0);
+
+        j = j == n ? 0 : j;
+
+        assert(i >= 0 && i < n);
+        assert(j >= 0 && j < n);
+
+        cost += cptp_dist(instance, i, j);
+        cost -= instance->profits[i];
+        demand_sum += instance->demands[i];
+
+        curr = espp_result->succ[i];
     }
 
     bool feasible = false;
@@ -445,6 +497,8 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
         // weights, which can be easily solved with Dijkstra
         // algorithm in Theta(n^2)
         fix_lagrange_multipliers(instance, &lm);
+        printf("%s :: new lagrangians after fixing = {lb = %f, ub = %f}\n",
+               __func__, lm.l0, lm.l1);
 
         init_espp_network_weights(&net, instance, lm);
 

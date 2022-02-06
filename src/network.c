@@ -889,7 +889,7 @@ void dijkstra(Network *net, int32_t source_vertex, int32_t sink_vertex,
         for (int32_t v = 0; v < n; v++) {
             if (!ctx->visited[v]) {
                 double w = *network_weight(net, u, v);
-                double d = ctx->dist[v] + w;
+                double d = ctx->dist[u] + w;
                 if (d < ctx->dist[v]) {
                     ctx->dist[v] = ctx->dist[u] + w;
                     ctx->pred[v] = u;
