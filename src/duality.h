@@ -30,8 +30,8 @@ extern "C" {
 #include "core-utils.h"
 
 typedef struct {
-    double cap_lb;
-    double cap_ub;
+    double l0;
+    double l1;
 } CptpLagrangianMultipliers;
 
 static inline double cptp_duality_dist(const Instance *instance,
@@ -40,15 +40,14 @@ static inline double cptp_duality_dist(const Instance *instance,
     double qi = instance->demands[i];
     double qj = instance->demands[j];
     double rc = cptp_reduced_cost(instance, i, j);
-    double result = rc + (lm.cap_ub - lm.cap_lb) * 0.5 * (qi + qj);
+    double result = rc + (lm.l1 - lm.l0) * 0.5 * (qi + qj);
     return result;
 }
 void generate_dual_instance(const Instance *instance, Instance *out,
                             CptpLagrangianMultipliers lm);
 
 double duality_subgradient_find_lower_bound(const Instance *instance,
-                                            double best_primal_bound,
-                                            double cap_lb);
+                                            double best_primal_bound, double B);
 
 #if __cplusplus
 }
