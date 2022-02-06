@@ -37,6 +37,9 @@ typedef struct {
 static inline double cptp_duality_dist(const Instance *instance,
                                        CptpLagrangianMultipliers lm, int32_t i,
                                        int32_t j) {
+    const int32_t n = instance->num_customers + 1;
+    i = i == n ? 0 : i;
+    j = j == n ? 0 : j;
     double qi = instance->demands[i];
     double qj = instance->demands[j];
     double rc = cptp_reduced_cost(instance, i, j);

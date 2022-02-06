@@ -880,8 +880,8 @@ void dijkstra(Network *net, int32_t source_vertex, int32_t sink_vertex,
             u = min_index;
         }
 
-        ctx->visited[u] = true;
         assert(u >= 0 && u < n);
+        ctx->visited[u] = true;
 
         // Update dist[v] only if is not visited, there is an edge from u to v,
         // and the total weight of path from src to v through u is smaller

@@ -115,9 +115,9 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
 #ifndef NDEBUG
     {
         // 1. Validate that the network is composed only of positive weights
-        // 2. Assert symmetry
-        for (int32_t i = 0; i < n; i++) {
-            for (int32_t j = 0; j < n; j++) {
+        // 2. Assert symmetry for customers edges
+        for (int32_t i = 1; i < n - 1; i++) {
+            for (int32_t j = 1; j < n - 1; j++) {
                 if (i != j) {
                     assert(*network_weight(net, i, j) >= 0);
                     assert(*network_weight(net, i, j) ==
@@ -159,8 +159,8 @@ double espp_solve(Network *net, EsppCtx *ctx, EsppResult *result) {
             u = min_index;
         }
 
-        ctx->visited[u] = true;
         assert(u >= 0 && u < n);
+        ctx->visited[u] = true;
 
         // Update dist[v] only if is not visited, there is an edge from u to v,
         // and the total weight of path from src to v through u is smaller
@@ -278,6 +278,9 @@ static double
 get_min_l1_for_positive_espp_weight(const Instance *instance,
                                     const CptpLagrangianMultipliers *lm,
                                     int32_t i, int32_t j) {
+    const int32_t n = instance->num_customers + 1;
+    i = i == n ? 0 : i;
+    j = j == n ? 0 : j;
     double avg_demand = 0.5 * (instance->demands[i] + instance->demands[j]);
 
     // Min lagrangian multiplier ub for achieving >= 0 cost
@@ -470,6 +473,8 @@ double duality_subgradient_find_lower_bound(const Instance *instance,
     network_destroy(&net);
     espp_ctx_destroy(&ctx);
     espp_result_destroy(&espp_result);
+
+    exit(0);
 
     return best_dual_bound;
 }
