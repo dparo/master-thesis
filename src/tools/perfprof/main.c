@@ -865,25 +865,26 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 static void main_loop(void) {
     PerfProfBatch batches[] = {
         {1,
-         "F-last-10",
+         "F-scaled-1.0-last-10",
          240.0,
          1,
-         {"data/BAP_Instances/last-10/F"},
+         {"data/BAP_Instances/last-10/CVRP-scaled-1.0/F"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
         {1,
-         "E-last-10",
+         "F-scaled-4.0-last-10",
          240.0,
          1,
-         {"data/BAP_Instances/last-10/E"},
+         {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
+
     };
 
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
