@@ -682,8 +682,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
 
     const bool any_fractional = is_any_fractional_cut_enabled(tld);
     const bool do_fractional_sep =
-        (tld->fractional_sep_it > 0 &&
-         tld->fractional_sep_it % (instance->num_customers + 1) == 0);
+        (tld->fractional_sep_it % (instance->num_customers + 1) == 0);
 
     if (any_fractional && do_fractional_sep) {
         FlowNetwork *net = &tld->network;

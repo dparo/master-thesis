@@ -24,7 +24,7 @@
 #include "../cuts.h"
 #include "./cuts-utils.h"
 
-static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.1;
+static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.05;
 static const double INTEGRAL_VIOLATION_TOLERANCE = 1e-2;
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
