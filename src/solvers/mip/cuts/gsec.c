@@ -67,7 +67,7 @@
 //                  value results in more branching
 #define FRACTIONAL_CUT_PURGEABILITY CPX_USECUT_FILTER
 
-static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.5;
+static const double FRACTIONAL_VIOLATION_TOLERANCE = 0.2;
 static const double EPS = 1e-5;
 
 struct CutSeparationPrivCtx {
@@ -146,7 +146,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     // No way anything will be violated, so don't pay the cost
     // of the function
-    if (mf->maxflow >= 2.0) {
+    if (mf->maxflow >= 2.0 - FRACTIONAL_VIOLATION_TOLERANCE) {
         return true;
     }
 

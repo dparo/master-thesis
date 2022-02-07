@@ -46,6 +46,8 @@ typedef struct {
 
 static inline bool is_violated_cut(CutSeparationPrivCtxCommon *ctx,
                                    SeparationInfo *info, double tolerance) {
+    assert(tolerance >= 0.0);
+
     bool valid = true;
 
     bool greater_eq = info->lhs >= (info->rhs - tolerance);
@@ -184,7 +186,7 @@ static inline bool push_integral_cut(char *cut_name,
     if (info->is_violated) {
         SeparationInfoAsString info_str = separation_info_to_str(info);
 
-        log_trace("Pusing integral_cut    ---  %s  %s  %f %s %f    nnz = %lld",
+        log_trace("Pushing integral_cut    ---  %s  %s  %f %s %f    nnz = %lld",
                   cut_name, info_str.purgeable_str, info->lhs,
                   info_str.sense_str, info->rhs, info->num_vars);
 
