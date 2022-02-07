@@ -165,10 +165,10 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
             ++set_s_size;
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
 
-            double diff = mf->maxflow - 2 * y_i;
+            double violation_amt = mf->maxflow - 2 * y_i;
             if (is_violated_fractional_cut(mf->maxflow, y_i) &&
-                diff < max_violation_amt) {
-                max_violation_amt = diff;
+                violation_amt < max_violation_amt) {
+                max_violation_amt = violation_amt;
                 best_violated_idx = i;
             }
         }
