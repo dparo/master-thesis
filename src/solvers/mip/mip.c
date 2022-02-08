@@ -1240,24 +1240,15 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         result = SOLVE_STATUS_FEASIBLE;
         break;
 
+    case CPXMIP_TIME_LIM_INFEAS:
+    case CPXMIP_NODE_LIM_INFEAS:
+    case CPXMIP_ABORT_INFEAS:
     case CPX_STAT_INFEASIBLE:
     case CPXMIP_INFEASIBLE:
         // NOTE(dparo): 8 Jan 2022
         //        Proven infeasible
 
         result = SOLVE_STATUS_INFEASIBLE;
-        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
-                 lpstat_str, lpstat);
-        break;
-
-    case CPXMIP_TIME_LIM_INFEAS:
-    case CPXMIP_NODE_LIM_INFEAS:
-    case CPXMIP_ABORT_INFEAS:
-        // NOTE(dparo): 8 Jan 2022
-        //        We think it is infeasible because we ran out of resources
-        //        (time or nodelimit) but we cannot for certain say
-        //        that no solution exist.
-        result = SOLVE_STATUS_INVALID;
         log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
                  lpstat_str, lpstat);
         break;
@@ -1272,6 +1263,8 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         break;
 
     default:
+        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
+                 lpstat_str, lpstat);
         assert(!"Invalid code path");
         result = SOLVE_STATUS_ERR;
         break;

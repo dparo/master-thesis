@@ -106,10 +106,12 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
 
     fprintf(fh, "%-16s %s\n", "STATUS:", ENUM_TO_STR(SolveStatus, status));
 
-    if (feasible && valid) {
+    if (valid) {
         printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
                solution->upper_bound);
-        print_tour(&solution->tour);
+        if (feasible) {
+            print_tour(&solution->tour);
+        }
     } else if (!valid) {
         printf("%-16s Could not solve\n", "ERR:");
     }
