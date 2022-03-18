@@ -1017,7 +1017,7 @@ static void generate_performance_profile_using_python_script(
 
     char x_lower_limit_str[128];
     char x_upper_limit_str[128];
-    char *xlabel_str = is_time_profile ? "Time Ratio" : "Relative Cost";
+    char *xlabel_str = is_time_profile ? "TimeRatio" : "RelativeCost";
 
     // double shift = batch->shift > 0 ? batch->shift : 1.0;
     // double max_ratio = batch->max_ratio > 0 ? batch->max_ratio : 4.0;
@@ -1033,7 +1033,7 @@ static void generate_performance_profile_using_python_script(
     Path csv_input_file_basename;
     char output_file[OS_MAX_PATH];
 
-    snprintf_safe(output_file, ARRAY_LEN(output_file), "%s/%s Plot.pdf",
+    snprintf_safe(output_file, ARRAY_LEN(output_file), "%s/%s_Plot.pdf",
                   os_dirname(csv_input_file, &csv_input_file_basename),
                   xlabel_str);
 
