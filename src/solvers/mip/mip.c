@@ -880,8 +880,8 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
     // NOTE: Global progress is inherently thread safe
     //            See:
     //            https://www.ibm.com/docs/en/cofz/12.10.0?topic=callbacks-multithreading-generic
-    double upper_bound = INFINITY;
-    double lower_bound = -INFINITY;
+    double primal_bound = INFINITY;
+    double dual_bound = -INFINITY;
 
     CPXINT num_restarts = 0;
 
@@ -889,8 +889,8 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
     CPXLONG num_nodes_left = 0;
     CPXLONG simplex_iterations = 0;
 
-    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &lower_bound);
-    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &upper_bound);
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_BND, &dual_bound);
+    CPXXcallbackgetinfodbl(context, CPXCALLBACKINFO_BEST_SOL, &primal_bound);
     CPXXcallbackgetinfoint(context, CPXCALLBACKINFO_RESTARTS, &num_restarts);
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_NODECOUNT,
                             &num_processed_nodes);
@@ -899,21 +899,21 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
     CPXXcallbackgetinfolong(context, CPXCALLBACKINFO_ITCOUNT,
                             &simplex_iterations);
 
-    if (lower_bound <= -CPX_INFBOUND) {
-        lower_bound = -INFINITY;
+    if (dual_bound <= -CPX_INFBOUND) {
+        dual_bound = -INFINITY;
     }
-    if (upper_bound >= CPX_INFBOUND) {
-        upper_bound = INFINITY;
+    if (primal_bound >= CPX_INFBOUND) {
+        primal_bound = INFINITY;
     }
 
     log_trace("%s :: num_restarts = %d, num_processed_nodes = %lld, "
               "num_nodes_left = %lld, "
               "simplex_iterations = %lld, "
-              "lower_bound = %.12f, upper_bound = %f",
+              "dual_bound = %.12f, primal_bound = %f",
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
-              simplex_iterations, lower_bound, upper_bound);
+              simplex_iterations, dual_bound, primal_bound);
 
-    if (solver->data->pricer_mode && is_valid_reduced_cost(upper_bound)) {
+    if (solver->data->pricer_mode && is_valid_reduced_cost(primal_bound)) {
         CPXXcallbackabort(context);
     }
 
@@ -1143,10 +1143,10 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
 
     CHECKED(CPXXgetbestobjval,
             CPXXgetbestobjval(self->data->env, self->data->lp,
-                              &solution->lower_bound));
+                              &solution->dual_bound));
 
     CHECKED(CPXXgetobjval, CPXXgetobjval(self->data->env, self->data->lp,
-                                         &solution->upper_bound));
+                                         &solution->primal_bound));
 
     CHECKED(CPXXgetmiprelgap,
             CPXXgetmiprelgap(self->data->env, self->data->lp, &gap));
@@ -1164,7 +1164,7 @@ static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
     log_info("Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
              "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "
              "%d",
-             lpstat, solution->lower_bound, solution->upper_bound, gap,
+             lpstat, solution->dual_bound, solution->primal_bound, gap,
              simplex_iterations, nodecnt, num_user_cuts);
 
 #undef CHECKED
@@ -1211,7 +1211,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
              lpstat_str, lpstat);
 
     if (0 == CPXXgetobjval(self->data->env, self->data->lp,
-                           &solution->upper_bound)) {
+                           &solution->primal_bound)) {
         if (0 == CPXXgetx(self->data->env, self->data->lp, vstar, 0,
                           self->data->num_mip_vars - 1)) {
             if (!process_cplex_output(self, solution, lpstat)) {

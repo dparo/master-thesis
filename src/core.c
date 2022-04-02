@@ -90,15 +90,15 @@ void tour_destroy(Tour *tour) {
 
 Solution solution_create(const Instance *instance) {
     Solution solution = {0};
-    solution.upper_bound = INFINITY;
-    solution.lower_bound = -INFINITY;
+    solution.primal_bound = INFINITY;
+    solution.dual_bound = -INFINITY;
     solution.tour = tour_create(instance);
     return solution;
 }
 
 void solution_clear(Solution *solution) {
-    solution->lower_bound = INFINITY;
-    solution->upper_bound = -INFINITY;
+    solution->dual_bound = INFINITY;
+    solution->primal_bound = -INFINITY;
     tour_clear(&solution->tour);
 }
 
@@ -390,15 +390,15 @@ static void postprocess_solver_solution(const Instance *instance,
     case SOLVE_STATUS_ABORTED_INVALID:
         solution_clear(solution);
         if (status == SOLVE_STATUS_INFEASIBLE) {
-            solution->upper_bound = INFINITY;
-            solution->lower_bound = INFINITY;
+            solution->primal_bound = INFINITY;
+            solution->dual_bound = INFINITY;
         }
         break;
 
     case SOLVE_STATUS_INFEASIBLE:
         solution_clear(solution);
-        solution->upper_bound = INFINITY;
-        solution->lower_bound = INFINITY;
+        solution->primal_bound = INFINITY;
+        solution->dual_bound = INFINITY;
         break;
 
     case SOLVE_STATUS_ABORTED_FEASIBLE:

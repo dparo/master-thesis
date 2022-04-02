@@ -308,7 +308,7 @@ static void ins_heur(const Instance *instance, Solution *solution,
 #endif
     }
 
-    solution->upper_bound = cost;
+    solution->primal_bound = cost;
 
 #ifndef NDEBUG
     validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
@@ -428,7 +428,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
 
             // Perform the two-opt exchange and reverse part of the tour
             twoopt_exchange(solver, instance, &solution->tour, best_a, best_b);
-            solution->upper_bound += best_delta_cost;
+            solution->primal_bound += best_delta_cost;
 #ifndef NDEBUG
             validate_solution(instance, solution,
                               WARM_START_MIN_NUM_CUSTOMERS_SERVED);
@@ -461,7 +461,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
         if (valid_starting_pair(instance, &starting_pair)) {
             ins_heur(instance, &solution, starting_pair);
             log_info("%s :: ins_heur -- found a solution of cost %f", __func__,
-                     solution.upper_bound);
+                     solution.primal_bound);
 
             // NOTE(dparo):
             //       Since 2opt refinements are not cheap, and may cost us
@@ -469,14 +469,14 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             //       necessary. This will keep the main execution path as
             //       fast as possible
             if (!pricer_mode_enabled ||
-                !is_valid_reduced_cost(solution.upper_bound)) {
+                !is_valid_reduced_cost(solution.primal_bound)) {
                 // Try to improve the solution using 2opt
-                double prev_ub = solution.upper_bound;
+                double prev_ub = solution.primal_bound;
                 twoopt_refine(solver, instance, &solution);
                 log_trace("%s :: two opt refine -- Improved solution from %f "
                           "to %f (%f delta improvement)",
-                          __func__, prev_ub, solution.upper_bound,
-                          solution.upper_bound - prev_ub);
+                          __func__, prev_ub, solution.primal_bound,
+                          solution.primal_bound - prev_ub);
             }
 
             if (!feed_warm_solution(solver, instance, &solution)) {
@@ -491,7 +491,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             //     start solutions, we've already found what we are looking
             //     for. Break out of the loop.
 
-            min_ub_found = MIN(min_ub_found, solution.upper_bound);
+            min_ub_found = MIN(min_ub_found, solution.primal_bound);
 
             if (pricer_mode_enabled && is_valid_reduced_cost(min_ub_found)) {
                 log_info("%s :: Found reduced_cost tour (%f), early "

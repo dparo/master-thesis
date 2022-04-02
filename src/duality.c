@@ -460,7 +460,7 @@ static double get_primal_bound(const Instance *instance,
     // Some more validations
     if (feasible) {
         Solution solution = solution_create(instance);
-        solution.upper_bound = cost;
+        solution.primal_bound = cost;
         solution.tour.num_comps = 1;
 
         // Unpack the ESPP into a CPTP solution tour, and validate the primal

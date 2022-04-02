@@ -107,8 +107,8 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     fprintf(fh, "%-16s %s\n", "STATUS:", ENUM_TO_STR(SolveStatus, status));
 
     if (valid) {
-        printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->lower_bound,
-               solution->upper_bound);
+        printf("%-16s [%.17g, %.17g]\n", "OBJ:", solution->dual_bound,
+               solution->primal_bound);
         if (feasible) {
             print_tour(&solution->tour);
         }
@@ -189,10 +189,10 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
                                cJSON_CreateBool(feasible && valid));
 
     s &= cJSON_AddItemToObject(root, "dualBound",
-                               cJSON_CreateNumber(solution->lower_bound));
+                               cJSON_CreateNumber(solution->dual_bound));
 
     s &= cJSON_AddItemToObject(root, "primalBound",
-                               cJSON_CreateNumber(solution->upper_bound));
+                               cJSON_CreateNumber(solution->primal_bound));
 
     double cost = tour_eval(instance, &solution->tour);
     s &= cJSON_AddItemToObject(root, "tourCost", cJSON_CreateNumber(cost));

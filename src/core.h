@@ -64,8 +64,8 @@ typedef struct Tour {
 } Tour;
 
 typedef struct Solution {
-    double upper_bound;
-    double lower_bound;
+    double primal_bound;
+    double dual_bound;
     Tour tour;
 } Solution;
 

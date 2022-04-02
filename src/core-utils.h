@@ -145,8 +145,8 @@ static inline double solution_relgap(Solution *solution) {
     // Taken from:
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetmiprelgap-cpxgetmiprelgap
 
-    double ub = solution->upper_bound;
-    double lb = solution->lower_bound;
+    double ub = solution->primal_bound;
+    double lb = solution->dual_bound;
     return (ub - lb) / (1e-10 + fabs(ub));
 }
 

@@ -70,8 +70,8 @@ TEST solving_small_instances(void) {
         cptp_solve(&instance, "mip", &params, &solution, TIMELIMIT, RANDOMSEED);
     ASSERT(is_valid_solve_status(status));
     ASSERT(status == SOLVE_STATUS_FEASIBLE || status == SOLVE_STATUS_OPTIMAL);
-    ASSERT(solution.lower_bound != -INFINITY);
-    ASSERT(solution.upper_bound != +INFINITY);
+    ASSERT(solution.dual_bound != -INFINITY);
+    ASSERT(solution.primal_bound != +INFINITY);
     ASSERT(solution.tour.num_comps == 1);
     instance_destroy(&instance);
     solution_destroy(&solution);
@@ -88,8 +88,8 @@ TEST solving_some_instances(void) {
             SolveStatus status = cptp_solve(&instance, "mip", &params,
                                             &solution, TIMELIMIT, RANDOMSEED);
             ASSERT(is_valid_solve_status(status));
-            ASSERT(solution.lower_bound != -INFINITY);
-            ASSERT(solution.upper_bound != +INFINITY);
+            ASSERT(solution.dual_bound != -INFINITY);
+            ASSERT(solution.primal_bound != +INFINITY);
             ASSERT(solution.tour.num_comps == 1);
             instance_destroy(&instance);
             solution_destroy(&solution);
