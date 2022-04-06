@@ -233,8 +233,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
         log_trace("%s :: Adding GSEC fractional constraint (%g >= "
                   "2.0 * %g)"
-                  " (nnz = %lld)",
-                  __func__, mf->maxflow, y_i, nnz);
+                  " (|S| = %d, nnz = %lld)",
+                  __func__, mf->maxflow, y_i, set_s_size, nnz);
 
         if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
                                     ctx->value, purgeable, local_validity)) {
@@ -370,8 +370,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             log_trace("%s :: Adding GSEC constraint (%g >= 2.0 * %g) for "
                       "component %d, vertex "
                       "%d "
-                      "(num_of_nodes_in_each_comp[%d] = %d, nnz = %lld)",
-                      __func__, flow, y_i, c, i, c, ctx->cnnodes[c], nnz);
+                      "(|S| = %d, nnz = %lld)",
+                      __func__, flow, y_i, c, i, ctx->cnnodes[c], nnz);
 
             if (!mip_cut_integral_sol(self, nnz, rhs, sense, ctx->index,
                                       ctx->value)) {
