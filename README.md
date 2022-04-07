@@ -4,12 +4,11 @@
 ![Downloads](https://img.shields.io/github/downloads/dparo/master-thesis/total)
 
 
-# CPTP: Capacitated Profitable Tour Problem
+# A Branch-and-Cut based Pricer algorithm for tackling the Capacitated Vehicle Routing Problem
 
-A Mixed Integer Programming (MIP) based solution for the CPTP.
+A Mixed Integer Programming (MIP) model and branch-and-cut framework algorithm for solving the CPTP.
 
-This project studies and compares various MIP formulations and cuts separation techniques for the CPTP.
-
+This project verifies the feasibility of employing a branch-and-cut framework for solving the Pricing Problem (PP) induced from the Set Partition (SP) formulation of the Capacitated Vehicle Routing Problem.
 
 ## Core Technical Concepts/Inspiration
 
