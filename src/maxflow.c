@@ -83,6 +83,14 @@ static flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
 static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
                                             int32_t s, int32_t t,
                                             MaxFlowResult *result) {
+    // NOTE:
+    //     This implementation of bruteforce cannot work with arbitrary
+    //     sized networks. For convenience we use an int32_t to encode
+    //     bipartitions, therefore the maximum allowed network size
+    //     is 31 (30 to be on the safe side)
+    //
+    assert(net->nnodes <= 30);
+
     flow_t maxflow = INFINITY;
 
     for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
