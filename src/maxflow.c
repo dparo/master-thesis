@@ -77,6 +77,7 @@ static flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
             }
         }
     }
+    result->maxflow = flow;
     return flow;
 }
 
@@ -92,6 +93,7 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
     assert(net->nnodes <= 30);
 
     flow_t maxflow = INFINITY;
+    int32_t mincolor1_amt = INT32_MAX;
 
     for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
         for (int32_t k = 0; k < net->nnodes; k++) {
@@ -102,12 +104,29 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
         mf->payload.temp_mf.colors[t] = 0;
 
         flow_t flow = maxflow_result_recompute_flow(net, &mf->payload.temp_mf);
+
+        int32_t color1_amt = 0;
+        for (int32_t i = 0; i < net->nnodes; i++)
+            if (mf->payload.temp_mf.colors[i] == mf->payload.temp_mf.colors[s])
+                color1_amt += 1;
+
+        bool improving = false;
         if (flow < maxflow) {
-            maxflow = flow;
+            improving = true;
+        } else if (flow == maxflow && color1_amt < mincolor1_amt) {
+            // In case of tie, prefer the min-cuts achieving
+            // the least number of nodes in the source-vertex
+            // side of the coloring
+            improving = true;
+        }
+
+        mincolor1_amt = MIN(mincolor1_amt, color1_amt);
+        maxflow = MIN(maxflow, flow);
+
+        if (improving) {
+            max_flow_result_copy(result, &mf->payload.temp_mf);
         }
     }
-
-    max_flow_result_copy(result, &mf->payload.temp_mf);
 }
 
 void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
