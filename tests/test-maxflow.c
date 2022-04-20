@@ -34,101 +34,57 @@
 
 #define MAX_NUM_NODES_TO_TEST 50
 
-static void print_network(FlowNetwork *net, int32_t source_vertex,
-                          int32_t sink_vertex) {
-    printf("net->nnodes = %d, source = %d, sink = %d\n", net->nnodes,
-           source_vertex, sink_vertex);
-    printf("EDGES:\n");
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        for (int32_t j = 0; j < net->nnodes; j++) {
-            printf("    flow(%d, %d)/cap(%d, %d) = %g / %g\n", i, j, i, j,
-                   *network_flow(net, i, j), *network_cap(net, i, j));
-        }
-    }
-    printf("\n");
-}
+TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
+                                 MaxFlowResult *result) {
+    MaxFlowResult bf_result;
+    max_flow_result_create(&bf_result, net->nnodes);
 
-TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
-                                 int32_t sink_vertex, MaxFlowResult *result) {
-    BruteforceMaxFlowResult bf =
-        max_flow_bruteforce(net, source_vertex, sink_vertex);
+    MaxFlow bf_maxflow = {0};
+    max_flow_create(&bf_maxflow, net->nnodes, MAXFLOW_ALGO_BRUTEFORCE);
 
-    printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
-           bf.maxflow);
-    printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
+    max_flow_single_pair(net, &bf_maxflow, s, t, &bf_result);
+    ASSERT_EQ(bf_result.maxflow, result->maxflow);
 
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        printf("computed_bipartition[%d] = %d\n", i, result->colors[i]);
-    }
-
-    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            printf("section[%d][%d] = %d\n", secidx, i,
-                   bf.sections[secidx].colors[i]);
-        }
-    }
-    printf("\n");
-
-    bool is_valid_section = false;
-
-    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-        bool found = true;
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            if (result->colors[i] != bf.sections[secidx].colors[i]) {
-                found = false;
-                break;
-            }
-        }
-
-        if (found) {
-            is_valid_section = true;
-            break;
-        }
-    }
-
-    ASSERT_IN_RANGE(bf.maxflow, result->maxflow, 1e-4);
-    ASSERT(is_valid_section);
-
-    // Cleanup
-    {
-        for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-            max_flow_result_destroy(&bf.sections[secidx]);
-        }
-        free(bf.sections);
-    }
+    max_flow_result_destroy(&bf_result);
+    max_flow_destroy(&bf_maxflow);
 
     PASS();
 }
 
 TEST weird_network(void) {
     int32_t nnodes = 4;
-    FlowNetwork net = flow_network_create(nnodes);
-    MaxFlowResult max_flow_result = max_flow_result_create(nnodes);
+    FlowNetwork net = {0};
+    MaxFlow mf = {0};
+    MaxFlowResult result = {0};
+
+    flow_network_create(&net, nnodes);
+    max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
+    max_flow_result_create(&result, nnodes);
+
     int32_t source_vertex = 1;
     int32_t sink_vertex = 0;
 
-    *network_cap(&net, 1, 2) = 0.4;
-    *network_cap(&net, 2, 1) = 0.6;
-    *network_cap(&net, 1, 0) = 0.8;
-    *network_cap(&net, 0, 1) = 0.4;
-    *network_cap(&net, 1, 3) = 0.4;
-    *network_cap(&net, 3, 1) = 0.2;
+    flow_net_set_cap(&net, 1, 2, 40);
+    flow_net_set_cap(&net, 2, 1, 60);
+    flow_net_set_cap(&net, 1, 0, 80);
+    flow_net_set_cap(&net, 0, 1, 40);
+    flow_net_set_cap(&net, 1, 3, 40);
+    flow_net_set_cap(&net, 3, 1, 20);
 
-    *network_cap(&net, 2, 0) = 0.2;
-    *network_cap(&net, 0, 2) = 0.2;
-    *network_cap(&net, 3, 0) = 0.6;
-    *network_cap(&net, 0, 3) = 0.8;
+    flow_net_set_cap(&net, 2, 0, 20);
+    flow_net_set_cap(&net, 0, 2, 20);
+    flow_net_set_cap(&net, 3, 0, 60);
+    flow_net_set_cap(&net, 0, 3, 80);
 
-    print_network(&net, source_vertex, sink_vertex);
-    double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
-                                            &max_flow_result);
+    max_flow_single_pair(&net, &mf, source_vertex, sink_vertex, &result);
 
-    ASSERT_IN_RANGE(1.4, max_flow, 1e-4);
-    CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
-                                           &max_flow_result));
+    CHECK_CALL(
+        validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
+    max_flow_result_destroy(&result);
+    max_flow_destroy(&mf);
     flow_network_destroy(&net);
-    max_flow_result_destroy(&max_flow_result);
+
     PASS();
 }
 
@@ -158,22 +114,22 @@ TEST weird_network2(void) {
     int32_t source_vertex = 2;
     int32_t sink_vertex = 3;
 
-    *network_cap(&net, 0, 0) = 0;
-    *network_cap(&net, 0, 1) = 0.8;
-    *network_cap(&net, 0, 2) = 0.8;
-    *network_cap(&net, 0, 3) = 0;
-    *network_cap(&net, 1, 0) = 0;
-    *network_cap(&net, 1, 1) = 0;
-    *network_cap(&net, 1, 2) = 0;
-    *network_cap(&net, 1, 3) = 0;
-    *network_cap(&net, 2, 0) = 0.2;
-    *network_cap(&net, 2, 1) = 0.6;
-    *network_cap(&net, 2, 2) = 0;
-    *network_cap(&net, 2, 3) = 0.6;
-    *network_cap(&net, 3, 0) = 0;
-    *network_cap(&net, 3, 1) = 0.2;
-    *network_cap(&net, 3, 2) = 0.8;
-    *network_cap(&net, 3, 3) = 0;
+    flow_net_set_cap(&net, 0, 0) = 0;
+    flow_net_set_cap(&net, 0, 1) = 0.8;
+    flow_net_set_cap(&net, 0, 2) = 0.8;
+    flow_net_set_cap(&net, 0, 3) = 0;
+    flow_net_set_cap(&net, 1, 0) = 0;
+    flow_net_set_cap(&net, 1, 1) = 0;
+    flow_net_set_cap(&net, 1, 2) = 0;
+    flow_net_set_cap(&net, 1, 3) = 0;
+    flow_net_set_cap(&net, 2, 0) = 0.2;
+    flow_net_set_cap(&net, 2, 1) = 0.6;
+    flow_net_set_cap(&net, 2, 2) = 0;
+    flow_net_set_cap(&net, 2, 3) = 0.6;
+    flow_net_set_cap(&net, 3, 0) = 0;
+    flow_net_set_cap(&net, 3, 1) = 0.2;
+    flow_net_set_cap(&net, 3, 2) = 0.8;
+    flow_net_set_cap(&net, 3, 3) = 0;
 
     print_network(&net, source_vertex, sink_vertex);
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
@@ -226,31 +182,31 @@ TEST weird_network3(void) {
     int32_t source_vertex = 0;
     int32_t sink_vertex = 2;
 
-    *network_cap(&net, 0, 0) = 0;
-    *network_cap(&net, 0, 1) = 0.4;
-    *network_cap(&net, 0, 2) = 0.8;
-    *network_cap(&net, 0, 3) = 0.6;
-    *network_cap(&net, 0, 4) = 0.8;
-    *network_cap(&net, 1, 0) = 0.8;
-    *network_cap(&net, 1, 1) = 0;
-    *network_cap(&net, 1, 2) = 0.2;
-    *network_cap(&net, 1, 3) = 0.4;
-    *network_cap(&net, 1, 4) = 0.8;
-    *network_cap(&net, 2, 0) = 0.8;
-    *network_cap(&net, 2, 1) = 0.6;
-    *network_cap(&net, 2, 2) = 0;
-    *network_cap(&net, 2, 3) = 0.6;
-    *network_cap(&net, 2, 4) = 0.8;
-    *network_cap(&net, 3, 0) = 0.4;
-    *network_cap(&net, 3, 1) = 0.6;
-    *network_cap(&net, 3, 2) = 0.2;
-    *network_cap(&net, 3, 3) = 0;
-    *network_cap(&net, 3, 4) = 0.2;
-    *network_cap(&net, 4, 0) = 0;
-    *network_cap(&net, 4, 1) = 0.4;
-    *network_cap(&net, 4, 2) = 0.8;
-    *network_cap(&net, 4, 3) = 0.8;
-    *network_cap(&net, 4, 4) = 0;
+    flow_net_set_cap(&net, 0, 0) = 0;
+    flow_net_set_cap(&net, 0, 1) = 0.4;
+    flow_net_set_cap(&net, 0, 2) = 0.8;
+    flow_net_set_cap(&net, 0, 3) = 0.6;
+    flow_net_set_cap(&net, 0, 4) = 0.8;
+    flow_net_set_cap(&net, 1, 0) = 0.8;
+    flow_net_set_cap(&net, 1, 1) = 0;
+    flow_net_set_cap(&net, 1, 2) = 0.2;
+    flow_net_set_cap(&net, 1, 3) = 0.4;
+    flow_net_set_cap(&net, 1, 4) = 0.8;
+    flow_net_set_cap(&net, 2, 0) = 0.8;
+    flow_net_set_cap(&net, 2, 1) = 0.6;
+    flow_net_set_cap(&net, 2, 2) = 0;
+    flow_net_set_cap(&net, 2, 3) = 0.6;
+    flow_net_set_cap(&net, 2, 4) = 0.8;
+    flow_net_set_cap(&net, 3, 0) = 0.4;
+    flow_net_set_cap(&net, 3, 1) = 0.6;
+    flow_net_set_cap(&net, 3, 2) = 0.2;
+    flow_net_set_cap(&net, 3, 3) = 0;
+    flow_net_set_cap(&net, 3, 4) = 0.2;
+    flow_net_set_cap(&net, 4, 0) = 0;
+    flow_net_set_cap(&net, 4, 1) = 0.4;
+    flow_net_set_cap(&net, 4, 2) = 0.8;
+    flow_net_set_cap(&net, 4, 3) = 0.8;
+    flow_net_set_cap(&net, 4, 4) = 0;
 
     print_network(&net, source_vertex, sink_vertex);
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
@@ -272,16 +228,16 @@ TEST CLRS_network(void) {
     int32_t source_vertex = 0;
     int32_t sink_vertex = nnodes - 1;
 
-    *network_cap(&net, 0, 1) = 16;
-    *network_cap(&net, 0, 2) = 13;
-    *network_cap(&net, 1, 2) = 10;
-    *network_cap(&net, 2, 1) = 4;
-    *network_cap(&net, 1, 3) = 12;
-    *network_cap(&net, 3, 2) = 9;
-    *network_cap(&net, 2, 4) = 14;
-    *network_cap(&net, 4, 3) = 7;
-    *network_cap(&net, 3, 5) = 20;
-    *network_cap(&net, 4, 5) = 4;
+    flow_net_set_cap(&net, 0, 1) = 16;
+    flow_net_set_cap(&net, 0, 2) = 13;
+    flow_net_set_cap(&net, 1, 2) = 10;
+    flow_net_set_cap(&net, 2, 1) = 4;
+    flow_net_set_cap(&net, 1, 3) = 12;
+    flow_net_set_cap(&net, 3, 2) = 9;
+    flow_net_set_cap(&net, 2, 4) = 14;
+    flow_net_set_cap(&net, 4, 3) = 7;
+    flow_net_set_cap(&net, 3, 5) = 20;
+    flow_net_set_cap(&net, 4, 5) = 4;
 
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
@@ -310,18 +266,18 @@ TEST non_trivial_network1(void) {
     int32_t source_vertex = 0;
     int32_t sink_vertex = 7 - 1;
 
-    *network_cap(&net, 1 - 1, 4 - 1) = 2;
-    *network_cap(&net, 1 - 1, 2 - 1) = 2;
-    *network_cap(&net, 1 - 1, 5 - 1) = 2;
-    *network_cap(&net, 5 - 1, 2 - 1) = 1;
-    *network_cap(&net, 2 - 1, 4 - 1) = 1;
-    *network_cap(&net, 5 - 1, 6 - 1) = 2;
-    *network_cap(&net, 2 - 1, 6 - 1) = 2;
-    *network_cap(&net, 2 - 1, 3 - 1) = 2;
-    *network_cap(&net, 4 - 1, 3 - 1) = 1;
-    *network_cap(&net, 6 - 1, 3 - 1) = 1;
-    *network_cap(&net, 3 - 1, 7 - 1) = 2;
-    *network_cap(&net, 6 - 1, 7 - 1) = 4;
+    flow_net_set_cap(&net, 1 - 1, 4 - 1) = 2;
+    flow_net_set_cap(&net, 1 - 1, 2 - 1) = 2;
+    flow_net_set_cap(&net, 1 - 1, 5 - 1) = 2;
+    flow_net_set_cap(&net, 5 - 1, 2 - 1) = 1;
+    flow_net_set_cap(&net, 2 - 1, 4 - 1) = 1;
+    flow_net_set_cap(&net, 5 - 1, 6 - 1) = 2;
+    flow_net_set_cap(&net, 2 - 1, 6 - 1) = 2;
+    flow_net_set_cap(&net, 2 - 1, 3 - 1) = 2;
+    flow_net_set_cap(&net, 4 - 1, 3 - 1) = 1;
+    flow_net_set_cap(&net, 6 - 1, 3 - 1) = 1;
+    flow_net_set_cap(&net, 3 - 1, 7 - 1) = 2;
+    flow_net_set_cap(&net, 6 - 1, 7 - 1) = 4;
 
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
@@ -350,18 +306,18 @@ TEST non_trivial_network2(void) {
     int32_t source_vertex = 0;
     int32_t sink_vertex = 7 - 1;
 
-    *network_cap(&net, 1 - 1, 2 - 1) = 6;
-    *network_cap(&net, 1 - 1, 4 - 1) = 5;
-    *network_cap(&net, 1 - 1, 5 - 1) = 10;
-    *network_cap(&net, 5 - 1, 4 - 1) = 12;
-    *network_cap(&net, 4 - 1, 2 - 1) = 5;
-    *network_cap(&net, 4 - 1, 3 - 1) = 7;
-    *network_cap(&net, 2 - 1, 3 - 1) = 5;
-    *network_cap(&net, 2 - 1, 6 - 1) = 12;
-    *network_cap(&net, 2 - 1, 6 - 1) = 12;
-    *network_cap(&net, 6 - 1, 3 - 1) = 3;
-    *network_cap(&net, 6 - 1, 7 - 1) = 15;
-    *network_cap(&net, 3 - 1, 7 - 1) = 4;
+    flow_net_set_cap(&net, 1 - 1, 2 - 1) = 6;
+    flow_net_set_cap(&net, 1 - 1, 4 - 1) = 5;
+    flow_net_set_cap(&net, 1 - 1, 5 - 1) = 10;
+    flow_net_set_cap(&net, 5 - 1, 4 - 1) = 12;
+    flow_net_set_cap(&net, 4 - 1, 2 - 1) = 5;
+    flow_net_set_cap(&net, 4 - 1, 3 - 1) = 7;
+    flow_net_set_cap(&net, 2 - 1, 3 - 1) = 5;
+    flow_net_set_cap(&net, 2 - 1, 6 - 1) = 12;
+    flow_net_set_cap(&net, 2 - 1, 6 - 1) = 12;
+    flow_net_set_cap(&net, 6 - 1, 3 - 1) = 3;
+    flow_net_set_cap(&net, 6 - 1, 7 - 1) = 15;
+    flow_net_set_cap(&net, 3 - 1, 7 - 1) = 4;
 
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
@@ -390,20 +346,20 @@ TEST non_trivial_network3(void) {
     int32_t source_vertex = 0;
     int32_t sink_vertex = 8 - 1;
 
-    *network_cap(&net, 1 - 1, 5 - 1) = 7;
-    *network_cap(&net, 1 - 1, 2 - 1) = 3;
-    *network_cap(&net, 1 - 1, 6 - 1) = 3;
-    *network_cap(&net, 6 - 1, 2 - 1) = 5;
-    *network_cap(&net, 5 - 1, 2 - 1) = 1;
-    *network_cap(&net, 2 - 1, 3 - 1) = 2;
-    *network_cap(&net, 5 - 1, 4 - 1) = 7;
-    *network_cap(&net, 4 - 1, 2 - 1) = 2;
-    *network_cap(&net, 6 - 1, 3 - 1) = 3;
-    *network_cap(&net, 6 - 1, 7 - 1) = 3;
-    *network_cap(&net, 3 - 1, 7 - 1) = 5;
-    *network_cap(&net, 3 - 1, 4 - 1) = 2;
-    *network_cap(&net, 7 - 1, 8 - 1) = 6;
-    *network_cap(&net, 4 - 1, 8 - 1) = 5;
+    flow_net_set_cap(&net, 1 - 1, 5 - 1) = 7;
+    flow_net_set_cap(&net, 1 - 1, 2 - 1) = 3;
+    flow_net_set_cap(&net, 1 - 1, 6 - 1) = 3;
+    flow_net_set_cap(&net, 6 - 1, 2 - 1) = 5;
+    flow_net_set_cap(&net, 5 - 1, 2 - 1) = 1;
+    flow_net_set_cap(&net, 2 - 1, 3 - 1) = 2;
+    flow_net_set_cap(&net, 5 - 1, 4 - 1) = 7;
+    flow_net_set_cap(&net, 4 - 1, 2 - 1) = 2;
+    flow_net_set_cap(&net, 6 - 1, 3 - 1) = 3;
+    flow_net_set_cap(&net, 6 - 1, 7 - 1) = 3;
+    flow_net_set_cap(&net, 3 - 1, 7 - 1) = 5;
+    flow_net_set_cap(&net, 3 - 1, 4 - 1) = 2;
+    flow_net_set_cap(&net, 7 - 1, 8 - 1) = 6;
+    flow_net_set_cap(&net, 4 - 1, 8 - 1) = 5;
 
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
@@ -434,12 +390,12 @@ TEST no_path_flow(void) {
 
     // 3 Nodes are circularly linked with the source node with max capacity 2 in
     // any direction, while the sink is completely detached (capacity 0)
-    *network_cap(&net, 0, 1) = 2;
-    *network_cap(&net, 1, 0) = 2;
-    *network_cap(&net, 1, 2) = 2;
-    *network_cap(&net, 2, 1) = 2;
-    *network_cap(&net, 2, 0) = 2;
-    *network_cap(&net, 0, 2) = 2;
+    flow_net_set_cap(&net, 0, 1) = 2;
+    flow_net_set_cap(&net, 1, 0) = 2;
+    flow_net_set_cap(&net, 1, 2) = 2;
+    flow_net_set_cap(&net, 2, 1) = 2;
+    flow_net_set_cap(&net, 2, 0) = 2;
+    flow_net_set_cap(&net, 0, 2) = 2;
 
     double max_flow = push_relabel_max_flow(&net, source_vertex, sink_vertex,
                                             &max_flow_result);
@@ -464,8 +420,8 @@ TEST single_path_flow(void) {
 
         for (int32_t i = 0; i < nnodes - 1; i++) {
             double r = rand() % (nnodes / 2);
-            *network_cap(&net, i, i + 1) = r;
-            *network_cap(&net, i + 1, i) = rand() % 256;
+            flow_net_set_cap(&net, i, i + 1) = r;
+            flow_net_set_cap(&net, i + 1, i) = rand() % 256;
             min_cap = MIN(min_cap, r);
         }
 
@@ -492,11 +448,11 @@ TEST two_path_flow(void) {
         double min_cap1 = INFINITY;
         double min_cap2 = INFINITY;
 
-        *network_cap(&net, 0, 1) = 99999;
-        *network_cap(&net, 0, 2) = 99999;
+        flow_net_set_cap(&net, 0, 1) = 99999;
+        flow_net_set_cap(&net, 0, 2) = 99999;
 
-        *network_cap(&net, blen * 2 - 1, nnodes - 1) = 99999;
-        *network_cap(&net, blen * 2, nnodes - 1) = 99999;
+        flow_net_set_cap(&net, blen * 2 - 1, nnodes - 1) = 99999;
+        flow_net_set_cap(&net, blen * 2, nnodes - 1) = 99999;
 
         for (int32_t i = 1; i < nnodes; i += 2) {
             if (i + 2 >= nnodes) {
@@ -506,8 +462,8 @@ TEST two_path_flow(void) {
                 continue;
             }
             double r = rand() % (nnodes / 2);
-            *network_cap(&net, i, i + 2) = r;
-            *network_cap(&net, i + 2, i) = rand() % 256;
+            flow_net_set_cap(&net, i, i + 2) = r;
+            flow_net_set_cap(&net, i + 2, i) = rand() % 256;
             min_cap1 = MIN(min_cap1, r);
         }
 
@@ -519,8 +475,8 @@ TEST two_path_flow(void) {
                 continue;
             }
             double r = rand() % (nnodes / 2);
-            *network_cap(&net, i, i + 2) = r;
-            *network_cap(&net, i + 2, i) = rand() % 256;
+            flow_net_set_cap(&net, i, i + 2) = r;
+            flow_net_set_cap(&net, i + 2, i) = rand() % 256;
             min_cap2 = MIN(min_cap2, r);
         }
 
@@ -548,7 +504,7 @@ TEST random_networks(void) {
             for (int32_t i = 0; i < nnodes; i++) {
                 for (int32_t j = 0; j < nnodes; j++) {
                     if (i != j) {
-                        *network_cap(&network, i, j) =
+                        flow_net_set_cap(&network, i, j) =
                             RAND_VALS[rand() % ARRAY_LEN(RAND_VALS)];
                     }
                 }

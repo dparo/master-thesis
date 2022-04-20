@@ -28,7 +28,7 @@ extern "C" {
 
 #include "types.h"
 
-typedef int32_t flow_t;
+typedef uint32_t flow_t;
 
 typedef struct {
     int32_t nnodes;
@@ -81,8 +81,12 @@ static inline flow_t flow_net_get_cap(const FlowNetwork *net, int32_t i,
     return net->caps[i * net->nnodes + j];
 }
 
+void flow_network_create(FlowNetwork *network, int32_t nnodes);
+void flow_network_destroy(FlowNetwork *network);
+void flow_network_clear_caps(FlowNetwork *net);
+
 void max_flow_destroy(MaxFlow *mf);
-void max_flow_init(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind);
+void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind);
 
 void max_flow_result_create(MaxFlowResult *result, int32_t nnodes);
 void max_flow_result_destroy(MaxFlowResult *result);

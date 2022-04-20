@@ -22,6 +22,29 @@
 
 #include "maxflow.h"
 
+void flow_network_destroy(FlowNetwork *network) {
+    free(network->caps);
+    memset(network, 0, sizeof(*network));
+}
+
+void flow_network_create(FlowNetwork *network, int32_t nnodes) {
+    if (network->nnodes) {
+        flow_network_destroy(network);
+    }
+    network->nnodes = nnodes;
+    int32_t nsquared = nnodes * nnodes;
+    network->caps = calloc(nsquared, sizeof(*network->caps));
+
+    if (!network->caps) {
+        flow_network_destroy(network);
+    }
+}
+
+void flow_network_clear_caps(FlowNetwork *net) {
+    int32_t nsquared = net->nnodes * net->nnodes;
+    memset(net->caps, 0, nsquared * sizeof(*net->caps));
+}
+
 void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src) {
     assert(dest->nnodes == src->nnodes);
     dest->s = src->s;
@@ -44,7 +67,7 @@ void max_flow_destroy(MaxFlow *mf) {
     memset(mf, 0, sizeof(*mf));
 }
 
-void max_flow_init(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
+void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     if (mf->kind != 0) {
         max_flow_destroy(mf);
     }
@@ -65,7 +88,7 @@ void max_flow_init(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
 
 static flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
                                             MaxFlowResult *result) {
-    flow_t flow = 0.0;
+    flow_t flow = 0;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = 0; j < net->nnodes; j++) {
@@ -141,6 +164,15 @@ void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
         max_flow_single_pair_bruteforce(net, mf, s, t, result);
+        break;
+
+    case MAXFLOW_ALGO_RANDOM:
+        for (int32_t i = 0; i < net->nnodes; i++) {
+            result->colors[i] = rand() % 2;
+        }
+        result->colors[s] = 1;
+        result->colors[t] = 0;
+        maxflow_result_recompute_flow(net, result);
         break;
     default:
         assert(!"Invalid code path");
