@@ -59,6 +59,7 @@ add_library(libcptp
     validation.c
     render.c
     network.c
+    maxflow.c
 
     # Stub solver
     solvers/stub/stub.c

@@ -35,10 +35,15 @@ extern "C" {
 #include "misc.h"
 #include "utils.h"
 
-typedef struct Mat2d {
+typedef struct MatXd {
     int32_t w, h;
-    double *data;
-} Mat2d;
+    double *p;
+} MatXd;
+
+typedef struct VecXi32 {
+    int32_t len;
+    int32_t *p;
+} VecXi32;
 
 static inline bool feq(double a, double b, double epsilon) {
     return fabs(a - b) <= epsilon;
