@@ -30,6 +30,11 @@ extern "C" {
 
 typedef uint32_t flow_t;
 
+typedef enum {
+    BLACK = 0,
+    WHITE = 1,
+} MaxFlowBipartitionColor;
+
 typedef struct {
     int32_t nnodes;
     flow_t *caps;
@@ -81,8 +86,8 @@ static inline flow_t flow_net_get_cap(const FlowNetwork *net, int32_t i,
     return net->caps[i * net->nnodes + j];
 }
 
-void flow_network_create(FlowNetwork *network, int32_t nnodes);
-void flow_network_destroy(FlowNetwork *network);
+void flow_network_create_v2(FlowNetwork *network, int32_t nnodes);
+void flow_network_destroy_v2(FlowNetwork *network);
 void flow_network_clear_caps(FlowNetwork *net);
 
 void max_flow_destroy(MaxFlow *mf);
@@ -96,8 +101,8 @@ void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
 void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes);
 void gomory_hu_tree_destroy(GomoryHuTree *tree);
 
-void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
-                          int32_t t, MaxFlowResult *result);
+double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
+                            int32_t t, MaxFlowResult *result);
 
 void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
                         GomoryHuTree *tree);

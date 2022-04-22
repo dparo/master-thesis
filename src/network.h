@@ -43,7 +43,7 @@ typedef struct {
 typedef enum {
     BLACK = 0,
     WHITE = 1,
-} MaxFlowColor;
+} MaxFlowBipartitionColor;
 
 typedef struct {
     bool *data;

@@ -22,21 +22,21 @@
 
 #include "maxflow.h"
 
-void flow_network_destroy(FlowNetwork *network) {
+void flow_network_destroy_v2(FlowNetwork *network) {
     free(network->caps);
     memset(network, 0, sizeof(*network));
 }
 
-void flow_network_create(FlowNetwork *network, int32_t nnodes) {
+void flow_network_create_v2(FlowNetwork *network, int32_t nnodes) {
     if (network->nnodes) {
-        flow_network_destroy(network);
+        flow_network_destroy_v2(network);
     }
     network->nnodes = nnodes;
     int32_t nsquared = nnodes * nnodes;
     network->caps = calloc(nsquared, sizeof(*network->caps));
 
     if (!network->caps) {
-        flow_network_destroy(network);
+        flow_network_destroy_v2(network);
     }
 }
 
@@ -152,8 +152,12 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
     }
 }
 
-void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
-                          int32_t t, MaxFlowResult *result) {
+static void max_flow_algo_push_relabel(const FlowNetwork *net, MaxFlow *mf,
+                                       int32_t s, int32_t t,
+                                       MaxFlowResult *result) {}
+
+double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
+                            int32_t t, MaxFlowResult *result) {
     assert(net->nnodes >= 2);
     assert(mf->nnodes >= 2);
     assert(result->nnodes >= 2);
@@ -174,6 +178,10 @@ void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
         result->colors[t] = 0;
         maxflow_result_recompute_flow(net, result);
         break;
+
+    case MAXFLOW_ALGO_PUSH_RELABEL:
+        max_flow_algo_push_relabel(net, mf, s, t, result);
+
     default:
         assert(!"Invalid code path");
         break;
@@ -181,6 +189,8 @@ void max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
 
     result->s = s;
     result->t = t;
+
+    return result->maxflow;
 }
 
 void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
