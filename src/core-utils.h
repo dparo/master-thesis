@@ -141,6 +141,23 @@ static inline double tour_eval(const Instance *instance, Tour *tour) {
     }
 }
 
+static inline double tour_demand(const Instance *instance, Tour *tour) {
+    double demand = 0.0;
+    if (*tcomp(tour, 0) >= 0) {
+        int32_t curr_vertex = 0;
+        int32_t next_vertex = -1;
+        demand += instance->demands[0];
+
+        while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
+            assert(next_vertex >= 0);
+            assert(next_vertex != curr_vertex);
+            demand += instance->demands[next_vertex];
+            curr_vertex = next_vertex;
+        }
+    }
+    return demand;
+}
+
 static inline double solution_relgap(Solution *solution) {
     // Taken from:
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetmiprelgap-cpxgetmiprelgap

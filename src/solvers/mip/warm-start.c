@@ -453,6 +453,8 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
     Solution solution = solution_create(instance);
     InsHeurNodePair starting_pair;
 
+    //   ((Instance *)instance)->vehicle_cap += instance->vehicle_cap * 1.0;
+
     starting_pair.u = 0;
     for (starting_pair.v = 0; starting_pair.v < n; starting_pair.v++) {
         if (starting_pair.v == starting_pair.u) {
@@ -460,8 +462,9 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
         }
         if (valid_starting_pair(instance, &starting_pair)) {
             ins_heur(instance, &solution, starting_pair);
-            log_info("%s :: ins_heur -- found a solution of cost %f", __func__,
-                     solution.primal_bound);
+            log_info("%s :: ins_heur -- found a solution of cost %f, demand %f",
+                     __func__, solution.primal_bound,
+                     tour_demand(instance, &solution.tour));
 
             // NOTE(dparo):
             //       Since 2opt refinements are not cheap, and may cost us

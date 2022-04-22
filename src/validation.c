@@ -167,22 +167,7 @@ void validate_tour(const Instance *instance, Tour *tour,
     //
     // Validate capacity is not exceeded
     //
-    {
-        double demand = 0.0;
-        if (*tcomp(tour, 0) >= 0) {
-            int32_t curr_vertex = 0;
-            int32_t next_vertex;
-            demand += instance->demands[0];
-
-            while ((next_vertex = *tsucc(tour, curr_vertex)) != 0) {
-                assert(next_vertex != curr_vertex);
-                demand += instance->demands[next_vertex];
-                curr_vertex = next_vertex;
-            }
-        }
-
-        assert(flte(demand, instance->vehicle_cap, 1e-3));
-    }
+    assert(flte(tour_demand(instance, tour), instance->vehicle_cap, 1e-5));
 
 #else
     UNUSED_PARAM(instance);

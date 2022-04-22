@@ -1350,6 +1350,13 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         goto fail;
     }
 
+    if (solver_params_get_bool(tparams, "APPLY_LB_HEUR")) {
+        if (CPXXsetintparam(solver->data->env, CPX_PARAM_LBHEUR, 1) != 0) {
+            log_warn("%s :: CPXXsetintparam for CPX_PARAM_LBHEUR failed",
+                     __func__);
+        }
+    }
+
     if (solver_params_get_bool(tparams, "SCRIND")) {
         CPXXsetintparam(solver->data->env, CPX_PARAM_SCRIND, 1);
         CPXXsetintparam(solver->data->env, CPX_PARAM_MIPDISPLAY, 4);
