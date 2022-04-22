@@ -69,7 +69,7 @@ typedef struct MaxFlow {
         // Push relabel context
         struct {
             int32_t *height;
-            double *excess_flow;
+            flow_t *excess_flow;
             int32_t *curr_neigh;
             int32_t list_len;
             int32_t *list;

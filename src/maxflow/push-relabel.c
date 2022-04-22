@@ -32,7 +32,7 @@ void max_flow_create_push_relabel(MaxFlow *mf, int32_t nnodes) {
     // randomly initialize the array to make accumulation errors apparent
     for (int32_t i = 0; i < nnodes; i++) {
         mf->payload.height[i] = rand();
-        mf->payload.excess_flow[i] = (double)rand() / RAND_MAX;
+        mf->payload.excess_flow[i] = (flow_t)rand() % 40;
         mf->payload.curr_neigh[i] = rand();
     }
 
