@@ -4,7 +4,7 @@
 ![Downloads](https://img.shields.io/github/downloads/dparo/master-thesis/total)
 
 
-# A Branch-and-Cut based Pricer algorithm for tackling the Capacitated Vehicle Routing Problem
+# A Branch-and-Cut based Pricer for the Capacitated Vehicle Routing Problem
 
 A Mixed Integer Programming (MIP) model and branch-and-cut framework algorithm for solving the CPTP.
 
