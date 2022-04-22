@@ -21,6 +21,7 @@
  */
 
 #include "maxflow.h"
+#include "maxflow/push-relabel.h"
 
 void flow_network_destroy_v2(FlowNetwork *network) {
     free(network->caps);
@@ -77,6 +78,9 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
         max_flow_result_create(&mf->payload.temp_mf, nnodes);
         break;
+    case MAXFLOW_ALGO_PUSH_RELABEL:
+        max_flow_create_push_relabel(mf, nnodes);
+        break;
     default:
         assert(!"Invalid code path");
         break;
@@ -86,8 +90,8 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     mf->nnodes = nnodes;
 }
 
-static flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
-                                            MaxFlowResult *result) {
+flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
+                                     MaxFlowResult *result) {
     flow_t flow = 0;
 
     for (int32_t i = 0; i < net->nnodes; i++) {
@@ -152,10 +156,6 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
     }
 }
 
-static void max_flow_algo_push_relabel(const FlowNetwork *net, MaxFlow *mf,
-                                       int32_t s, int32_t t,
-                                       MaxFlowResult *result) {}
-
 double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result) {
     assert(net->nnodes >= 2);
@@ -181,6 +181,7 @@ double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
 
     case MAXFLOW_ALGO_PUSH_RELABEL:
         max_flow_algo_push_relabel(net, mf, s, t, result);
+        break;
 
     default:
         assert(!"Invalid code path");

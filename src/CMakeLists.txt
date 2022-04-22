@@ -60,6 +60,7 @@ add_library(libcptp
     render.c
     network.c
     maxflow.c
+    maxflow/push-relabel.c
 
     # Stub solver
     solvers/stub/stub.c

@@ -65,6 +65,15 @@ typedef struct MaxFlow {
         struct {
             MaxFlowResult temp_mf;
         };
+
+        // Push relabel context
+        struct {
+            int32_t *height;
+            double *excess_flow;
+            int32_t *curr_neigh;
+            int32_t list_len;
+            int32_t *list;
+        };
     } payload;
 
 } MaxFlow;
@@ -94,6 +103,8 @@ void max_flow_destroy(MaxFlow *mf);
 void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind);
 
 void max_flow_result_create(MaxFlowResult *result, int32_t nnodes);
+flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
+                                     MaxFlowResult *result);
 void max_flow_result_destroy(MaxFlowResult *result);
 
 void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
