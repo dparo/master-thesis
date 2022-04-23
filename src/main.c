@@ -103,6 +103,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     fprintf(fh, "%-16s %f\n", "TIMELIM:", ctx->timelimit);
     fprintf(fh, "%-16s %d\n", "SEED:", ctx->randomseed);
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
+    fprintf(fh, "%-16s %.17g\n", "VEHICLE_CAP:", instance->vehicle_cap);
 
     fprintf(fh, "%-16s %s\n", "STATUS:", ENUM_TO_STR(SolveStatus, status));
 
@@ -118,7 +119,10 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
 
     if (feasible && valid) {
         double cost = tour_eval(instance, &solution->tour);
+        double demand = tour_demand(instance, &solution->tour);
         printf("%-16s %.17g\n", "TOUR COST:", cost);
+        printf("%-16s %.17g   (%.3g%)\n", "TOUR DEMAND:", demand,
+               demand / instance->vehicle_cap * 100.0);
     }
 
     printf("%-16s %s", "STARTED:", ctime(&timing.started));
