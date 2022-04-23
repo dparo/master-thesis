@@ -653,7 +653,7 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     args[argidx++] = timelimit;
     args[argidx++] = "--seed";
     args[argidx++] = seed_str;
-    args[argidx++] = "-DPRICER_MODE=0";
+    args[argidx++] = "-DHEUR_PRICER_MODE=0";
     args[argidx++] = "-DAPPLY_UPPER_CUTOFF=1";
 
     for (int32_t i = 0; solver->args[i] != NULL; i++) {

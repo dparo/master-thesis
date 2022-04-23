@@ -45,10 +45,9 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"APPLY_LB_HEUR", TYPED_PARAM_BOOL, "false",
          "Apply local branching heuristic (CPX_PARAM_LBHEUR) to try to improve "
          "new incumbents found during a MIP search."},
-        {"PRICER_MODE", TYPED_PARAM_BOOL, "false",
-         "Behave as pricer. Terminate solution process as soon as a negative "
-         "value tour is found, without proving its optimality (there may exist "
-         "more optimal tours) "},
+        {"HEUR_PRICER_MODE", TYPED_PARAM_BOOL, "false",
+         "Behave as an heuristic pricer. Terminate solution process as soon as "
+         "a reduced cost route, without proving its optimality."},
         {"INS_HEUR_WARM_START", TYPED_PARAM_BOOL, "true",
          "Warm start the MIP solver by using an insertion heuristic for "
          "finding an initial solution"},

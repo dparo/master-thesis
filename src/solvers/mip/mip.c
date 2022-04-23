@@ -913,7 +913,7 @@ static int cplex_on_progress(char *progress_kind, CPXCALLBACKCONTEXTptr context,
               progress_kind, num_restarts, num_processed_nodes, num_nodes_left,
               simplex_iterations, dual_bound, primal_bound);
 
-    if (solver->data->pricer_mode && is_valid_reduced_cost(primal_bound)) {
+    if (solver->data->heur_pricer_mode && is_valid_reduced_cost(primal_bound)) {
         CPXXcallbackabort(context);
     }
 
@@ -1391,10 +1391,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         }
     }
 
-    if (solver_params_get_bool(tparams, "PRICER_MODE")) {
-        solver->data->pricer_mode = true;
+    if (solver_params_get_bool(tparams, "HEUR_PRICER_MODE")) {
+        solver->data->heur_pricer_mode = true;
     } else {
-        solver->data->pricer_mode = false;
+        solver->data->heur_pricer_mode = false;
     }
 
     log_info("%s :: CPXXsetintparam -- Setting SEED to %d", __func__,
@@ -1505,7 +1505,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
     if (solver_params_get_bool(tparams, "INS_HEUR_WARM_START")) {
         int64_t begin_time = os_get_usecs();
         if (!mip_ins_heur_warm_start(&solver, instance,
-                                     solver.data->pricer_mode)) {
+                                     solver.data->heur_pricer_mode)) {
             log_fatal("%s :: WARM start failed", __func__);
             goto fail;
         }

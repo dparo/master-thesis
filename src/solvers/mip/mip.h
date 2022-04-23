@@ -47,7 +47,7 @@ typedef struct SolverData {
     CPXENVptr env;
     CPXLPptr lp;
     int numcores;
-    bool pricer_mode;
+    bool heur_pricer_mode;
     CPXDIM num_mip_vars;
     CPXDIM num_mip_constraints;
 } SolverData;
