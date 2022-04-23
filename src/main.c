@@ -121,7 +121,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
         double cost = tour_eval(instance, &solution->tour);
         double demand = tour_demand(instance, &solution->tour);
         printf("%-16s %.17g\n", "TOUR COST:", cost);
-        printf("%-16s %.17g   (%.3g%)\n", "TOUR DEMAND:", demand,
+        printf("%-16s %.17g   (%.3g%%)\n", "TOUR DEMAND:", demand,
                demand / instance->vehicle_cap * 100.0);
     }
 
