@@ -55,6 +55,8 @@ void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src) {
 }
 
 void max_flow_destroy(MaxFlow *mf) {
+    free(mf->flows);
+    mf->flows = NULL;
 
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
@@ -72,6 +74,8 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     if (mf->kind != 0) {
         max_flow_destroy(mf);
     }
+
+    mf->flows = malloc(nnodes * nnodes * sizeof(*mf->flows));
 
     switch (kind) {
 
@@ -119,7 +123,7 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
     //
     assert(net->nnodes <= 30);
 
-    flow_t maxflow = INFINITY;
+    flow_t maxflow = FLOW_MAX;
     int32_t mincolor1_amt = INT32_MAX;
 
     for (int32_t label_it = 0; label_it < 1 << net->nnodes; label_it++) {
@@ -158,12 +162,30 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
 
 double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result) {
+    assert(net->caps);
     assert(net->nnodes >= 2);
     assert(mf->nnodes >= 2);
     assert(result->nnodes >= 2);
+    assert(net->nnodes == mf->nnodes);
+    assert(result->nnodes == net->nnodes);
+
+    assert(s != t);
+    assert(s >= 0 && s < net->nnodes);
+    assert(t >= 0 && t < net->nnodes);
+
+    assert(result->colors);
+
+#ifndef NDEBUG
+    for (int32_t i = 0; i < net->nnodes; i++) {
+        assert(flow_net_get_cap(net, i, i) == 0);
+    }
+#endif
 
     result->s = s;
     result->t = t;
+
+    mf->s = s;
+    mf->t = t;
 
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:

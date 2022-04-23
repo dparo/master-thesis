@@ -28,7 +28,8 @@ extern "C" {
 
 #include "types.h"
 
-typedef uint32_t flow_t;
+typedef int32_t flow_t;
+#define FLOW_MAX INT32_MAX
 
 typedef enum {
     BLACK = 0,
@@ -58,6 +59,10 @@ typedef struct MaxFlowResult {
 
 typedef struct MaxFlow {
     int32_t nnodes;
+
+    int32_t s;
+    int32_t t;
+    flow_t *flows;
 
     MaxFlowAlgoKind kind;
     union {
