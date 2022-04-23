@@ -37,7 +37,7 @@
 TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
                                  MaxFlowResult *result) {
     MaxFlowResult bf_result;
-    max_flow_result_create(&bf_result, net->nnodes);
+    max_flow_result_create_v2(&bf_result, net->nnodes);
 
     MaxFlow bf_maxflow = {0};
     max_flow_create(&bf_maxflow, net->nnodes, MAXFLOW_ALGO_BRUTEFORCE);
@@ -45,7 +45,7 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
     max_flow_single_pair(net, &bf_maxflow, s, t, &bf_result);
     ASSERT_EQ(bf_result.maxflow, result->maxflow);
 
-    max_flow_result_destroy(&bf_result);
+    max_flow_result_destroy_v2(&bf_result);
     max_flow_destroy(&bf_maxflow);
 
     PASS();
@@ -59,7 +59,7 @@ TEST weird_network(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 1;
     int32_t sink_vertex = 0;
@@ -81,7 +81,7 @@ TEST weird_network(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -115,7 +115,7 @@ TEST weird_network2(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 2;
     int32_t sink_vertex = 3;
@@ -142,7 +142,7 @@ TEST weird_network2(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -188,7 +188,7 @@ TEST weird_network3(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 2;
@@ -224,7 +224,7 @@ TEST weird_network3(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -240,7 +240,7 @@ TEST CLRS_network(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 5;
@@ -270,7 +270,7 @@ TEST CLRS_network(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -287,7 +287,7 @@ TEST non_trivial_network1(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 7 - 1;
@@ -320,7 +320,7 @@ TEST non_trivial_network1(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -337,7 +337,7 @@ TEST non_trivial_network2(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 7 - 1;
@@ -370,7 +370,7 @@ TEST non_trivial_network2(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -387,7 +387,7 @@ TEST non_trivial_network3(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 8 - 1;
@@ -422,7 +422,7 @@ TEST non_trivial_network3(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -437,7 +437,7 @@ TEST no_path_flow(void) {
 
     flow_network_create_v2(&net, nnodes);
     max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create(&result, nnodes);
+    max_flow_result_create_v2(&result, nnodes);
 
     int32_t source_vertex = 0;
     int32_t sink_vertex = 3;
@@ -463,7 +463,7 @@ TEST no_path_flow(void) {
     CHECK_CALL(
         validate_with_slow_max_flow(&net, source_vertex, sink_vertex, &result));
 
-    max_flow_result_destroy(&result);
+    max_flow_result_destroy_v2(&result);
     max_flow_destroy(&mf);
     flow_network_destroy_v2(&net);
 
@@ -478,7 +478,7 @@ TEST single_path_flow(void) {
 
         flow_network_create_v2(&net, nnodes);
         max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-        max_flow_result_create(&result, nnodes);
+        max_flow_result_create_v2(&result, nnodes);
 
         int32_t source_vertex = 0;
         int32_t sink_vertex = nnodes - 1;
@@ -501,7 +501,7 @@ TEST single_path_flow(void) {
         CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                                &result));
 
-        max_flow_result_destroy(&result);
+        max_flow_result_destroy_v2(&result);
         max_flow_destroy(&mf);
         flow_network_destroy_v2(&net);
     }
@@ -518,7 +518,7 @@ TEST two_path_flow(void) {
 
         flow_network_create_v2(&net, nnodes);
         max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-        max_flow_result_create(&result, nnodes);
+        max_flow_result_create_v2(&result, nnodes);
 
         int32_t source_vertex = 0;
         int32_t sink_vertex = nnodes - 1;
@@ -568,7 +568,7 @@ TEST two_path_flow(void) {
         CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex, sink_vertex,
                                                &result));
 
-        max_flow_result_destroy(&result);
+        max_flow_result_destroy_v2(&result);
         max_flow_destroy(&mf);
         flow_network_destroy_v2(&net);
     }
@@ -587,7 +587,7 @@ TEST random_networks(void) {
 
             flow_network_create_v2(&net, nnodes);
             max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-            max_flow_result_create(&result, nnodes);
+            max_flow_result_create_v2(&result, nnodes);
 
             int32_t source_vertex = 0;
             int32_t sink_vertex = nnodes - 1;
@@ -611,7 +611,7 @@ TEST random_networks(void) {
             CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex,
                                                    sink_vertex, &result));
 
-            max_flow_result_destroy(&result);
+            max_flow_result_destroy_v2(&result);
             max_flow_destroy(&mf);
             flow_network_destroy_v2(&net);
         }

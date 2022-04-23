@@ -23,6 +23,16 @@
 #include "maxflow.h"
 #include "maxflow/push-relabel.h"
 
+void max_flow_result_create_v2(MaxFlowResult *result, int32_t nnodes) {
+    result->nnodes = nnodes;
+    result->colors = malloc(nnodes * sizeof(*result->colors));
+}
+
+void max_flow_result_destroy_v2(MaxFlowResult *m) {
+    free(m->colors);
+    memset(m, 0, sizeof(*m));
+}
+
 void flow_network_destroy_v2(FlowNetwork *network) {
     free(network->caps);
     memset(network, 0, sizeof(*network));
@@ -60,7 +70,7 @@ void max_flow_destroy(MaxFlow *mf) {
 
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
-        max_flow_result_destroy(&mf->payload.temp_mf);
+        max_flow_result_destroy_v2(&mf->payload.temp_mf);
         break;
     default:
         assert(!"Invalid code path");
@@ -80,7 +90,7 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     switch (kind) {
 
     case MAXFLOW_ALGO_BRUTEFORCE:
-        max_flow_result_create(&mf->payload.temp_mf, nnodes);
+        max_flow_result_create_v2(&mf->payload.temp_mf, nnodes);
         break;
     case MAXFLOW_ALGO_PUSH_RELABEL:
         max_flow_create_push_relabel(mf, nnodes);

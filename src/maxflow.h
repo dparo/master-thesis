@@ -107,10 +107,10 @@ void flow_network_clear_caps(FlowNetwork *net);
 void max_flow_destroy(MaxFlow *mf);
 void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind);
 
-void max_flow_result_create(MaxFlowResult *result, int32_t nnodes);
+void max_flow_result_create_v2(MaxFlowResult *result, int32_t nnodes);
 flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
                                      MaxFlowResult *result);
-void max_flow_result_destroy(MaxFlowResult *result);
+void max_flow_result_destroy_v2(MaxFlowResult *result);
 
 void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
 
