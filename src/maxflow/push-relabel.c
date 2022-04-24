@@ -72,6 +72,9 @@ static void push(const FlowNetwork *net, MaxFlow *mf, int32_t u, int32_t v) {
     assert(MAXFLOW_FLOW(mf, u, v) == -MAXFLOW_FLOW(mf, v, u));
     assert(MAXFLOW_FLOW(mf, u, v) <= flow_net_get_cap(net, u, v));
     assert(MAXFLOW_FLOW(mf, v, u) <= flow_net_get_cap(net, v, u));
+
+    mf->payload.excess_flow[u] -= delta;
+    mf->payload.excess_flow[v] += delta;
 }
 
 static void relabel(const FlowNetwork *net, MaxFlow *mf, int32_t u) {
@@ -104,7 +107,7 @@ static void relabel(const FlowNetwork *net, MaxFlow *mf, int32_t u) {
 static void discharge(const FlowNetwork *net, MaxFlow *mf, int32_t u) {
     assert(u != mf->s && u != mf->t);
 
-    while (mf->payload.excess_flow[0] > 0) {
+    while (mf->payload.excess_flow[u] > 0) {
         int32_t v = mf->payload.curr_neigh[u];
         if (v >= net->nnodes) {
             relabel(net, mf, u);
@@ -199,6 +202,7 @@ void max_flow_algo_push_relabel(const FlowNetwork *net, MaxFlow *mf, int32_t s,
             mf->payload.list[mf->payload.list_len++] = i;
         }
     }
+
     // MAIN LOOP
     {
         int32_t curr_node = 0;
@@ -224,6 +228,7 @@ void max_flow_algo_push_relabel(const FlowNetwork *net, MaxFlow *mf, int32_t s,
     flow_t max_flow = get_flow_from_source_node(mf);
 
     validate_flow(net, mf, max_flow);
+
 #ifndef NDEBUG
     for (int32_t i = 0; i < net->nnodes; i++) {
         if (i != s && i != t) {

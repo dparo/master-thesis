@@ -95,15 +95,15 @@ static inline void validate_min_cut(const FlowNetwork *net, const MaxFlow *mf,
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = 0; j < net->nnodes; j++) {
 
-            int32_t li = (int32_t)result->colors[i];
-            int32_t lj = (int32_t)result->colors[j];
+            int32_t li = result->colors[i];
+            int32_t lj = result->colors[j];
             assert(MAXFLOW_FLOW(mf, i, j) == -MAXFLOW_FLOW(mf, j, i));
 
             flow_t f = MAXFLOW_FLOW(mf, i, j);
             flow_t c = flow_net_get_cap(net, i, j);
 
             assert(c >= 0);
-            assert(f == c);
+            assert(f <= c);
 
             if (f >= 0) {
                 if (li == BLACK && lj == WHITE) {
