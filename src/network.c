@@ -518,7 +518,7 @@ BruteforceMaxFlowResult max_flow_bruteforce(FlowNetwork *net,
                                             int32_t sink_vertex) {
     int32_t s = source_vertex;
     int32_t t = sink_vertex;
-    assert(net->nnodes >= 2 && net->nnodes <= 10);
+    assert(net->nnodes >= 2 && net->nnodes <= 30);
     int32_t *labels = calloc(net->nnodes, sizeof(*labels));
 
     int32_t num_sections = 0;

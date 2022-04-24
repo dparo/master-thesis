@@ -65,12 +65,13 @@ void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src) {
 }
 
 void max_flow_destroy(MaxFlow *mf) {
-    free(mf->flows);
-    mf->flows = NULL;
 
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
         max_flow_result_destroy_v2(&mf->payload.temp_mf);
+        break;
+    case MAXFLOW_ALGO_PUSH_RELABEL:
+        max_flow_destroy_push_relabel(mf);
         break;
     default:
         assert(!"Invalid code path");
@@ -84,8 +85,6 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     if (mf->kind != 0) {
         max_flow_destroy(mf);
     }
-
-    mf->flows = malloc(nnodes * nnodes * sizeof(*mf->flows));
 
     switch (kind) {
 

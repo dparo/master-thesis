@@ -62,7 +62,6 @@ typedef struct MaxFlow {
 
     int32_t s;
     int32_t t;
-    flow_t *flows;
 
     MaxFlowAlgoKind kind;
     union {
@@ -73,6 +72,7 @@ typedef struct MaxFlow {
 
         // Push relabel context
         struct {
+            flow_t *flows;
             int32_t *height;
             flow_t *excess_flow;
             int32_t *curr_neigh;

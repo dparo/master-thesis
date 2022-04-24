@@ -6,10 +6,11 @@ extern "C" {
 
 #include "maxflow.h"
 
-#define MAXFLOW_FLOW(mf, i, j) (mf->flows[i * mf->nnodes + j])
+#define MAXFLOW_FLOW(mf, i, j) (mf->payload.flows[i * mf->nnodes + j])
 
 static inline void maxflow_clear_flow(MaxFlow *mf) {
-    memset(mf->flows, 0, mf->nnodes * mf->nnodes * sizeof(*mf->flows));
+    memset(mf->payload.flows, 0,
+           mf->nnodes * mf->nnodes * sizeof(*mf->payload.flows));
 }
 
 static inline flow_t residual_cap(const FlowNetwork *net, const MaxFlow *mf,
@@ -125,6 +126,7 @@ static inline void validate_min_cut(const FlowNetwork *net, const MaxFlow *mf,
     UNUSED_PARAM(result);
     UNUSED_PARAM(mf);
     UNUSED_PARAM(result);
+    UNUSED_PARAM(max_flow);
 #endif
 }
 

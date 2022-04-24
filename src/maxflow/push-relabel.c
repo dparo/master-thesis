@@ -23,7 +23,16 @@
 #include "push-relabel.h"
 #include "maxflow/utils.h"
 
+void max_flow_destroy_push_relabel(MaxFlow *mf) {
+    free(mf->payload.flows);
+    free(mf->payload.height);
+    free(mf->payload.excess_flow);
+    free(mf->payload.curr_neigh);
+    free(mf->payload.list);
+}
+
 void max_flow_create_push_relabel(MaxFlow *mf, int32_t nnodes) {
+    mf->payload.flows = malloc(nnodes * nnodes * sizeof(*mf->payload.flows));
     mf->payload.height = malloc(nnodes * sizeof(*mf->payload.height));
     mf->payload.excess_flow = malloc(nnodes * sizeof(*mf->payload.excess_flow));
     mf->payload.curr_neigh = malloc(nnodes * sizeof(*mf->payload.curr_neigh));

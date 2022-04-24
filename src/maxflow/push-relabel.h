@@ -26,3 +26,4 @@ void max_flow_algo_push_relabel(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                                 int32_t t, MaxFlowResult *result);
 
 void max_flow_create_push_relabel(MaxFlow *mf, int32_t nnodes);
+void max_flow_destroy_push_relabel(MaxFlow *mf);

@@ -32,7 +32,7 @@
 #include "types.h"
 #include "maxflow.h"
 
-#define MAX_NUM_NODES_TO_TEST 50
+#define MAX_NUM_NODES_TO_TEST 10
 
 TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
                                  MaxFlowResult *result) {
@@ -483,7 +483,7 @@ TEST single_path_flow(void) {
         int32_t source_vertex = 0;
         int32_t sink_vertex = nnodes - 1;
 
-        flow_t min_cap = INFINITY;
+        flow_t min_cap = FLOW_MAX;
 
         for (int32_t i = 0; i < nnodes - 1; i++) {
             flow_t c = rand() % 10;
@@ -523,8 +523,8 @@ TEST two_path_flow(void) {
         int32_t source_vertex = 0;
         int32_t sink_vertex = nnodes - 1;
 
-        flow_t min_cap1 = INFINITY;
-        flow_t min_cap2 = INFINITY;
+        flow_t min_cap1 = FLOW_MAX;
+        flow_t min_cap2 = FLOW_MAX;
 
         flow_net_set_cap(&net, 0, 1, 99999);
         flow_net_set_cap(&net, 0, 2, 99999);
@@ -579,7 +579,7 @@ TEST two_path_flow(void) {
 TEST random_networks(void) {
     const flow_t RAND_VALS[] = {0, 1, 2, 5, 7, 0, 3};
 
-    for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
+    for (int32_t nnodes = 2; nnodes <= MAX_NUM_NODES_TO_TEST; nnodes++) {
         for (int32_t try_it = 0; try_it < 2048; try_it++) {
             FlowNetwork net = {0};
             MaxFlow mf = {0};
