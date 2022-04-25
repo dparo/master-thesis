@@ -84,7 +84,12 @@ typedef struct MaxFlow {
 } MaxFlow;
 
 typedef struct GomoryHuTree {
-
+    int32_t nnodes;
+    MaxFlowResult *results;
+    int32_t *indices;
+    struct {
+        int32_t *sink_candidate;
+    };
 } GomoryHuTree;
 
 static inline void flow_net_set_cap(FlowNetwork *net, int32_t i, int32_t j,

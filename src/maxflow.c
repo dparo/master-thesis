@@ -225,10 +225,82 @@ double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
     return result->maxflow;
 }
 
+void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes) {
+    tree->nnodes = nnodes;
+    tree->sink_candidate = malloc(nnodes * sizeof(*tree->sink_candidate));
+    tree->results = malloc(nnodes * sizeof(*tree->results));
+    tree->indices = malloc(nnodes * nnodes * sizeof(*tree->indices));
+}
+
+void gomory_hu_tree_destroy(GomoryHuTree *tree) {
+    free(tree->sink_candidate);
+    free(tree->results);
+    free(tree->indices);
+    memset(tree, 0, sizeof(*tree));
+}
+
 void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
                         GomoryHuTree *tree) {
-    int32_t s, t;
-    MaxFlowResult result = {0};
+    ATTRIB_MAYBE_UNUSED const int32_t n = net->nnodes;
 
-    max_flow_single_pair(net, mf, s, t, &result);
+#ifndef NDEBUG
+
+    // IMPORTANT:
+    //     This implementation only works with undirected graphs.
+    //     Since the FlowNetwork allows representations of directed graphs
+    //     We are going to assert that the network is undirected here
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i != j) {
+                assert(flow_net_get_cap(net, i, j) ==
+                       flow_net_get_cap(net, j, i));
+            }
+        }
+    }
+
+#endif
+
+    for (int32_t i = 0; i < n; i++) {
+        tree->sink_candidate[i] = 0;
+    }
+
+    for (int32_t s = 1; s < n; s++) {
+        int32_t max_flow_iteration = s - 1;
+        MaxFlowResult *result = &tree->results[max_flow_iteration];
+        int32_t t = tree->sink_candidate[s];
+        double max_flow = max_flow_single_pair(net, mf, s, t, result);
+
+        assert(result->colors[s] == BLACK);
+        assert(result->colors[t] == WHITE);
+
+        // Setup the next sink candidate for each vertex according to their
+        // bipartition (s, t) as valid max_flow candidates.
+        for (int32_t i = 0; i < n; i++) {
+            bool i_black = result->colors[i] == BLACK;
+            bool i_white = result->colors[i] == WHITE;
+
+            if (i != s && tree->sink_candidate[i] == t && i_black) {
+                tree->sink_candidate[i] = s;
+            } else if (i != t && tree->sink_candidate[i] == s && i_white) {
+                tree->sink_candidate[i] = t;
+            }
+        }
+
+        // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
+        // s bipartition), fix the candidates, and swap the flows
+        if (result->colors[tree->sink_candidate[t]] == BLACK) {
+            tree->sink_candidate[s] = tree->sink_candidate[t];
+            tree->sink_candidate[t] = s;
+        }
+
+        for (int32_t i = 0; i < n; i++) {
+            for (int32_t j = 0; j < n; j++) {
+                if (result->colors[i] == BLACK && result->colors[j] == WHITE) {
+                    tree->indices[i * n + j] = max_flow_iteration;
+                }
+            }
+        }
+    }
 }
+
+MaxFlowResult *gomory_hu_tree_query(GomoryHuTree *tree, int32_t i, int32_t j) {}
