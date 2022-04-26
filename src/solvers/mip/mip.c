@@ -1350,6 +1350,15 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         goto fail;
     }
 
+    if (solver_params_get_bool(tparams, "ENFORCE_STRONG_BRANCHING")) {
+        if (CPXXsetintparam(solver->data->env, CPX_PARAM_VARSEL,
+                            CPX_VARSEL_STRONG) != 0) {
+            log_warn("%s :: CPXXsetintparam for CPX_PARAM_VARSEL "
+                     "(=CPX_VARSEL_STRONG) failed",
+                     __func__);
+        }
+    }
+
     if (solver_params_get_bool(tparams, "APPLY_LB_HEUR")) {
         if (CPXXsetintparam(solver->data->env, CPX_PARAM_LBHEUR, 1) != 0) {
             log_warn("%s :: CPXXsetintparam for CPX_PARAM_LBHEUR failed",
