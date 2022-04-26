@@ -169,7 +169,7 @@ static void max_flow_single_pair_bruteforce(const FlowNetwork *net, MaxFlow *mf,
     }
 }
 
-double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
+flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result) {
     assert(net->caps);
     assert(net->nnodes >= 2);
@@ -225,14 +225,22 @@ double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
     return result->maxflow;
 }
 
-void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes) {
+void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes) {
     tree->nnodes = nnodes;
     tree->sink_candidate = malloc(nnodes * sizeof(*tree->sink_candidate));
     tree->results = malloc(nnodes * sizeof(*tree->results));
     tree->indices = malloc(nnodes * nnodes * sizeof(*tree->indices));
+
+    for (int32_t i = 0; i < nnodes - 1; i++) {
+        max_flow_result_create_v2(&tree->results[i], nnodes);
+    }
 }
 
-void gomory_hu_tree_destroy(GomoryHuTree *tree) {
+void gomory_hu_tree_destroy_v2(GomoryHuTree *tree) {
+    for (int32_t i = 0; i < tree->nnodes - 1; i++) {
+        max_flow_result_destroy_v2(&tree->results[i]);
+    }
+
     free(tree->sink_candidate);
     free(tree->results);
     free(tree->indices);
@@ -264,11 +272,21 @@ void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
         tree->sink_candidate[i] = 0;
     }
 
+    // Clear indices to -1 so that we can validate
+    // whether all indices will be populated later correctly.
+#ifndef NDEBUG
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            tree->indices[i * n + j] = -1;
+        }
+    }
+#endif
+
     for (int32_t s = 1; s < n; s++) {
         int32_t max_flow_iteration = s - 1;
         MaxFlowResult *result = &tree->results[max_flow_iteration];
         int32_t t = tree->sink_candidate[s];
-        double max_flow = max_flow_single_pair(net, mf, s, t, result);
+        flow_t max_flow = max_flow_single_pair(net, mf, s, t, result);
 
         assert(result->colors[s] == BLACK);
         assert(result->colors[t] == WHITE);
@@ -301,6 +319,25 @@ void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
             }
         }
     }
+
+#ifndef NDEBUG
+    for (int32_t i = 0; i < n; i++) {
+        for (int32_t j = 0; j < n; j++) {
+            if (i == j) {
+                continue;
+            }
+
+            int32_t index = tree->indices[i * n + j];
+            assert(index >= 0 && index < n - 1);
+        }
+    }
+#endif
 }
 
-MaxFlowResult *gomory_hu_tree_query(GomoryHuTree *tree, int32_t i, int32_t j) {}
+MaxFlowResult *gomory_hu_tree_query_v2(GomoryHuTree *tree, int32_t s,
+                                       int32_t t) {
+    assert(s != t);
+    assert(s >= 0 && s < tree->nnodes);
+    assert(t >= 0 && t < tree->nnodes);
+    return &tree->results[tree->indices[s * tree->nnodes + t]];
+}

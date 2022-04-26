@@ -119,10 +119,12 @@ void max_flow_result_destroy_v2(MaxFlowResult *result);
 
 void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
 
-void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes);
-void gomory_hu_tree_destroy(GomoryHuTree *tree);
+void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes);
+void gomory_hu_tree_destroy_v2(GomoryHuTree *tree);
+MaxFlowResult *gomory_hu_tree_query_v2(GomoryHuTree *tree, int32_t s,
+                                       int32_t t);
 
-double max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
+flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result);
 
 void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
