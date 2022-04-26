@@ -226,9 +226,10 @@ flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
 }
 
 void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes) {
+    tree->num_results = nnodes - 1;
     tree->nnodes = nnodes;
     tree->sink_candidate = malloc(nnodes * sizeof(*tree->sink_candidate));
-    tree->results = malloc(nnodes * sizeof(*tree->results));
+    tree->results = malloc(tree->num_results * sizeof(*tree->results));
     tree->indices = malloc(nnodes * nnodes * sizeof(*tree->indices));
 
     for (int32_t i = 0; i < nnodes - 1; i++) {

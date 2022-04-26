@@ -85,6 +85,7 @@ typedef struct MaxFlow {
 
 typedef struct GomoryHuTree {
     int32_t nnodes;
+    int32_t num_results;
     MaxFlowResult *results;
     int32_t *indices;
     struct {
