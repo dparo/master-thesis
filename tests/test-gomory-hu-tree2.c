@@ -137,10 +137,12 @@ TEST random_gomory_hu(void) {
             MaxFlow mf = {0};
             FlowNetwork net = {0};
             MaxFlowResult result1 = {0};
+            MaxFlowResult result2 = {0};
             GomoryHuTree tree = {0};
 
             max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
             max_flow_result_create_v2(&result1, nnodes);
+            max_flow_result_create_v2(&result2, nnodes);
             flow_network_create_v2(&net, nnodes);
             init_symm_random_flownet(&net);
             gomory_hu_tree_create_v2(&tree, nnodes);
@@ -157,17 +159,16 @@ TEST random_gomory_hu(void) {
                     max_flow1 =
                         max_flow_single_pair(&net, &mf, source, sink, &result1);
 
-                    MaxFlowResult *result2 =
-                        gomory_hu_tree_query_v2(&tree, source, sink);
-                    flow_t max_flow2 = result2->maxflow;
+                    flow_t max_flow2 =
+                        gomory_hu_tree_query_v2(&tree, &result2, source, sink);
 
                     assert(result1.colors[source] == BLACK);
                     assert(result1.colors[sink] == WHITE);
-                    assert(result2->colors[source] == BLACK);
-                    assert(result2->colors[sink] == WHITE);
+                    assert(result2.colors[source] == BLACK);
+                    assert(result2.colors[sink] == WHITE);
 
                     ASSERT_EQ(max_flow1, result1.maxflow);
-                    ASSERT_EQ(max_flow2, result2->maxflow);
+                    ASSERT_EQ(max_flow2, result2.maxflow);
 
                     printf("max_flow1 = %d, max_flow2 = %d\n", max_flow1,
                            max_flow2);
@@ -178,6 +179,7 @@ TEST random_gomory_hu(void) {
             flow_network_destroy_v2(&net);
             max_flow_destroy(&mf);
             max_flow_result_destroy_v2(&result1);
+            max_flow_result_destroy_v2(&result2);
             gomory_hu_tree_destroy_v2(&tree);
         }
     }
@@ -188,7 +190,7 @@ GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
-    RUN_TEST(random_symm_networks);
+    // RUN_TEST(random_symm_networks);
     RUN_TEST(random_gomory_hu);
     GREATEST_MAIN_END(); /* display results */
 }

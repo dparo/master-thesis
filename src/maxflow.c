@@ -226,26 +226,39 @@ flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
 }
 
 void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes) {
-    tree->num_results = (nnodes - 1) * 2;
     tree->nnodes = nnodes;
     tree->sink_candidate = malloc(nnodes * sizeof(*tree->sink_candidate));
-    tree->results = malloc(tree->num_results * sizeof(*tree->results));
-    tree->indices = malloc(nnodes * nnodes * sizeof(*tree->indices));
+    tree->flows = malloc(nnodes * sizeof(*tree->flows));
 
-    for (int32_t i = 0; i < tree->num_results; i++) {
-        max_flow_result_create_v2(&tree->results[i], nnodes);
-    }
+    tree->rows = malloc(nnodes * sizeof(tree->rows[0]) * nnodes *
+                        sizeof(tree->rows[0].records[0]));
+
+    tree->bfs_queue = malloc(nnodes * sizeof(*tree->bfs_queue));
+    tree->parent = malloc(nnodes * sizeof(*tree->parent));
+    tree->visited = malloc(nnodes * sizeof(*tree->visited));
+
+    max_flow_result_create_v2(&tree->temp_result, nnodes);
 }
 
 void gomory_hu_tree_destroy_v2(GomoryHuTree *tree) {
-    for (int32_t i = 0; i < tree->num_results; i++) {
-        max_flow_result_destroy_v2(&tree->results[i]);
-    }
+    max_flow_result_destroy_v2(&tree->temp_result);
 
-    free(tree->indices);
-    free(tree->results);
+    free(tree->bfs_queue);
+    free(tree->parent);
+    free(tree->visited);
+    free(tree->rows);
     free(tree->sink_candidate);
+    free(tree->flows);
+
     memset(tree, 0, sizeof(*tree));
+}
+
+static GomoryHuTreeAdjRow *gomory_hu_tree_get_row(GomoryHuTree *tree,
+                                                  int32_t node) {
+    ATTRIB_MAYBE_UNUSED const int32_t n = tree->nnodes;
+    return (GomoryHuTreeAdjRow *)((uint8_t *)tree->rows +
+                                  node * sizeof(tree->rows[0]) * n *
+                                      sizeof(tree->rows[0].records[0]));
 }
 
 void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
@@ -274,44 +287,30 @@ void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
 
     for (int32_t i = 0; i < n; i++) {
         tree->sink_candidate[i] = 0;
+        tree->flows[i] = 0;
+        GomoryHuTreeAdjRow *row = gomory_hu_tree_get_row(tree, i);
+        row->num_records = 0;
     }
-
-    // Clear indices to -1 so that we can validate
-    // whether all indices will be populated later correctly.
-#ifndef NDEBUG
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            tree->indices[i * n + j] = -1;
-        }
-    }
-#endif
 
     for (int32_t s = 1; s < n; s++) {
-
-        const int32_t result1_idx = (s - 1) * 2;
-        const int32_t result2_idx = (s - 1) * 2 + 1;
-        MaxFlowResult *result1 = &tree->results[result1_idx];
-        MaxFlowResult *result2 = &tree->results[result2_idx];
+        MaxFlowResult *result = &tree->temp_result;
 
         int32_t t = tree->sink_candidate[s];
+        ATTRIB_MAYBE_UNUSED flow_t max_flow =
+            max_flow_single_pair(net, mf, s, t, result);
 
-        flow_t max_flow1 = max_flow_single_pair(net, mf, s, t, result1);
-        flow_t max_flow2 = max_flow_single_pair(net, mf, t, s, result2);
+        assert(max_flow == result->maxflow);
 
-        assert(max_flow1 == max_flow2);
-        assert(result1->maxflow == result2->maxflow);
+        assert(result->colors[s] == BLACK);
+        assert(result->colors[t] == WHITE);
 
-        assert(result1->colors[s] == BLACK);
-        assert(result1->colors[t] == WHITE);
-
-        assert(result2->colors[t] == BLACK);
-        assert(result2->colors[s] == WHITE);
+        tree->flows[s] = max_flow;
 
         // Setup the next sink candidate for each vertex according to their
         // bipartition (s, t) as valid max_flow candidates.
         for (int32_t i = 0; i < n; i++) {
-            bool i_black = result1->colors[i] == BLACK;
-            bool i_white = result1->colors[i] == WHITE;
+            bool i_black = result->colors[i] == BLACK;
+            bool i_white = result->colors[i] == WHITE;
 
             if (i != s && tree->sink_candidate[i] == t && i_black) {
                 tree->sink_candidate[i] = s;
@@ -322,49 +321,106 @@ void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
 
         // If the next sink candidate for t is of BLACK COLOR (eg belongs to the
         // s bipartition), fix the candidates, and swap the flows
-        if (result1->colors[tree->sink_candidate[t]] == BLACK) {
+        if (result->colors[tree->sink_candidate[t]] == BLACK) {
             tree->sink_candidate[s] = tree->sink_candidate[t];
             tree->sink_candidate[t] = s;
+            SWAP(flow_t, tree->flows[s], tree->flows[t]);
         }
+    }
 
-        for (int32_t i = 0; i < n; i++) {
-            for (int32_t j = 0; j < n; j++) {
-                const int32_t subscript = i * n + j;
-                if (result1->colors[i] == BLACK &&
-                    result1->colors[j] == WHITE) {
-                    assert(tree->indices[subscript] == -1);
-                    tree->indices[subscript] = result1_idx;
-                } else if (result2->colors[i] == BLACK &&
-                           result2->colors[j] == WHITE) {
-                    assert(tree->indices[subscript] == -1);
-                    tree->indices[subscript] = result2_idx;
+    // Setup the adjency matrix
+    for (int32_t s = 1; s < n; s++) {
+        flow_t f = tree->flows[s];
+        int32_t t = tree->sink_candidate[s];
+
+        GomoryHuTreeAdjRow *s_row = gomory_hu_tree_get_row(tree, s);
+        GomoryHuTreeAdjRow *t_row = gomory_hu_tree_get_row(tree, t);
+
+        s_row->records[s_row->num_records].node = t;
+        s_row->records[s_row->num_records].flow = f;
+        ++s_row->num_records;
+
+        t_row->records[t_row->num_records].node = s;
+        t_row->records[t_row->num_records].flow = f;
+        ++t_row->num_records;
+    }
+}
+
+flow_t gomory_hu_tree_query_v2(GomoryHuTree *tree, MaxFlowResult *result,
+                               int32_t s, int32_t t) {
+    const int32_t n = tree->nnodes;
+
+    assert(s != t);
+    assert(s >= 0 && s < tree->nnodes);
+    assert(t >= 0 && t < tree->nnodes);
+
+    int32_t *queue = tree->bfs_queue;
+
+    {
+        memset(tree->visited, 0, n * sizeof(*tree->visited));
+        memset(tree->flows, 0, n * sizeof(*tree->flows));
+        int32_t head = 0;
+        int32_t tail = 0;
+        queue[tail++] = s;
+        tree->visited[s] = true;
+        tree->parent[s] = -1;
+        tree->flows[s] = FLOW_MAX;
+
+        while (head != tail) {
+            int32_t u = queue[head++];
+
+            GomoryHuTreeAdjRow *row = gomory_hu_tree_get_row(tree, u);
+            for (int32_t i = 0; i < row->num_records; i++) {
+                if (i >= row->num_records) {
+                    break;
+                }
+
+                int32_t v = row->records[i].node;
+                flow_t flow = row->records[i].flow;
+                bool explore_v = !tree->visited[v];
+
+                if (explore_v) {
+                    queue[tail++] = v;
+                    tree->parent[v] = u;
+                    tree->flows[v] = MIN(flow, tree->flows[tree->parent[v]]);
+                    tree->visited[v] = true;
                 }
             }
         }
     }
 
-#ifndef NDEBUG
-    for (int32_t i = 0; i < n; i++) {
-        for (int32_t j = 0; j < n; j++) {
-            if (i == j) {
-                continue;
-            }
+    assert(tree->visited[t]);
+    flow_t max_flow = tree->flows[t];
+    result->maxflow = max_flow;
 
-            int32_t index = tree->indices[i * n + j];
-            assert(index >= 0 && index < tree->num_results);
+    for (int32_t i = 0; i < n; i++) {
+        result->colors[i] = WHITE;
+    }
+
+    // Final BFS to determine the bipartition
+    {
+        int32_t head = 0;
+        int32_t tail = 0;
+        queue[tail++] = s;
+        result->colors[s] = BLACK;
+
+        while (head != tail) {
+            int32_t u = queue[head++];
+
+            GomoryHuTreeAdjRow *row = gomory_hu_tree_get_row(tree, u);
+            for (int32_t i = 0; i < row->num_records; i++) {
+                int32_t v = row->records[i].node;
+                flow_t flow = row->records[i].flow;
+                bool explore_v = result->colors[v] == WHITE && flow > max_flow;
+
+                if (explore_v) {
+                    queue[tail++] = v;
+                    result->colors[v] = BLACK;
+                }
+            }
         }
     }
-#endif
-}
-
-MaxFlowResult *gomory_hu_tree_query_v2(GomoryHuTree *tree, int32_t s,
-                                       int32_t t) {
-    assert(s != t);
-    assert(s >= 0 && s < tree->nnodes);
-    assert(t >= 0 && t < tree->nnodes);
-
-    const int32_t subscript = s * tree->nnodes + t;
-    const int32_t idx = tree->indices[subscript];
-    assert(idx >= 0 && idx < tree->num_results);
-    return &tree->results[idx];
+    assert(result->colors[s] == BLACK);
+    assert(result->colors[t] == WHITE);
+    return max_flow;
 }

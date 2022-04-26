@@ -83,12 +83,25 @@ typedef struct MaxFlow {
 
 } MaxFlow;
 
+typedef struct {
+    int32_t node;
+    flow_t flow;
+} GomoryHuTreeAdjRecord;
+
+typedef struct {
+    int32_t num_records;
+    GomoryHuTreeAdjRecord records[];
+} GomoryHuTreeAdjRow;
+
 typedef struct GomoryHuTree {
     int32_t nnodes;
-    int32_t num_results;
-    MaxFlowResult *results;
-    int32_t *indices;
+    MaxFlowResult temp_result;
     struct {
+        flow_t *flows;
+        GomoryHuTreeAdjRow *rows;
+        int32_t *bfs_queue;
+        int32_t *parent;
+        int32_t *visited;
         int32_t *sink_candidate;
     };
 } GomoryHuTree;
@@ -122,8 +135,8 @@ void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
 
 void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes);
 void gomory_hu_tree_destroy_v2(GomoryHuTree *tree);
-MaxFlowResult *gomory_hu_tree_query_v2(GomoryHuTree *tree, int32_t s,
-                                       int32_t t);
+flow_t gomory_hu_tree_query_v2(GomoryHuTree *tree, MaxFlowResult *result,
+                               int32_t s, int32_t t);
 
 flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result);
