@@ -170,8 +170,8 @@ TEST random_gomory_hu(void) {
                     ASSERT_EQ(max_flow1, result1.maxflow);
                     ASSERT_EQ(max_flow2, result2.maxflow);
 
-                    printf("max_flow1 = %d, max_flow2 = %d\n", max_flow1,
-                           max_flow2);
+                    // printf("max_flow1 = %d, max_flow2 = %d\n", max_flow1,
+                    //        max_flow2);
                     ASSERT_EQ(max_flow1, max_flow2);
                 }
             }
