@@ -162,6 +162,12 @@ TEST random_gomory_hu(void) {
                     flow_t max_flow2 =
                         gomory_hu_tree_query_v2(&tree, &result2, source, sink);
 
+                    assert(result1.s == source);
+                    assert(result1.t == sink);
+
+                    assert(result2.s == source);
+                    assert(result2.t == sink);
+
                     assert(result1.colors[source] == BLACK);
                     assert(result1.colors[sink] == WHITE);
                     assert(result2.colors[source] == BLACK);

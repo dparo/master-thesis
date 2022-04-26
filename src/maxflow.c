@@ -430,5 +430,7 @@ flow_t gomory_hu_tree_query_v2(GomoryHuTree *tree, MaxFlowResult *result,
     }
     assert(result->colors[s] == BLACK);
     assert(result->colors[t] == WHITE);
+    result->s = s;
+    result->t = t;
     return max_flow;
 }
