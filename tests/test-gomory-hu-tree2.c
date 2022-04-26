@@ -190,7 +190,7 @@ GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
     GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
-    // RUN_TEST(random_symm_networks);
+    RUN_TEST(random_symm_networks);
     RUN_TEST(random_gomory_hu);
     GREATEST_MAIN_END(); /* display results */
 }
