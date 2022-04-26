@@ -42,6 +42,8 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
         {"APPLY_LOWER_CUTOFF", TYPED_PARAM_BOOL, "true",
          "Apply lower cutoff value (CPX_PARAM_CUTLO) by using a "
          "trivially computed lower bound for the objective function"},
+        {"ENFORCE_STRONG_BRANCHING", TYPED_PARAM_BOOL, "false",
+         "Force CPLEX to opt for strong branching decisions"},
         {"APPLY_LB_HEUR", TYPED_PARAM_BOOL, "false",
          "Apply local branching heuristic (CPX_PARAM_LBHEUR) to try to improve "
          "new incumbents found during a MIP search."},
@@ -53,7 +55,8 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
          "Warm start the MIP solver by using an insertion heuristic for "
          "finding an initial solution"},
         {"APPLY_POLISHING_AFTER_WARM_START", TYPED_PARAM_BOOL, "false",
-         "Polish the initial warm start solutions right away before beginning "
+         "Polish the initial warm start solutions right away before "
+         "beginning "
          "the Branch&Cut procedure"},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "true", "Enable GLM cuts separation"},
