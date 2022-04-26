@@ -96,8 +96,9 @@ typedef struct {
 typedef struct GomoryHuTree {
     int32_t nnodes;
     MaxFlowResult temp_result;
+    flow_t *maxflows;
     struct {
-        flow_t *flows;
+        flow_t *record_flows;
         GomoryHuTreeAdjRow *rows;
         int32_t *bfs_queue;
         int32_t *parent;
