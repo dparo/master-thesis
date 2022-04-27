@@ -127,7 +127,8 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf) {
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow) {
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
@@ -136,8 +137,8 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     int32_t depot_color = mf->colors[0];
 
-    const int32_t source_vertex = mf->source;
-    const int32_t sink_vertex = mf->sink;
+    const int32_t source_vertex = mf->s;
+    const int32_t sink_vertex = mf->t;
 
     assert(mf->colors[source_vertex] == BLACK);
     assert(mf->colors[sink_vertex] == WHITE);
@@ -234,7 +235,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         log_trace("%s :: Adding GSEC fractional constraint (%g >= "
                   "2.0 * %g)"
                   " (|S| = %d, nnz = %lld)",
-                  __func__, mf->maxflow, y_i, set_s_size, nnz);
+                  __func__, max_flow, y_i, set_s_size, nnz);
 
         if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
                                     ctx->value, purgeable, local_validity)) {

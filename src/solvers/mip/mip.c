@@ -52,7 +52,7 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
 #include "log.h"
 #include "cuts.h"
 #include "warm-start.h"
-#include "network.h"
+#include "maxflow.h"
 #include "validation.h"
 
 ATTRIB_MAYBE_UNUSED static void show_lp_file(Solver *self) {
@@ -110,9 +110,9 @@ typedef struct {
     bool valid;
     double *vstar;
     FlowNetwork network;
-    GomoryHuTreeCtx gh_ctx;
     GomoryHuTree gh_tree;
-    MaxFlowResult max_flow;
+    MaxFlow maxflow;
+    MaxFlowResult maxflow_result;
     Tour tour;
     CutSeparationFunctor functors[NUM_CUTS];
 } CallbackThreadLocalData;
@@ -143,10 +143,10 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     }
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
-    flow_network_destroy(&thread_local_data->network);
-    gomory_hu_tree_ctx_destroy(&thread_local_data->gh_ctx);
-    gomory_hu_tree_destroy(&thread_local_data->gh_tree);
-    max_flow_result_destroy(&thread_local_data->max_flow);
+    flow_network_destroy_v2(&thread_local_data->network);
+    max_flow_destroy(&thread_local_data->maxflow);
+    gomory_hu_tree_destroy_v2(&thread_local_data->gh_tree);
+    max_flow_result_destroy_v2(&thread_local_data->maxflow_result);
     thread_local_data->valid = false;
 }
 
@@ -166,10 +166,10 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     const int32_t n = instance->num_customers + 1;
     memset(thread_local_data, 0, sizeof(*thread_local_data));
 
-    thread_local_data->network = flow_network_create(n);
-    thread_local_data->max_flow = max_flow_result_create(n);
-    thread_local_data->gh_tree = gomory_hu_tree_create(n);
-    success &= gomory_hu_tree_ctx_create(&thread_local_data->gh_ctx, n);
+    flow_network_create_v2(&thread_local_data->network, n);
+    max_flow_create(&thread_local_data->maxflow, n, MAXFLOW_ALGO_PUSH_RELABEL);
+    max_flow_result_create_v2(&thread_local_data->maxflow_result, n);
+    gomory_hu_tree_create_v2(&thread_local_data->gh_tree, n);
 
     thread_local_data->tour = tour_create(instance);
 
@@ -188,10 +188,8 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
             functor->solver = solver;
 
             success &= functor->ctx && thread_local_data->vstar &&
-                       thread_local_data->network.flow &&
-                       thread_local_data->network.cap &&
-                       thread_local_data->max_flow.colors &&
-                       thread_local_data->gh_tree.reduced_net.cap &&
+                       thread_local_data->network.caps &&
+                       thread_local_data->maxflow_result.colors &&
                        tour_is_valid(&thread_local_data->tour);
         }
     }
@@ -618,6 +616,8 @@ bool build_mip_formulation(Solver *self, const Instance *instance) {
     return result;
 }
 
+#define CAP_DOUBLE_TO_INT (1 << 24)
+
 static void init_flow_network(FlowNetwork *net, const Instance *instance,
                               const double *vstar) {
 
@@ -635,7 +635,8 @@ static void init_flow_network(FlowNetwork *net, const Instance *instance,
                 cap = 0.0;
             }
             assert(cap >= 0.0);
-            *network_cap(net, i, j) = cap;
+            flow_t cap_int = (flow_t)(cap * CAP_DOUBLE_TO_INT);
+            flow_net_set_cap(net, i, j, cap_int);
         }
     }
 }
@@ -681,14 +682,15 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     }
 
     const bool any_fractional = is_any_fractional_cut_enabled(tld);
-    const bool do_fractional_sep =
-        (tld->fractional_sep_it % (instance->num_customers + 1) == 0);
+    // const bool do_fractional_sep =
+    //     (tld->fractional_sep_it % (instance->num_customers + 1) == 0);
+    const bool do_fractional_sep = true;
 
     if (any_fractional && do_fractional_sep) {
         FlowNetwork *net = &tld->network;
         init_flow_network(net, instance, vstar);
 
-        gomory_hu_tree2(net, &tld->gh_tree, &tld->gh_ctx);
+        max_flow_all_pairs(net, &tld->maxflow, &tld->gh_tree);
 
         for (int32_t s = 0; s < instance->num_customers + 1; s++) {
             for (int32_t t = 0; t < instance->num_customers + 1; t++) {
@@ -718,11 +720,14 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                 //
                 //      which are not complementary!!
                 //
-                gomory_hu_query(&tld->gh_tree, s, t, &tld->max_flow,
-                                &tld->gh_ctx);
 
-                assert(tld->max_flow.colors[s] == BLACK);
-                assert(tld->max_flow.colors[t] == WHITE);
+                flow_t max_flow_int = gomory_hu_tree_query_v2(
+                    &tld->gh_tree, &tld->maxflow_result, s, t);
+
+                double max_flow = max_flow_int / (double)CAP_DOUBLE_TO_INT;
+
+                assert(tld->maxflow_result.colors[s] == BLACK);
+                assert(tld->maxflow_result.colors[t] == WHITE);
 
                 for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
                     if (is_fractional_cut_active(cut_id)) {
@@ -738,7 +743,8 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                             // of the thread
                             functor->internal.cplex_cb_ctx = cplex_cb_ctx;
                             bool separation_success = iface->fractional_sep(
-                                functor, obj_p, vstar, &tld->max_flow);
+                                functor, obj_p, vstar, &tld->maxflow_result,
+                                max_flow);
                             functor->internal.fractional_stats.accum_usecs +=
                                 os_get_usecs() - begin_time;
 

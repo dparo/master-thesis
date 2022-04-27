@@ -64,6 +64,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                                       const double *vstar, int32_t *colors,
                                       int32_t curr_color, double max_flow,
                                       double tolerance) {
+    UNUSED_PARAM(max_flow);
     SeparationInfo info = {0};
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
@@ -117,14 +118,6 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 push_var_lhs(&ctx->super, &info, vstar, value,
                              (CPXDIM)get_x_mip_var_idx(instance, i, j));
             }
-        }
-
-        for (int32_t i = 0; i < n; i++) {
-            bool i_in_s = colors[i] == curr_color;
-
-            if (!i_in_s) {
-                continue;
-            }
 
             assert(i != 0);
             double value = -2.0 * demand(instance, i) / Q;
@@ -144,14 +137,15 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf) {
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow) {
     UNUSED_PARAM(obj_p);
 
     CutSeparationPrivCtx *ctx = self->ctx;
     int32_t depot_color = mf->colors[0];
     SeparationInfo info =
         separate(self, vstar, mf->colors, depot_color == BLACK ? WHITE : BLACK,
-                 mf->maxflow, FRACTIONAL_VIOLATION_TOLERANCE);
+                 max_flow, FRACTIONAL_VIOLATION_TOLERANCE);
     if (!push_fractional_cut("GLM", self, &ctx->super, &info)) {
         return false;
     }

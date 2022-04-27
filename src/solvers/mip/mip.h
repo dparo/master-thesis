@@ -29,7 +29,7 @@ extern "C" {
 #include "types.h"
 #include "core.h"
 #include "core-utils.h"
-#include "network.h"
+#include "maxflow.h"
 
 #ifdef COMPILED_WITH_CPLEX
 
@@ -78,7 +78,8 @@ typedef struct {
     void (*deactivate)(CutSeparationPrivCtx *ctx);
 
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf);
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour);
 } CutSeparationIface;

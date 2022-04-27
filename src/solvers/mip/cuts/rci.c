@@ -139,14 +139,15 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf) {
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow) {
     UNUSED_PARAM(obj_p);
 
     CutSeparationPrivCtx *ctx = self->ctx;
     int32_t depot_color = mf->colors[0];
     SeparationInfo info =
         separate(self, vstar, mf->colors, depot_color == BLACK ? WHITE : BLACK,
-                 mf->maxflow, FRACTIONAL_VIOLATION_TOLERANCE);
+                 max_flow, FRACTIONAL_VIOLATION_TOLERANCE);
     if (!push_fractional_cut("RCI", self, &ctx->super, &info)) {
         return false;
     }
