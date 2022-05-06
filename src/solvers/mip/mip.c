@@ -115,6 +115,9 @@ typedef struct {
     MaxFlowResult maxflow_result;
     Tour tour;
     CutSeparationFunctor functors[NUM_CUTS];
+
+    CPXDIM *index;
+    double *value;
 } CallbackThreadLocalData;
 
 /// Struct that is used as a userhandle to be passed to the cplex generic
@@ -141,6 +144,9 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
             }
         }
     }
+
+    free(thread_local_data->index);
+    free(thread_local_data->value);
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
     flow_network_destroy_v2(&thread_local_data->network);
@@ -175,6 +181,11 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
 
     thread_local_data->vstar =
         malloc(sizeof(*thread_local_data->vstar) * solver->data->num_mip_vars);
+
+    thread_local_data->index =
+        malloc(solver->data->num_mip_vars * sizeof(*thread_local_data->index));
+    thread_local_data->value =
+        malloc(solver->data->num_mip_vars * sizeof(*thread_local_data->value));
 
     for (int32_t cut_id = 0; cut_id < (int32_t)NUM_CUTS; cut_id++) {
         if (is_active_cut(cut_id)) {
@@ -787,6 +798,45 @@ static int cplex_on_branching(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                                             &obj_p)) {
         log_fatal("%s :: CPXXcallbackgetrelaxationpoint() failed", __func__);
         goto terminate;
+    }
+
+    double accum = 0.0;
+    for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+        double y_i = vstar[get_y_mip_var_idx(instance, i)];
+        accum += y_i;
+    }
+
+    double intval = round(accum);
+    double frac = fabs(intval - accum);
+
+    // printf("Branching :: intval = %f, frac = %f\n", intval, frac);
+
+    if (false && frac > 0.1) {
+        double const up = ceil(frac);
+        double const down = floor(frac);
+        CPXNNZ rmatbeg[] = {0};
+        CPXDIM nnz = instance->num_customers + 1;
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            tld->index[i] = (CPXDIM)get_y_mip_var_idx(instance, i);
+            tld->value[i] = 1.0;
+        }
+
+        /* Create the UP branch. */
+        if (0 != CPXXcallbackmakebranch(cplex_cb_ctx, 0, NULL, NULL, NULL, 1,
+                                        nnz, &up, "G", rmatbeg, tld->index,
+                                        tld->value, obj_p, NULL)) {
+            log_fatal("Failed to create up branch\n");
+            goto terminate;
+        }
+
+        /* Create the DOWN branch. */
+        if (0 != CPXXcallbackmakebranch(cplex_cb_ctx, 0, NULL, NULL, NULL, 1,
+                                        nnz, &down, "L", rmatbeg, tld->index,
+                                        tld->value, obj_p, NULL)) {
+            log_fatal("Failed to create up branch\n");
+            goto terminate;
+        }
     }
 
     log_trace("%s :: obj_p = %f", __func__, obj_p);
@@ -1432,6 +1482,15 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         log_info("%s :: Setting UPPER_CUTOFF to %f", __func__,
                  upper_cutoff_value);
 
+        // FIXME:
+        //     Reference:
+        //     https://www.ibm.com/docs/en/icos/22.1.0?topic=parameters-upper-cutoff
+        // This parameter is effective only in the branch and bound algorithm,
+        // for example, in a mixed integer program (MIP). It does not have the
+        // expected effect when branch and bound is not invoked.
+        //
+        //   So... Should we also implement the upper_cutoff as an explicit
+        //   constraint (i.e a dedicated row in the tablue) ???
         if (0 != CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTUP,
                                  upper_cutoff_value)) {
             log_fatal(
@@ -1451,6 +1510,13 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         const double cutoff_value = compute_trivial_lower_cutoff(instance);
         log_info("%s :: Setting LOWER_CUTOFF to %f", __func__, cutoff_value);
 
+        // FIXME:
+        //      Reference:
+        //      https://www.ibm.com/docs/en/icos/22.1.0?topic=parameters-lower-cutoff
+        //  The CPX_PARAM_CUTLO applies only to maximimization problems. In our
+        //  case we have a minimization problem, therefore we need to implement
+        //  the lower_cutoff value as an explicit constraint (i.e a dedicated
+        //  row in the tablue).
         if (0 !=
             CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTLO, cutoff_value)) {
             log_fatal(
