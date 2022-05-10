@@ -248,10 +248,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         added_cuts += 1;
     }
 
-    if (added_cuts > 0) {
-        log_info("%s :: Created %d GSEC cuts", __func__, added_cuts);
-    }
-
     return true;
 failure:
     return false;
@@ -385,8 +381,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         assert(added_cuts == ctx->cnnodes[c]);
         total_num_added_cuts += added_cuts;
     }
-
-    log_info("%s :: Created %d GSEC cuts", __func__, total_num_added_cuts);
 
     return true;
 
