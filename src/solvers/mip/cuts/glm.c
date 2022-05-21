@@ -175,7 +175,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         ++added_cuts;
     }
 
-    log_info("%s :: Created %d GLM cuts", __func__, added_cuts);
+    log_trace("%s :: Created %d GLM cuts", __func__, added_cuts);
 
     return true;
 }
