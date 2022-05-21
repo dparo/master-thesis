@@ -25,7 +25,7 @@
 #include "./cuts-utils.h"
 
 static const double FRACTIONAL_VIOLATION_TOLERANCE = 1e-2;
-static const double INTEGRAL_VIOLATION_TOLERANCE = 0.01;
+static const double INTEGRAL_VIOLATION_TOLERANCE = 0;
 ATTRIB_MAYBE_UNUSED static const double EPS = 1e-6;
 
 struct CutSeparationPrivCtx {
