@@ -108,6 +108,7 @@ typedef enum SolveStatus {
     SOLVE_STATUS_INVALID = 0,
     SOLVE_STATUS_ABORTED_INVALID,
     SOLVE_STATUS_INFEASIBLE,
+    SOLVE_STATUS_ABORTED_INFEASIBLE,
     SOLVE_STATUS_FEASIBLE,
     SOLVE_STATUS_ABORTED_FEASIBLE,
     SOLVE_STATUS_OPTIMAL,
@@ -119,6 +120,7 @@ static const ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INVALID),
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
+    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INFEASIBLE),
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_FEASIBLE),
     ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
@@ -181,18 +183,20 @@ static inline bool is_valid_instance(Instance *instance) {
 static inline bool is_aborted_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_INVALID ||
+           status == SOLVE_STATUS_ABORTED_INFEASIBLE ||
            status == SOLVE_STATUS_ABORTED_ERR;
 }
 
-static inline bool is_feasible_solve_status(SolveStatus status) {
+static inline bool is_primal_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_OPTIMAL;
 }
 
 static inline bool is_valid_solve_status(SolveStatus status) {
-    return is_feasible_solve_status(status) ||
-           status == SOLVE_STATUS_INFEASIBLE;
+    return is_primal_solve_status(status) ||
+           status == SOLVE_STATUS_INFEASIBLE ||
+           status == SOLVE_STATUS_ABORTED_INFEASIBLE;
 }
 
 #if __cplusplus

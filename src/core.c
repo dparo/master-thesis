@@ -391,6 +391,7 @@ static void postprocess_solver_solution(const Instance *instance,
         solution_clear(solution);
         break;
 
+    case SOLVE_STATUS_ABORTED_INFEASIBLE:
     case SOLVE_STATUS_INFEASIBLE:
         break;
 
@@ -502,6 +503,10 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
             break;
         case SOLVE_STATUS_FEASIBLE:
             status = SOLVE_STATUS_ABORTED_FEASIBLE;
+            break;
+        case SOLVE_STATUS_INFEASIBLE:
+            status = SOLVE_STATUS_ABORTED_INFEASIBLE;
+            break;
         default:
             break;
         }

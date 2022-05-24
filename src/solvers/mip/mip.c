@@ -1191,34 +1191,6 @@ static bool process_cplex_output(Solver *self, const Instance *instance,
     bool found_primal_solution =
         result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
 
-    if (found_primal_solution) {
-        if (0 != CPXXgetx(self->data->env, self->data->lp, vstar, 0,
-                          self->data->num_mip_vars - 1)) {
-            log_fatal("%s :: Failed to access MIP solution, even though primal "
-                      "solution should be available",
-                      __func__);
-            goto failure;
-        }
-        if (0 != CPXXgetobjval(self->data->env, self->data->lp,
-                               &solution->primal_bound)) {
-            log_fatal("%s :: Failed to access primal objective value, even "
-                      "though primal "
-                      "solution should be available",
-                      __func__);
-            goto failure;
-        }
-        double gap = INFINITY;
-
-        if (0 != CPXXgetmiprelgap(self->data->env, self->data->lp, &gap)) {
-            log_fatal("%s :: Failed to access relative solution gap, even "
-                      "though primal "
-                      "solution should be available",
-                      __func__);
-            goto failure;
-        }
-        assert(feq(gap, solution_relgap(solution), 1e-6));
-    }
-
     if (result != SOLVE_STATUS_ERR) {
         CPXDIM num_user_cuts = 0;
 
@@ -1228,6 +1200,38 @@ static bool process_cplex_output(Solver *self, const Instance *instance,
                       "should be available since CPLEX did not error out",
                       __func__);
             goto failure;
+        }
+
+        if (found_primal_solution) {
+            if (0 != CPXXgetx(self->data->env, self->data->lp, vstar, 0,
+                              self->data->num_mip_vars - 1)) {
+                log_fatal(
+                    "%s :: Failed to access MIP solution, even though primal "
+                    "solution should be available",
+                    __func__);
+                goto failure;
+            }
+            if (0 != CPXXgetobjval(self->data->env, self->data->lp,
+                                   &solution->primal_bound)) {
+                log_fatal("%s :: Failed to access primal objective value, even "
+                          "though primal "
+                          "solution should be available",
+                          __func__);
+                goto failure;
+            }
+            double gap = INFINITY;
+
+            if (0 != CPXXgetmiprelgap(self->data->env, self->data->lp, &gap)) {
+                log_fatal("%s :: Failed to access relative solution gap, even "
+                          "though primal "
+                          "solution should be available",
+                          __func__);
+                goto failure;
+            }
+
+            printf("gap = %.17g,      solution_relgap = %.17g\n", gap,
+                   solution_relgap(solution));
+            assert(feq(gap, solution_relgap(solution), 1e-6));
         }
 
         if (0 != CPXXgetnumcuts(self->data->env, self->data->lp, CPX_CUT_USER,
@@ -1240,7 +1244,7 @@ static bool process_cplex_output(Solver *self, const Instance *instance,
 
         CPXCNT nodecnt = CPXXgetnodecnt(self->data->env, self->data->lp);
 
-        log_warn(
+        log_info(
             "Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
             "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "
             "%d",
@@ -1250,7 +1254,6 @@ static bool process_cplex_output(Solver *self, const Instance *instance,
     }
 
     if (found_primal_solution) {
-
         for (int32_t i = 0; i < instance->num_customers + 1; i++) {
             for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
