@@ -1127,10 +1127,10 @@ static bool on_solve_start(Solver *self, const Instance *instance,
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
         CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_THREAD_UP |
-        CPX_CALLBACKCONTEXT_THREAD_DOWN | CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS;
+        CPX_CALLBACKCONTEXT_THREAD_DOWN;
 
 #ifndef NDEBUG
-    contextmask |= CPX_CALLBACKCONTEXT_LOCAL_PROGRESS;
+    contextmask |= CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS;
 #endif
 
     if (CPXXcallbacksetfunc(self->data->env, self->data->lp, contextmask,

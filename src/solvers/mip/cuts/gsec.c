@@ -140,6 +140,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
     const int32_t source_vertex = mf->s;
     const int32_t sink_vertex = mf->t;
 
+    assert(source_vertex != sink_vertex);
     assert(mf->colors[source_vertex] == BLACK);
     assert(mf->colors[sink_vertex] == WHITE);
 
