@@ -178,6 +178,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     assert(set_s_size >= 1);
 
+    //
     // NOTE(dparo): 9 Jan 2022
     //      Report to CPLEX a single GSEC per set S. The one that is violated
     //      the most. The reason is to reduce the processing/scoring that CPLEX
@@ -260,7 +261,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     //   Generalized Subtour Elimination Constraints (GSECs) separation based on
     //   the connected components
 
-    // NOTE: In alternative, see function CCcut_connect_component of Concorde
+    // NOTE: An alternative implementation, may employ the
+    // `CCcut_connect_component` function of Concorde
 
     if (tour->num_comps == 1) {
         return true;
@@ -276,9 +278,10 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     // Count the number of nodes in each component
     for (int32_t i = 0; i < n; i++) {
-        assert(*comp(tour, i) < tour->num_comps);
-        if (*comp(tour, i) >= 0) {
-            ++(ctx->cnnodes[*comp(tour, i)]);
+        int32_t c = *tour_comp(tour, i);
+        assert(c < tour->num_comps);
+        if (c >= 0) {
+            ++(ctx->cnnodes[c]);
         }
     }
 
@@ -294,7 +297,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     const double rhs = 0.0;
     const char sense = 'G';
 
-    assert(*comp(tour, 0) == 0);
+    assert(*tour_comp(tour, 0) == 0);
 
     int32_t depot_color = 0;
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
@@ -360,7 +363,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
 
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
-            assert(*comp(tour, i) >= 1);
+            assert(*tour_comp(tour, i) >= 1);
 
             ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
             ctx->value[nnz - 1] = -2.0;

@@ -84,9 +84,13 @@ typedef struct {
                          const double *vstar, Tour *tour);
 } CutSeparationIface;
 
-static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
+static inline int32_t *tour_succ(Tour *tour, int32_t i) {
+    return tsucc(tour, i);
+}
 
-static inline int32_t *comp(Tour *tour, int32_t i) { return tcomp(tour, i); }
+static inline int32_t *tour_comp(Tour *tour, int32_t i) {
+    return tcomp(tour, i);
+}
 
 static inline double cost(const Instance *instance, int32_t i, int32_t j) {
     return cptp_dist(instance, i, j);

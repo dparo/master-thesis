@@ -238,7 +238,7 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
 
     tour_clear(t);
     for (int32_t start = 0; start < n; start++) {
-        if (*comp(t, start) >= 0) {
+        if (*tour_comp(t, start) >= 0) {
             // node "start" was already visited, just skip it
             continue;
         }
@@ -250,7 +250,7 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
 
         int32_t tour_length = 0;
         while (!done) {
-            *comp(t, i) = t->num_comps - 1;
+            *tour_comp(t, i) = t->num_comps - 1;
             done = true;
             tour_length += 1;
             for (int32_t j = 0; j < n; j++) {
@@ -259,9 +259,9 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
                 }
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
                 assert(feq(v, 0.0, 1e-3) || feq(v, 1.0, 1e-3));
-                bool j_was_already_visited = *comp(t, j) >= 0;
+                bool j_was_already_visited = *tour_comp(t, j) >= 0;
                 if (v > 0.5 && !j_was_already_visited) {
-                    *succ(t, i) = j;
+                    *tour_succ(t, i) = j;
                     i = j;
                     done = false;
                     break;
@@ -272,13 +272,13 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
         // Last edge to close the cycle
         if (i != start) {
             assert(tour_length > 1);
-            *succ(t, i) = start;
+            *tour_succ(t, i) = start;
         } else {
             // Avoid closing cycle for single node tours. They should be left
             // alone
             assert(tour_length == 1);
             t->num_comps -= 1;
-            *comp(t, i) = INT32_DEAD_VAL;
+            *tour_comp(t, i) = INT32_DEAD_VAL;
         }
     }
 
@@ -290,11 +290,11 @@ void unpack_mip_solution(const Instance *instance, Tour *t, double *vstar) {
         double v = vstar[get_y_mip_var_idx(instance, i)];
         assert(feq(v, 0.0, 1e-3) || feq(v, 1.0, 1e-3));
         if (i == 0 || v >= 0.5) {
-            assert(*comp(t, i) >= 0);
-            assert(*succ(t, i) >= 0);
+            assert(*tour_comp(t, i) >= 0);
+            assert(*tour_succ(t, i) >= 0);
         } else {
-            assert(*comp(t, i) < 0);
-            assert(*succ(t, i) < 0);
+            assert(*tour_comp(t, i) < 0);
+            assert(*tour_succ(t, i) < 0);
         }
     }
 #endif
@@ -1336,7 +1336,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
                 if (feq(v, 1.0, 1e-3)) {
                     printf("x(%4d, %4d) = %-3g            c(%4d, %4d) = "
-                           "%-4.2g\n",
+                           "%-4.3g\n",
                            i, j, vstar[get_x_mip_var_idx(instance, i, j)], i, j,
                            cptp_dist(instance, i, j));
                 }
@@ -1347,7 +1347,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         for (int32_t i = 0; i < instance->num_customers + 1; i++) {
             double v = vstar[get_y_mip_var_idx(instance, i)];
             if (feq(v, 1.0, 1e-3)) {
-                printf("y(%4d) = %-3g            p(%4d) = %-4.2g\n", i, v, i,
+                printf("y(%4d) = %-3g            p(%4d) = %-4.5g\n", i, v, i,
                        instance->profits[i]);
             }
         }
