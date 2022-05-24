@@ -1284,7 +1284,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
                   int64_t begin_time) {
     self->data->begin_time = begin_time;
 
-    SolveStatus result = SOLVE_STATUS_ERR;
+    SolveStatus status = SOLVE_STATUS_ERR;
 
     CplexCallbackCtx callback_ctx = {0};
     callback_ctx.solver = self;
@@ -1326,14 +1326,14 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
     switch (lpstat) {
     case CPXMIP_OPTIMAL:
     case CPXMIP_OPTIMAL_TOL:
-        result = SOLVE_STATUS_OPTIMAL;
+        status = SOLVE_STATUS_OPTIMAL;
         break;
 
     case CPX_STAT_FEASIBLE:
     case CPXMIP_TIME_LIM_FEAS:
     case CPXMIP_NODE_LIM_FEAS:
     case CPXMIP_ABORT_FEAS:
-        result = SOLVE_STATUS_FEASIBLE;
+        status = SOLVE_STATUS_FEASIBLE;
         break;
 
     case CPXMIP_TIME_LIM_INFEAS:
@@ -1344,7 +1344,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         // NOTE(dparo): 8 Jan 2022
         //        Proven infeasible
 
-        result = SOLVE_STATUS_INFEASIBLE;
+        status = SOLVE_STATUS_INFEASIBLE;
         log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
                  lpstat_str, lpstat);
         break;
@@ -1353,7 +1353,7 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
     case CPX_STAT_UNBOUNDED:
     case CPXMIP_UNBOUNDED:
     case CPXERR_CALLBACK:
-        result = SOLVE_STATUS_ERR;
+        status = SOLVE_STATUS_ERR;
         log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
                  lpstat_str, lpstat);
         break;
@@ -1362,18 +1362,18 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
                  lpstat_str, lpstat);
         assert(!"Invalid code path");
-        result = SOLVE_STATUS_ERR;
+        status = SOLVE_STATUS_ERR;
         break;
     }
 
     if (!process_cplex_output(self, instance, solution, vstar, lpstat,
-                              result)) {
+                              status)) {
         goto terminate;
     }
 
 terminate:
     free(vstar);
-    return result;
+    return status;
 }
 
 // NOTE: Not thread safe
