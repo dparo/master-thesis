@@ -1335,8 +1335,10 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
             for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
                 double v = vstar[get_x_mip_var_idx(instance, i, j)];
                 if (feq(v, 1.0, 1e-3)) {
-                    printf("x(%d, %d) = %g\n", i, j,
-                           vstar[get_x_mip_var_idx(instance, i, j)]);
+                    printf("x(%4d, %4d) = %-3g            c(%4d, %4d) = "
+                           "%-4.2g\n",
+                           i, j, vstar[get_x_mip_var_idx(instance, i, j)], i, j,
+                           cptp_dist(instance, i, j));
                 }
             }
         }
@@ -1345,7 +1347,8 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         for (int32_t i = 0; i < instance->num_customers + 1; i++) {
             double v = vstar[get_y_mip_var_idx(instance, i)];
             if (feq(v, 1.0, 1e-3)) {
-                printf("y(%d) = %g\n", i, v);
+                printf("y(%4d) = %-3g            p(%4d) = %-4.2g\n", i, v, i,
+                       instance->profits[i]);
             }
         }
 
