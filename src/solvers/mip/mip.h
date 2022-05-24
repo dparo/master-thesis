@@ -29,7 +29,7 @@ extern "C" {
 #include "types.h"
 #include "core.h"
 #include "core-utils.h"
-#include "network.h"
+#include "maxflow.h"
 
 #ifdef COMPILED_WITH_CPLEX
 
@@ -47,7 +47,7 @@ typedef struct SolverData {
     CPXENVptr env;
     CPXLPptr lp;
     int numcores;
-    bool pricer_mode;
+    bool heur_pricer_mode;
     CPXDIM num_mip_vars;
     CPXDIM num_mip_constraints;
 } SolverData;
@@ -78,14 +78,19 @@ typedef struct {
     void (*deactivate)(CutSeparationPrivCtx *ctx);
 
     bool (*fractional_sep)(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf);
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow);
     bool (*integral_sep)(CutSeparationFunctor *self, const double obj_p,
                          const double *vstar, Tour *tour);
 } CutSeparationIface;
 
-static inline int32_t *succ(Tour *tour, int32_t i) { return tsucc(tour, i); }
+static inline int32_t *tour_succ(Tour *tour, int32_t i) {
+    return tsucc(tour, i);
+}
 
-static inline int32_t *comp(Tour *tour, int32_t i) { return tcomp(tour, i); }
+static inline int32_t *tour_comp(Tour *tour, int32_t i) {
+    return tcomp(tour, i);
+}
 
 static inline double cost(const Instance *instance, int32_t i, int32_t j) {
     return cptp_dist(instance, i, j);

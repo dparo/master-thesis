@@ -312,7 +312,7 @@ static void ins_heur(const Instance *instance, Solution *solution,
 
 #ifndef NDEBUG
     validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
-    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
+    validate_primal_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 
     // NOTE(dparo):
     //    Due to the MIP structure of the formulation,
@@ -430,7 +430,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
             twoopt_exchange(solver, instance, &solution->tour, best_a, best_b);
             solution->primal_bound += best_delta_cost;
 #ifndef NDEBUG
-            validate_solution(instance, solution,
+            validate_primal_solution(instance, solution,
                               WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
         } else {
@@ -440,12 +440,12 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
     }
 
 #ifndef NDEBUG
-    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
+    validate_primal_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
 }
 
 bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
-                             bool pricer_mode_enabled) {
+                             bool heur_pricer_mode) {
     bool result = true;
     const int32_t n = instance->num_customers + 1;
 
@@ -471,7 +471,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
             //       computation time, try to do them only when absolutely
             //       necessary. This will keep the main execution path as
             //       fast as possible
-            if (!pricer_mode_enabled ||
+            if (!heur_pricer_mode ||
                 !is_valid_reduced_cost(solution.primal_bound)) {
                 // Try to improve the solution using 2opt
                 double prev_ub = solution.primal_bound;
@@ -496,7 +496,7 @@ bool mip_ins_heur_warm_start(Solver *solver, const Instance *instance,
 
             min_ub_found = MIN(min_ub_found, solution.primal_bound);
 
-            if (pricer_mode_enabled && is_valid_reduced_cost(min_ub_found)) {
+            if (heur_pricer_mode && is_valid_reduced_cost(min_ub_found)) {
                 log_info("%s :: Found reduced_cost tour (%f), early "
                          "terminating warm-start feeding\n",
                          __func__, min_ub_found);

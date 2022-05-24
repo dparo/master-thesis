@@ -62,13 +62,15 @@ TEST creation(void) {
 
 TEST solve_test_instances(void) {
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
+
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         ASSERT(is_valid_instance(&instance));
         SolverParams params = {0};
         Solution solution = solution_create(&instance);
         SolveStatus status = cptp_solve(&instance, "mip", &params, &solution,
                                         TIMELIMIT, RANDOMSEED);
-        ASSERT(is_valid_solve_status(status));
+        ASSERT(status == SOLVE_STATUS_OPTIMAL ||
+               status == SOLVE_STATUS_INFEASIBLE);
         ASSERT(solution.dual_bound != -INFINITY);
         ASSERT(solution.primal_bound != +INFINITY);
         ASSERT(solution.tour.num_comps == 1);

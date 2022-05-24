@@ -5,7 +5,7 @@ set(
     "test-vrplib-parser.c"
     "test-parsing-utils.c"
     "test-core.c"
-    "test-network-flow.c"
+    "test-maxflow.c"
     "test-gomory-hu-tree.c"
 )
 if (CPLEX_FOUND)

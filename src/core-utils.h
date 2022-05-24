@@ -162,9 +162,9 @@ static inline double solution_relgap(Solution *solution) {
     // Taken from:
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetmiprelgap-cpxgetmiprelgap
 
-    double ub = solution->primal_bound;
-    double lb = solution->dual_bound;
-    return (ub - lb) / (1e-10 + fabs(ub));
+    double best_integer = solution->primal_bound;
+    double best_objective = solution->dual_bound;
+    return (best_integer - best_objective) / (1e-10 + fabs(best_integer));
 }
 
 static inline void solver_params_push(SolverParams *params, char *name,

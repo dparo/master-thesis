@@ -127,7 +127,8 @@ static CutSeparationPrivCtx *activate(const Instance *instance,
 }
 
 static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
-                           const double *vstar, MaxFlowResult *mf) {
+                           const double *vstar, MaxFlowResult *mf,
+                           double max_flow) {
     CutSeparationPrivCtx *ctx = self->ctx;
     const Instance *instance = self->instance;
     const int32_t n = instance->num_customers + 1;
@@ -136,9 +137,10 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     int32_t depot_color = mf->colors[0];
 
-    const int32_t source_vertex = mf->source;
-    const int32_t sink_vertex = mf->sink;
+    const int32_t source_vertex = mf->s;
+    const int32_t sink_vertex = mf->t;
 
+    assert(source_vertex != sink_vertex);
     assert(mf->colors[source_vertex] == BLACK);
     assert(mf->colors[sink_vertex] == WHITE);
 
@@ -176,6 +178,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
 
     assert(set_s_size >= 1);
 
+    //
     // NOTE(dparo): 9 Jan 2022
     //      Report to CPLEX a single GSEC per set S. The one that is violated
     //      the most. The reason is to reduce the processing/scoring that CPLEX
@@ -234,7 +237,7 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         log_trace("%s :: Adding GSEC fractional constraint (%g >= "
                   "2.0 * %g)"
                   " (|S| = %d, nnz = %lld)",
-                  __func__, mf->maxflow, y_i, set_s_size, nnz);
+                  __func__, max_flow, y_i, set_s_size, nnz);
 
         if (!mip_cut_fractional_sol(self, nnz, rhs, sense, ctx->index,
                                     ctx->value, purgeable, local_validity)) {
@@ -245,10 +248,6 @@ static bool fractional_sep(CutSeparationFunctor *self, const double obj_p,
         }
 
         added_cuts += 1;
-    }
-
-    if (added_cuts > 0) {
-        log_info("%s :: Created %d GSEC cuts", __func__, added_cuts);
     }
 
     return true;
@@ -262,7 +261,8 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     //   Generalized Subtour Elimination Constraints (GSECs) separation based on
     //   the connected components
 
-    // NOTE: In alternative, see function CCcut_connect_component of Concorde
+    // NOTE: An alternative implementation, may employ the
+    // `CCcut_connect_component` function of Concorde
 
     if (tour->num_comps == 1) {
         return true;
@@ -278,9 +278,10 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     // Count the number of nodes in each component
     for (int32_t i = 0; i < n; i++) {
-        assert(*comp(tour, i) < tour->num_comps);
-        if (*comp(tour, i) >= 0) {
-            ++(ctx->cnnodes[*comp(tour, i)]);
+        int32_t c = tour->comp[i];
+        assert(c < tour->num_comps);
+        if (c >= 0) {
+            ++(ctx->cnnodes[c]);
         }
     }
 
@@ -296,7 +297,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     const double rhs = 0.0;
     const char sense = 'G';
 
-    assert(*comp(tour, 0) == 0);
+    assert(tour->comp[0] == 0);
 
     int32_t depot_color = 0;
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
@@ -337,6 +338,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                 assert(i != 0);
                 assert(tour->comp[i] != tour->comp[j]);
                 assert(tour->comp[i] != depot_color);
+                assert(tour->comp[i] == c);
                 assert(tour->comp[j] != c);
                 ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                 ctx->value[pos] = +1.0;
@@ -346,6 +348,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
         }
 
+        assert(feq(flow, 0.0, EPS));
         assert(pos < nnz_upper_bound);
         assert(pos == nnz - 1);
 
@@ -362,7 +365,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
 
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
-            assert(*comp(tour, i) >= 1);
+            assert(tour->comp[i] >= 1);
 
             ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
             ctx->value[nnz - 1] = -2.0;
@@ -384,8 +387,6 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
         assert(added_cuts == ctx->cnnodes[c]);
         total_num_added_cuts += added_cuts;
     }
-
-    log_info("%s :: Created %d GSEC cuts", __func__, total_num_added_cuts);
 
     return true;
 

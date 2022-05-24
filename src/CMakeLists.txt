@@ -54,11 +54,11 @@ add_library(libcptp
     parser.c
     parsing-utils.c
     core.c
-    duality.c
     os.c
     validation.c
     render.c
-    network.c
+    maxflow.c
+    maxflow/push-relabel.c
 
     # Stub solver
     solvers/stub/stub.c

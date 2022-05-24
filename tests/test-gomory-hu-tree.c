@@ -30,7 +30,7 @@
 
 #include <greatest.h>
 #include "types.h"
-#include "network.h"
+#include "maxflow.h"
 
 #define MAX_NUM_NODES_TO_TEST 50
 
@@ -38,55 +38,19 @@ typedef struct NodePair {
     int32_t u, v;
 } NodePair;
 
-TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t source_vertex,
-                                 int32_t sink_vertex, MaxFlowResult *result) {
-    BruteforceMaxFlowResult bf =
-        max_flow_bruteforce(net, source_vertex, sink_vertex);
+TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
+                                 MaxFlowResult *result) {
+    MaxFlowResult bf_result;
+    max_flow_result_create(&bf_result, net->nnodes);
 
-    // printf("found_max_flow = %g, true_max_flow = %g\n", result->maxflow,
-    //        bf.maxflow);
-    // printf("LABELS. Found %d max flow sections:\n", bf.num_sections);
+    MaxFlow bf_maxflow = {0};
+    max_flow_create(&bf_maxflow, net->nnodes, MAXFLOW_ALGO_BRUTEFORCE);
 
-    for (int32_t i = 0; i < net->nnodes; i++) {
-        // printf("computed_bipartition[%d] = %d\n", i,
-        //        result->bipartition.data[i]);
-    }
+    max_flow_single_pair(net, &bf_maxflow, s, t, &bf_result);
+    ASSERT_EQ(bf_result.maxflow, result->maxflow);
 
-    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            // printf("section[%d][%d] = %d\n", secidx, i,
-            //        bf.sections[secidx].bipartition.data[i]);
-        }
-    }
-    // printf("\n");
-
-    bool is_valid_section = false;
-
-    for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-        bool found = true;
-        for (int32_t i = 0; i < net->nnodes; i++) {
-            if (result->colors[i] != bf.sections[secidx].colors[i]) {
-                found = false;
-                break;
-            }
-        }
-
-        if (found) {
-            is_valid_section = true;
-            break;
-        }
-    }
-
-    ASSERT_IN_RANGE(bf.maxflow, result->maxflow, 1e-4);
-    ASSERT(is_valid_section);
-
-    // Cleanup
-    {
-        for (int32_t secidx = 0; secidx < bf.num_sections; secidx++) {
-            max_flow_result_destroy(&bf.sections[secidx]);
-        }
-        free(bf.sections);
-    }
+    max_flow_result_destroy(&bf_result);
+    max_flow_destroy(&bf_maxflow);
 
     PASS();
 }
@@ -103,14 +67,13 @@ static NodePair make_random_node_pair(int32_t n) {
 }
 
 static void init_symm_random_flownet(FlowNetwork *net) {
-
-    const double RAND_VALS[] = {0.0, 1e-3, 1e-2, 1e-1, 0.5, 0.8, 1.0};
+    const flow_t RAND_VALS[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
     for (int32_t i = 0; i < net->nnodes; i++) {
         for (int32_t j = i + 1; j < net->nnodes; j++) {
             if (i != j) {
-                double r = RAND_VALS[rand() % ARRAY_LEN(RAND_VALS)];
-                *network_cap(net, i, j) = r;
-                *network_cap(net, j, i) = r;
+                flow_t r = RAND_VALS[rand() % ARRAY_LEN(RAND_VALS)];
+                flow_net_set_cap(net, i, j, r);
+                flow_net_set_cap(net, j, i, r);
             }
         }
     }
@@ -119,52 +82,49 @@ static void init_symm_random_flownet(FlowNetwork *net) {
 TEST random_symm_networks(void) {
     for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
         for (int32_t try_it = 0; try_it < 2048; try_it++) {
-            FlowNetwork network = flow_network_create(nnodes);
-            MaxFlowResult max_flow_result1 = max_flow_result_create(nnodes);
-            MaxFlowResult max_flow_result2 = max_flow_result_create(nnodes);
+            FlowNetwork net = {0};
+            MaxFlow mf = {0};
+            MaxFlowResult result1 = {0};
+            MaxFlowResult result2 = {0};
+
+            flow_network_create(&net, nnodes);
+            max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
+            max_flow_result_create(&result1, nnodes);
+            max_flow_result_create(&result2, nnodes);
 
             NodePair st_pair = make_random_node_pair(nnodes);
-            init_symm_random_flownet(&network);
+            init_symm_random_flownet(&net);
+
             int32_t source_vertex = st_pair.u;
             int32_t sink_vertex = st_pair.v;
 
-            double max_flow1 = -1.0;
-            double max_flow2 = -2.0;
+            flow_t max_flow1 = 0;
+            flow_t max_flow2 = 0;
 
             // Validate flow symmetry between max flows (s, t) vs (t, s)
             {
-                max_flow1 = push_relabel_max_flow(
-                    &network, source_vertex, sink_vertex, &max_flow_result1);
-                ASSERT_IN_RANGE(max_flow1, max_flow_result1.maxflow, 1e-5);
-                CHECK_CALL(validate_with_slow_max_flow(
-                    &network, source_vertex, sink_vertex, &max_flow_result1));
+                max_flow1 = max_flow_single_pair(&net, &mf, source_vertex,
+                                                 sink_vertex, &result1);
+
+                ASSERT_EQ(max_flow1, result1.maxflow);
+                CHECK_CALL(validate_with_slow_max_flow(&net, source_vertex,
+                                                       sink_vertex, &result1));
             }
 
             {
-                max_flow2 = push_relabel_max_flow(
-                    &network, sink_vertex, source_vertex, &max_flow_result2);
-                ASSERT_IN_RANGE(max_flow2, max_flow_result2.maxflow, 1e-5);
+                max_flow2 = max_flow_single_pair(&net, &mf, sink_vertex,
+                                                 source_vertex, &result2);
+                ASSERT_EQ(max_flow2, result2.maxflow);
                 CHECK_CALL(validate_with_slow_max_flow(
-                    &network, sink_vertex, source_vertex, &max_flow_result2));
+                    &net, sink_vertex, source_vertex, &result2));
             }
 
-            ASSERT_IN_RANGE(max_flow1, max_flow2, 1e-5);
+            ASSERT_EQ(max_flow1, max_flow2);
 
-            // NOTE:
-            //       A simple byte by byte comparison of is not possible to
-            //       assert whether, 2 min_cuts are complementary. This is
-            //       because a solution to a max_flow problem can have multiple
-            //       min cut solutions.
-#if 0
-            for (int32_t i = 0; i < nnodes; i++) {
-                ASSERT_EQ(max_flow_result1.bipartition.data[i],
-                          !max_flow_result2.bipartition.data[i]);
-            }
-#endif
-
-            flow_network_destroy(&network);
-            max_flow_result_destroy(&max_flow_result1);
-            max_flow_result_destroy(&max_flow_result2);
+            flow_network_destroy(&net);
+            max_flow_destroy(&mf);
+            max_flow_result_destroy(&result1);
+            max_flow_result_destroy(&result2);
         }
     }
 
@@ -174,46 +134,58 @@ TEST random_symm_networks(void) {
 TEST random_gomory_hu(void) {
     for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
         for (int32_t try_it = 0; try_it < 1024; try_it++) {
-            FlowNetwork network = flow_network_create(nnodes);
-            init_symm_random_flownet(&network);
+            MaxFlow mf = {0};
+            FlowNetwork net = {0};
+            MaxFlowResult result1 = {0};
+            MaxFlowResult result2 = {0};
+            GomoryHuTree tree = {0};
 
-            MaxFlowResult max_flow_result1 = max_flow_result_create(nnodes);
-            MaxFlowResult max_flow_result2 = max_flow_result_create(nnodes);
+            max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
+            max_flow_result_create(&result1, nnodes);
+            max_flow_result_create(&result2, nnodes);
+            flow_network_create(&net, nnodes);
+            init_symm_random_flownet(&net);
+            gomory_hu_tree_create(&tree, nnodes);
 
-            GomoryHuTree tree = gomory_hu_tree_create(nnodes);
-            GomoryHuTreeCtx gh_ctx = {0};
+            flow_t max_flow1 = FLOW_MAX;
 
-            double max_flow1 = INFINITY, max_flow2 = INFINITY;
-
-            gomory_hu_tree_ctx_create(&gh_ctx, nnodes);
-            gomory_hu_tree2(&network, &tree, &gh_ctx);
+            max_flow_all_pairs(&net, &mf, &tree);
 
             for (int32_t source = 0; source < nnodes; source++) {
                 for (int32_t sink = 0; sink < nnodes; sink++) {
                     if (source == sink) {
                         continue;
                     }
-                    max_flow1 = push_relabel_max_flow(&network, source, sink,
-                                                      &max_flow_result1);
-                    max_flow2 = gomory_hu_query(&tree, source, sink,
-                                                &max_flow_result2, &gh_ctx);
+                    max_flow1 =
+                        max_flow_single_pair(&net, &mf, source, sink, &result1);
 
-                    assert(max_flow_result1.colors[source] == BLACK);
-                    assert(max_flow_result1.colors[sink] == WHITE);
-                    assert(max_flow_result2.colors[source] == BLACK);
-                    assert(max_flow_result2.colors[sink] == WHITE);
+                    flow_t max_flow2 =
+                        gomory_hu_tree_query(&tree, &result2, source, sink);
 
-                    ASSERT_IN_RANGE(max_flow1, max_flow_result1.maxflow, 1e-5);
-                    ASSERT_IN_RANGE(max_flow2, max_flow_result2.maxflow, 1e-5);
+                    assert(result1.s == source);
+                    assert(result1.t == sink);
 
-                    ASSERT_IN_RANGE(max_flow1, max_flow2, 1e-5);
+                    assert(result2.s == source);
+                    assert(result2.t == sink);
+
+                    assert(result1.colors[source] == BLACK);
+                    assert(result1.colors[sink] == WHITE);
+                    assert(result2.colors[source] == BLACK);
+                    assert(result2.colors[sink] == WHITE);
+
+                    ASSERT_EQ(max_flow1, result1.maxflow);
+                    ASSERT_EQ(max_flow2, result2.maxflow);
+
+                    // printf("max_flow1 = %d, max_flow2 = %d\n", max_flow1,
+                    //        max_flow2);
+                    ASSERT_EQ(max_flow1, max_flow2);
                 }
             }
 
-            flow_network_destroy(&network);
-            max_flow_result_destroy(&max_flow_result1);
-            max_flow_result_destroy(&max_flow_result2);
-            gomory_hu_tree_ctx_destroy(&gh_ctx);
+            flow_network_destroy(&net);
+            max_flow_destroy(&mf);
+            max_flow_result_destroy(&result1);
+            max_flow_result_destroy(&result2);
             gomory_hu_tree_destroy(&tree);
         }
     }

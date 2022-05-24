@@ -41,8 +41,8 @@ void validate_symmetric_distances(const Instance *instance) {
 #endif
 }
 
-void validate_solution(const Instance *instance, Solution *solution,
-                       int32_t min_num_customers_served) {
+void validate_primal_solution(const Instance *instance, Solution *solution,
+                              int32_t min_num_customers_served) {
 #ifndef NDEBUG
 
     validate_tour(instance, &solution->tour, min_num_customers_served);
