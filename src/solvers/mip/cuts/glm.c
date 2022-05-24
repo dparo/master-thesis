@@ -45,6 +45,7 @@ static void deactivate(CutSeparationPrivCtx *ctx) {
 
 static CutSeparationPrivCtx *activate(const Instance *instance,
                                       Solver *solver) {
+    UNUSED_PARAM(solver);
 
     CutSeparationPrivCtx *ctx = malloc(sizeof(*ctx));
     size_t nnz_ub = get_nnz_upper_bound(instance);
@@ -101,8 +102,9 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
 
                 bool j_in_s = colors[j] == curr_color;
 
-                if (j_in_s)
+                if (j_in_s) {
                     continue;
+                }
 
                 assert(i_in_s && !j_in_s);
                 assert(i != 0);
@@ -110,17 +112,20 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 assert(colors[i] == curr_color);
                 assert(colors[j] != curr_color);
 
+                double qj = demand(instance, j);
+
                 if (j == 0) {
-                    assert(demand(instance, j) == 0.0);
+                    assert(qj == 0.0);
                 }
 
-                double value = 1.0 - 2.0 * demand(instance, j) / Q;
+                double value = 1.0 - 2.0 * qj / Q;
                 push_var_lhs(&ctx->super, &info, vstar, value,
                              (CPXDIM)get_x_mip_var_idx(instance, i, j));
             }
 
             assert(i != 0);
-            double value = -2.0 * demand(instance, i) / Q;
+            double qi = demand(instance, i);
+            double value = -2.0 * qi / Q;
             push_var_lhs(&ctx->super, &info, vstar, value,
                          (CPXDIM)get_y_mip_var_idx(instance, i));
         }
