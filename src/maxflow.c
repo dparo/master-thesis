@@ -23,31 +23,31 @@
 #include "maxflow.h"
 #include "maxflow/push-relabel.h"
 
-void max_flow_result_create_v2(MaxFlowResult *result, int32_t nnodes) {
+void max_flow_result_create(MaxFlowResult *result, int32_t nnodes) {
     result->nnodes = nnodes;
     result->colors = malloc(nnodes * sizeof(*result->colors));
 }
 
-void max_flow_result_destroy_v2(MaxFlowResult *m) {
+void max_flow_result_destroy(MaxFlowResult *m) {
     free(m->colors);
     memset(m, 0, sizeof(*m));
 }
 
-void flow_network_destroy_v2(FlowNetwork *network) {
+void flow_network_destroy(FlowNetwork *network) {
     free(network->caps);
     memset(network, 0, sizeof(*network));
 }
 
-void flow_network_create_v2(FlowNetwork *network, int32_t nnodes) {
+void flow_network_create(FlowNetwork *network, int32_t nnodes) {
     if (network->nnodes) {
-        flow_network_destroy_v2(network);
+        flow_network_destroy(network);
     }
     network->nnodes = nnodes;
     int32_t nsquared = nnodes * nnodes;
     network->caps = calloc(nsquared, sizeof(*network->caps));
 
     if (!network->caps) {
-        flow_network_destroy_v2(network);
+        flow_network_destroy(network);
     }
 }
 
@@ -68,7 +68,7 @@ void max_flow_destroy(MaxFlow *mf) {
 
     switch (mf->kind) {
     case MAXFLOW_ALGO_BRUTEFORCE:
-        max_flow_result_destroy_v2(&mf->payload.temp_mf);
+        max_flow_result_destroy(&mf->payload.temp_mf);
         break;
     case MAXFLOW_ALGO_PUSH_RELABEL:
         max_flow_destroy_push_relabel(mf);
@@ -89,7 +89,7 @@ void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind) {
     switch (kind) {
 
     case MAXFLOW_ALGO_BRUTEFORCE:
-        max_flow_result_create_v2(&mf->payload.temp_mf, nnodes);
+        max_flow_result_create(&mf->payload.temp_mf, nnodes);
         break;
     case MAXFLOW_ALGO_PUSH_RELABEL:
         max_flow_create_push_relabel(mf, nnodes);
@@ -225,7 +225,7 @@ flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
     return result->maxflow;
 }
 
-void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes) {
+void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes) {
     tree->nnodes = nnodes;
     tree->sink_candidate = malloc(nnodes * sizeof(*tree->sink_candidate));
     tree->record_flows = malloc(nnodes * sizeof(*tree->record_flows));
@@ -237,11 +237,11 @@ void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes) {
     tree->parent = malloc(nnodes * sizeof(*tree->parent));
     tree->visited = malloc(nnodes * sizeof(*tree->visited));
 
-    max_flow_result_create_v2(&tree->temp_result, nnodes);
+    max_flow_result_create(&tree->temp_result, nnodes);
 }
 
-void gomory_hu_tree_destroy_v2(GomoryHuTree *tree) {
-    max_flow_result_destroy_v2(&tree->temp_result);
+void gomory_hu_tree_destroy(GomoryHuTree *tree) {
+    max_flow_result_destroy(&tree->temp_result);
 
     free(tree->bfs_queue);
     free(tree->parent);
@@ -388,7 +388,7 @@ void max_flow_all_pairs(const FlowNetwork *net, MaxFlow *mf,
     }
 }
 
-flow_t gomory_hu_tree_query_v2(GomoryHuTree *tree, MaxFlowResult *result,
+flow_t gomory_hu_tree_query(GomoryHuTree *tree, MaxFlowResult *result,
                                int32_t s, int32_t t) {
     const int32_t n = tree->nnodes;
 

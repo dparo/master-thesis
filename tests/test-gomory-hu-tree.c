@@ -41,7 +41,7 @@ typedef struct NodePair {
 TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
                                  MaxFlowResult *result) {
     MaxFlowResult bf_result;
-    max_flow_result_create_v2(&bf_result, net->nnodes);
+    max_flow_result_create(&bf_result, net->nnodes);
 
     MaxFlow bf_maxflow = {0};
     max_flow_create(&bf_maxflow, net->nnodes, MAXFLOW_ALGO_BRUTEFORCE);
@@ -49,7 +49,7 @@ TEST validate_with_slow_max_flow(FlowNetwork *net, int32_t s, int32_t t,
     max_flow_single_pair(net, &bf_maxflow, s, t, &bf_result);
     ASSERT_EQ(bf_result.maxflow, result->maxflow);
 
-    max_flow_result_destroy_v2(&bf_result);
+    max_flow_result_destroy(&bf_result);
     max_flow_destroy(&bf_maxflow);
 
     PASS();
@@ -87,10 +87,10 @@ TEST random_symm_networks(void) {
             MaxFlowResult result1 = {0};
             MaxFlowResult result2 = {0};
 
-            flow_network_create_v2(&net, nnodes);
+            flow_network_create(&net, nnodes);
             max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-            max_flow_result_create_v2(&result1, nnodes);
-            max_flow_result_create_v2(&result2, nnodes);
+            max_flow_result_create(&result1, nnodes);
+            max_flow_result_create(&result2, nnodes);
 
             NodePair st_pair = make_random_node_pair(nnodes);
             init_symm_random_flownet(&net);
@@ -121,10 +121,10 @@ TEST random_symm_networks(void) {
 
             ASSERT_EQ(max_flow1, max_flow2);
 
-            flow_network_destroy_v2(&net);
+            flow_network_destroy(&net);
             max_flow_destroy(&mf);
-            max_flow_result_destroy_v2(&result1);
-            max_flow_result_destroy_v2(&result2);
+            max_flow_result_destroy(&result1);
+            max_flow_result_destroy(&result2);
         }
     }
 
@@ -141,11 +141,11 @@ TEST random_gomory_hu(void) {
             GomoryHuTree tree = {0};
 
             max_flow_create(&mf, nnodes, MAXFLOW_ALGO_PUSH_RELABEL);
-            max_flow_result_create_v2(&result1, nnodes);
-            max_flow_result_create_v2(&result2, nnodes);
-            flow_network_create_v2(&net, nnodes);
+            max_flow_result_create(&result1, nnodes);
+            max_flow_result_create(&result2, nnodes);
+            flow_network_create(&net, nnodes);
             init_symm_random_flownet(&net);
-            gomory_hu_tree_create_v2(&tree, nnodes);
+            gomory_hu_tree_create(&tree, nnodes);
 
             flow_t max_flow1 = FLOW_MAX;
 
@@ -160,7 +160,7 @@ TEST random_gomory_hu(void) {
                         max_flow_single_pair(&net, &mf, source, sink, &result1);
 
                     flow_t max_flow2 =
-                        gomory_hu_tree_query_v2(&tree, &result2, source, sink);
+                        gomory_hu_tree_query(&tree, &result2, source, sink);
 
                     assert(result1.s == source);
                     assert(result1.t == sink);
@@ -182,11 +182,11 @@ TEST random_gomory_hu(void) {
                 }
             }
 
-            flow_network_destroy_v2(&net);
+            flow_network_destroy(&net);
             max_flow_destroy(&mf);
-            max_flow_result_destroy_v2(&result1);
-            max_flow_result_destroy_v2(&result2);
-            gomory_hu_tree_destroy_v2(&tree);
+            max_flow_result_destroy(&result1);
+            max_flow_result_destroy(&result2);
+            gomory_hu_tree_destroy(&tree);
         }
     }
     PASS();

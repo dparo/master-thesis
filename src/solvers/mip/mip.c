@@ -149,10 +149,10 @@ destroy_callback_thread_local_data(CallbackThreadLocalData *thread_local_data) {
     free(thread_local_data->value);
     free(thread_local_data->vstar);
     tour_destroy(&thread_local_data->tour);
-    flow_network_destroy_v2(&thread_local_data->network);
+    flow_network_destroy(&thread_local_data->network);
     max_flow_destroy(&thread_local_data->maxflow);
-    gomory_hu_tree_destroy_v2(&thread_local_data->gh_tree);
-    max_flow_result_destroy_v2(&thread_local_data->maxflow_result);
+    gomory_hu_tree_destroy(&thread_local_data->gh_tree);
+    max_flow_result_destroy(&thread_local_data->maxflow_result);
     thread_local_data->valid = false;
 }
 
@@ -172,10 +172,10 @@ create_callback_thread_local_data(CallbackThreadLocalData *thread_local_data,
     const int32_t n = instance->num_customers + 1;
     memset(thread_local_data, 0, sizeof(*thread_local_data));
 
-    flow_network_create_v2(&thread_local_data->network, n);
+    flow_network_create(&thread_local_data->network, n);
     max_flow_create(&thread_local_data->maxflow, n, MAXFLOW_ALGO_PUSH_RELABEL);
-    max_flow_result_create_v2(&thread_local_data->maxflow_result, n);
-    gomory_hu_tree_create_v2(&thread_local_data->gh_tree, n);
+    max_flow_result_create(&thread_local_data->maxflow_result, n);
+    gomory_hu_tree_create(&thread_local_data->gh_tree, n);
 
     thread_local_data->tour = tour_create(instance);
 
@@ -732,7 +732,7 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
                 //      which are not complementary!!
                 //
 
-                flow_t max_flow_int = gomory_hu_tree_query_v2(
+                flow_t max_flow_int = gomory_hu_tree_query(
                     &tld->gh_tree, &tld->maxflow_result, s, t);
 
                 double max_flow = max_flow_int / (double)CAP_DOUBLE_TO_INT;

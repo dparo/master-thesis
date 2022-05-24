@@ -120,24 +120,24 @@ static inline flow_t flow_net_get_cap(const FlowNetwork *net, int32_t i,
     return net->caps[i * net->nnodes + j];
 }
 
-void flow_network_create_v2(FlowNetwork *network, int32_t nnodes);
-void flow_network_destroy_v2(FlowNetwork *network);
+void flow_network_create(FlowNetwork *network, int32_t nnodes);
+void flow_network_destroy(FlowNetwork *network);
 void flow_network_clear_caps(FlowNetwork *net);
 
 void max_flow_destroy(MaxFlow *mf);
 void max_flow_create(MaxFlow *mf, int32_t nnodes, MaxFlowAlgoKind kind);
 
-void max_flow_result_create_v2(MaxFlowResult *result, int32_t nnodes);
+void max_flow_result_create(MaxFlowResult *result, int32_t nnodes);
 flow_t maxflow_result_recompute_flow(const FlowNetwork *net,
                                      MaxFlowResult *result);
-void max_flow_result_destroy_v2(MaxFlowResult *result);
+void max_flow_result_destroy(MaxFlowResult *result);
 
 void max_flow_result_copy(MaxFlowResult *dest, const MaxFlowResult *src);
 
-void gomory_hu_tree_create_v2(GomoryHuTree *tree, int32_t nnodes);
-void gomory_hu_tree_destroy_v2(GomoryHuTree *tree);
-flow_t gomory_hu_tree_query_v2(GomoryHuTree *tree, MaxFlowResult *result,
-                               int32_t s, int32_t t);
+void gomory_hu_tree_create(GomoryHuTree *tree, int32_t nnodes);
+void gomory_hu_tree_destroy(GomoryHuTree *tree);
+flow_t gomory_hu_tree_query(GomoryHuTree *tree, MaxFlowResult *result,
+                            int32_t s, int32_t t);
 
 flow_t max_flow_single_pair(const FlowNetwork *net, MaxFlow *mf, int32_t s,
                             int32_t t, MaxFlowResult *result);
