@@ -38,11 +38,11 @@
 #include "core-utils.h"
 #include "instances.h"
 
-#define TIMELIMIT ((double)(5.0))
+#define TIMELIMIT ((double)(600.0))
 #define RANDOMSEED ((int32_t)0)
 
 TEST creation(void) {
-    const char *filepath = SMALL_TEST_INSTANCE;
+    const char *filepath = G_TEST_INSTANCES[0].filepath;
     Instance instance = parse(filepath);
     ASSERT(is_valid_instance(&instance));
     SolverParams params = {0};
@@ -60,40 +60,27 @@ TEST creation(void) {
     PASS();
 }
 
-TEST solving_small_instances(void) {
-    const char *filepath = SMALL_TEST_INSTANCE;
-    Instance instance = parse(filepath);
-    ASSERT(is_valid_instance(&instance));
-    SolverParams params = {0};
-    Solution solution = solution_create(&instance);
-    SolveStatus status =
-        cptp_solve(&instance, "mip", &params, &solution, TIMELIMIT, RANDOMSEED);
-    ASSERT(is_valid_solve_status(status));
-    ASSERT(status == SOLVE_STATUS_FEASIBLE || status == SOLVE_STATUS_OPTIMAL);
-    ASSERT(solution.dual_bound != -INFINITY);
-    ASSERT(solution.primal_bound != +INFINITY);
-    ASSERT(solution.tour.num_comps == 1);
-    instance_destroy(&instance);
-    solution_destroy(&solution);
-    PASS();
-}
-
-TEST solving_some_instances(void) {
+TEST solve_test_instances(void) {
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
-        if (G_TEST_INSTANCES[i].expected_num_customers <= 71) {
-            Instance instance = parse(G_TEST_INSTANCES[i].filepath);
-            ASSERT(is_valid_instance(&instance));
-            SolverParams params = {0};
-            Solution solution = solution_create(&instance);
-            SolveStatus status = cptp_solve(&instance, "mip", &params,
-                                            &solution, TIMELIMIT, RANDOMSEED);
-            ASSERT(is_valid_solve_status(status));
-            ASSERT(solution.dual_bound != -INFINITY);
-            ASSERT(solution.primal_bound != +INFINITY);
-            ASSERT(solution.tour.num_comps == 1);
-            instance_destroy(&instance);
-            solution_destroy(&solution);
-        }
+        Instance instance = parse(G_TEST_INSTANCES[i].filepath);
+        ASSERT(is_valid_instance(&instance));
+        SolverParams params = {0};
+        Solution solution = solution_create(&instance);
+        SolveStatus status = cptp_solve(&instance, "mip", &params, &solution,
+                                        TIMELIMIT, RANDOMSEED);
+        ASSERT(is_valid_solve_status(status));
+        ASSERT(solution.dual_bound != -INFINITY);
+        ASSERT(solution.primal_bound != +INFINITY);
+        ASSERT(solution.tour.num_comps == 1);
+
+        printf("%s :: Found primal_bound = %.17g,     Expected "
+               "primal_bound = %.17g\n",
+               G_TEST_INSTANCES[i].filepath, solution.primal_bound,
+               G_TEST_INSTANCES[i].best_primal);
+        ASSERT(
+            feq(solution.primal_bound, G_TEST_INSTANCES[i].best_primal, 1e-3));
+        instance_destroy(&instance);
+        solution_destroy(&solution);
     }
     PASS();
 }
@@ -103,13 +90,12 @@ TEST solving_some_instances(void) {
 GREATEST_MAIN_DEFS();
 
 int main(int argc, char **argv) {
-    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
+    log_set_level(LOG_WARN);
 
+    GREATEST_MAIN_BEGIN(); /* command-line arguments, initialization. */
 #if COMPILED_WITH_CPLEX
     RUN_TEST(creation);
-    RUN_TEST(solving_small_instances);
-    RUN_TEST(solving_some_instances);
+    RUN_TEST(solve_test_instances);
 #endif
-
     GREATEST_MAIN_END(); /* display results */
 }

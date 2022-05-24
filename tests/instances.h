@@ -28,45 +28,28 @@ extern "C" {
 
 #include "types.h"
 
-const char *SMALL_TEST_INSTANCE =
-    "data/ESPPRC - Test Instances/vrps/F-n45-k4_a.vrp";
-
 static struct {
     char *filepath;
     int32_t expected_num_customers;
     int32_t expected_num_vehicles;
+    double best_primal;
 } const G_TEST_INSTANCES[] = {
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k7_a.vrp", 75, 7},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k7_b.vrp", 75, 7},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k8_a.vrp", 75, 8},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k8_b.vrp", 75, 8},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k10_a.vrp", 75, 10},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k10_b.vrp", 75, 10},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k14_a.vrp", 75, 14},
-    {"data/ESPPRC - Test Instances/vrps/E-n76-k14_b.vrp", 75, 14},
-    {"data/ESPPRC - Test Instances/vrps/E-n101-k8_a.vrp", 100, 8},
-    {"data/ESPPRC - Test Instances/vrps/E-n101-k8_b.vrp", 100, 8},
-    {"data/ESPPRC - Test Instances/vrps/E-n101-k14_a.vrp", 100, 14},
-    {"data/ESPPRC - Test Instances/vrps/E-n101-k14_b.vrp", 100, 14},
-    {"data/ESPPRC - Test Instances/vrps/F-n45-k4_a.vrp", 44, 4},
-    {"data/ESPPRC - Test Instances/vrps/F-n72-k4_a.vrp", 71, 4},
-    {"data/ESPPRC - Test Instances/vrps/F-n135-k7_a.vrp", 134, 7},
-    {"data/ESPPRC - Test Instances/vrps/M-n121-k7_a.vrp", 120, 7},
-    {"data/ESPPRC - Test Instances/vrps/M-n121-k7_b.vrp", 120, 7},
-    {"data/ESPPRC - Test Instances/vrps/M-n151-k12_a.vrp", 150, 12},
-    {"data/ESPPRC - Test Instances/vrps/M-n151-k12_b.vrp", 150, 12},
-    {"data/ESPPRC - Test Instances/vrps/M-n200-k16_a.vrp", 199, 16},
-    {"data/ESPPRC - Test Instances/vrps/M-n200-k16_b.vrp", 199, 16},
-    {"data/ESPPRC - Test Instances/vrps/M-n200-k17_a.vrp", 199, 17},
-    {"data/ESPPRC - Test Instances/vrps/M-n200-k17_b.vrp", 199, 17},
-    {"data/ESPPRC - Test Instances/vrps/P-n70-k10_a.vrp", 69, 10},
-    {"data/ESPPRC - Test Instances/vrps/P-n70-k10_b.vrp", 69, 10},
-    {"data/ESPPRC - Test Instances/vrps/P-n76-k4_a.vrp", 75, 4},
-    {"data/ESPPRC - Test Instances/vrps/P-n76-k4_b.vrp", 75, 4},
-    {"data/ESPPRC - Test Instances/vrps/P-n76-k5_a.vrp", 75, 5},
-    {"data/ESPPRC - Test Instances/vrps/P-n76-k5_b.vrp", 75, 5},
-    {"data/ESPPRC - Test Instances/vrps/P-n101-k4_a.vrp", 100, 4},
-    {"data/ESPPRC - Test Instances/vrps/P-n101-k4_b.vrp", 100, 4},
+    // Family F
+    {"data/ESPPRC - Test Instances/vrps/F-n45-k4_a.vrp", 75, 7, -11.967},
+
+    // Family E
+    {"data/ESPPRC - Test Instances/vrps/E-n76-k7_a.vrp", 75, 7, -6.032},
+    {"data/ESPPRC - Test Instances/vrps/E-n76-k8_a.vrp", 75, 8, -6.635},
+    {"data/ESPPRC - Test Instances/vrps/E-n76-k10_a.vrp", 75, 10, -3.81},
+    {"data/ESPPRC - Test Instances/vrps/E-n76-k14_a.vrp", 75, 14, -3.788},
+    // {"data/ESPPRC - Test Instances/vrps/E-n101-k8_a.vrp", 100, 8, -23.977},
+    // {"data/ESPPRC - Test Instances/vrps/E-n101-k14_a.vrp", 100, 14, -6.667},
+
+    // Family P
+    // {"data/ESPPRC - Test Instances/vrps/P-n70-k10_a.vrp", 69, 10, -2.852},
+    {"data/ESPPRC - Test Instances/vrps/P-n76-k4_a.vrp", 75, 4, -2.903},
+    {"data/ESPPRC - Test Instances/vrps/P-n76-k5_a.vrp", 75, 5, -3.96},
+    {"data/ESPPRC - Test Instances/vrps/P-n101-k4_a.vrp", 100, 4, -7.219},
 };
 
 #if __cplusplus
