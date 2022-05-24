@@ -58,7 +58,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
     assert(curr_color != colors[0]);
     assert(demand(instance, 0) == 0.0);
 
-    double demand_sum = 0.0;
+    double Qs = 0.0;
     int32_t set_s_size = 0;
     double served_demand = 0.0;
 
@@ -66,13 +66,13 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         bool i_in_s = (colors[i] == curr_color);
         if (i_in_s) {
             ++set_s_size;
-            demand_sum += demand(instance, i);
+            Qs += demand(instance, i);
             served_demand =
                 demand(instance, i) * vstar[get_y_mip_var_idx(instance, i)];
         }
     }
 
-    double Qr = fmod(demand_sum, Q);
+    double Qr = fmod(Qs, Q);
 
     assert(set_s_size >= 1);
 
@@ -80,7 +80,7 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
         // Short circuit function as fast as possible (without iterating all the
         // N^2 nodes) if we can determine the cut will not be separated.
         {
-            double rhs = 2.0 * (ceil(demand_sum / Q) - (demand_sum / Qr));
+            double rhs = 2.0 * (ceil(Qs / Q) - (Qs / Qr));
 
             bool is_violated =
                 !((max_flow - (2.0 * served_demand) / Qr) >= (rhs - tolerance));
@@ -97,12 +97,11 @@ static inline SeparationInfo separate(CutSeparationFunctor *self,
                 continue;
             }
 
-            double d = demand(instance, i);
-
             assert(i != 0);
             assert(colors[i] == curr_color);
 
-            double value = -2.0 * d / Qr;
+            double qi = demand(instance, i);
+            double value = -2.0 * qi / Qr;
             push_var_lhs(&ctx->super, &info, vstar, value,
                          (CPXDIM)get_y_mip_var_idx(instance, i));
 
