@@ -30,7 +30,7 @@ extern "C" {
 #include "core-utils.h"
 
 void validate_symmetric_distances(const Instance *instance);
-void validate_solution(const Instance *instance, Solution *solution,
+void validate_primal_solution(const Instance *instance, Solution *solution,
                        int32_t min_num_customers_served);
 void validate_tour(const Instance *instance, Tour *tour,
                    int32_t min_num_customers_served);

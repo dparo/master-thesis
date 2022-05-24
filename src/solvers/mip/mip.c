@@ -1185,46 +1185,99 @@ fail:
     return false;
 }
 
-static bool process_cplex_output(Solver *self, Solution *solution, int lpstat) {
-#define CHECKED(FUNC, ...)                                                     \
-    do {                                                                       \
-        if (0 != __VA_ARGS__) {                                                \
-            log_fatal("%s ::" #FUNC " failed", __func__);                      \
-            return false;                                                      \
-        }                                                                      \
-    } while (0)
+static bool process_cplex_output(Solver *self, const Instance *instance,
+                                 Solution *solution, double *vstar, int lpstat,
+                                 SolveStatus result) {
+    bool found_primal_solution =
+        result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
 
-    double gap = INFINITY;
-    CPXDIM num_user_cuts = 0;
+    if (found_primal_solution) {
+        if (0 != CPXXgetx(self->data->env, self->data->lp, vstar, 0,
+                          self->data->num_mip_vars - 1)) {
+            log_fatal("%s :: Failed to access MIP solution, even though primal "
+                      "solution should be available",
+                      __func__);
+            goto failure;
+        }
+        if (0 != CPXXgetobjval(self->data->env, self->data->lp,
+                               &solution->primal_bound)) {
+            log_fatal("%s :: Failed to access primal objective value, even "
+                      "though primal "
+                      "solution should be available",
+                      __func__);
+            goto failure;
+        }
+        double gap = INFINITY;
 
-    CHECKED(CPXXgetbestobjval,
-            CPXXgetbestobjval(self->data->env, self->data->lp,
-                              &solution->dual_bound));
+        if (0 != CPXXgetmiprelgap(self->data->env, self->data->lp, &gap)) {
+            log_fatal("%s :: Failed to access relative solution gap, even "
+                      "though primal "
+                      "solution should be available",
+                      __func__);
+            goto failure;
+        }
+        assert(feq(gap, solution_relgap(solution), 1e-6));
+    }
 
-    CHECKED(CPXXgetobjval, CPXXgetobjval(self->data->env, self->data->lp,
-                                         &solution->primal_bound));
+    if (result != SOLVE_STATUS_ERR) {
+        CPXDIM num_user_cuts = 0;
 
-    CHECKED(CPXXgetmiprelgap,
-            CPXXgetmiprelgap(self->data->env, self->data->lp, &gap));
+        if (0 != CPXXgetbestobjval(self->data->env, self->data->lp,
+                                   &solution->dual_bound)) {
+            log_fatal("%s :: Failed to retrieve best dual bound. A dual bound "
+                      "should be available since CPLEX did not error out",
+                      __func__);
+            goto failure;
+        }
 
-    CHECKED(CPXXgetnumcuts, CPXXgetnumcuts(self->data->env, self->data->lp,
-                                           CPX_CUT_USER, &num_user_cuts));
+        if (0 != CPXXgetnumcuts(self->data->env, self->data->lp, CPX_CUT_USER,
+                                &num_user_cuts)) {
+            log_warn("%s :: Failed to retrieve number of user cuts", __func__);
+        }
 
-    CPXCNT simplex_iterations =
-        CPXXgetmipitcnt(self->data->env, self->data->lp);
+        CPXCNT simplex_iterations =
+            CPXXgetmipitcnt(self->data->env, self->data->lp);
 
-    CPXCNT nodecnt = CPXXgetnodecnt(self->data->env, self->data->lp);
+        CPXCNT nodecnt = CPXXgetnodecnt(self->data->env, self->data->lp);
 
-    assert(feq(gap, solution_relgap(solution), 1e-6));
+        log_warn(
+            "Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
+            "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "
+            "%d",
+            lpstat, solution->dual_bound, solution->primal_bound,
+            solution_relgap(solution), simplex_iterations, nodecnt,
+            num_user_cuts);
+    }
 
-    log_info("Cplex solution finished (lpstat = %d) with :: cost = [%f, %f], "
-             "gap = %f, simplex_iterations = %lld, nodecnt = %lld, user_cuts = "
-             "%d",
-             lpstat, solution->dual_bound, solution->primal_bound, gap,
-             simplex_iterations, nodecnt, num_user_cuts);
+    if (found_primal_solution) {
 
-#undef CHECKED
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
+                double v = vstar[get_x_mip_var_idx(instance, i, j)];
+                if (feq(v, 1.0, 1e-3)) {
+                    printf("x(%4d, %4d) = %-3g            c(%4d, %4d) = "
+                           "%-4.3g\n",
+                           i, j, vstar[get_x_mip_var_idx(instance, i, j)], i, j,
+                           cptp_dist(instance, i, j));
+                }
+            }
+        }
+        printf("\n");
+
+        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
+            double v = vstar[get_y_mip_var_idx(instance, i)];
+            if (feq(v, 1.0, 1e-3)) {
+                printf("y(%4d) = %-3g            p(%4d) = %-4.5g\n", i, v, i,
+                       instance->profits[i]);
+            }
+        }
+
+        unpack_mip_solution(instance, &solution->tour, vstar);
+    }
+
     return true;
+failure:
+    return false;
 }
 
 SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
@@ -1265,19 +1318,6 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
 
     log_info("%s :: CPXmipopt terminated with lpstat = \"%s\" [%d]", __func__,
              lpstat_str, lpstat);
-
-    if (0 == CPXXgetobjval(self->data->env, self->data->lp,
-                           &solution->primal_bound)) {
-        if (0 == CPXXgetx(self->data->env, self->data->lp, vstar, 0,
-                          self->data->num_mip_vars - 1)) {
-            if (!process_cplex_output(self, solution, lpstat)) {
-                log_fatal("%s :: process_cplex_output failed    ####    lpstat "
-                          "= [%d] %s",
-                          __func__, lpstat, lpstat_str);
-                goto terminate;
-            }
-        }
-    }
 
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetstat-cpxgetstat
     // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
@@ -1326,33 +1366,9 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         break;
     }
 
-    bool cplex_found_a_solution =
-        result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
-
-    if (cplex_found_a_solution) {
-
-        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-            for (int32_t j = i + 1; j < instance->num_customers + 1; j++) {
-                double v = vstar[get_x_mip_var_idx(instance, i, j)];
-                if (feq(v, 1.0, 1e-3)) {
-                    printf("x(%4d, %4d) = %-3g            c(%4d, %4d) = "
-                           "%-4.3g\n",
-                           i, j, vstar[get_x_mip_var_idx(instance, i, j)], i, j,
-                           cptp_dist(instance, i, j));
-                }
-            }
-        }
-        printf("\n");
-
-        for (int32_t i = 0; i < instance->num_customers + 1; i++) {
-            double v = vstar[get_y_mip_var_idx(instance, i)];
-            if (feq(v, 1.0, 1e-3)) {
-                printf("y(%4d) = %-3g            p(%4d) = %-4.5g\n", i, v, i,
-                       instance->profits[i]);
-            }
-        }
-
-        unpack_mip_solution(instance, &solution->tour, vstar);
+    if (!process_cplex_output(self, instance, solution, vstar, lpstat,
+                              result)) {
+        goto terminate;
     }
 
 terminate:
@@ -1477,9 +1493,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
 
     if (solver_params_get_bool(tparams, "APPLY_UPPER_CUTOFF")) {
         // NOTE:
-        // This parameter is effective only when the branch and bound algorithm
-        // is invoked, for example, in a mixed integer program (MIP). It does
-        // not have the expected effect when branch and bound is not invoked.
+        // This parameter is effective only when the branch and bound
+        // algorithm is invoked, for example, in a mixed integer program
+        // (MIP). It does not have the expected effect when branch and bound
+        // is not invoked.
         const double upper_cutoff_value = 0.0;
 
         log_info("%s :: Setting UPPER_CUTOFF to %f", __func__,
@@ -1488,9 +1505,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         // FIXME:
         //     Reference:
         //     https://www.ibm.com/docs/en/icos/22.1.0?topic=parameters-upper-cutoff
-        // This parameter is effective only in the branch and bound algorithm,
-        // for example, in a mixed integer program (MIP). It does not have the
-        // expected effect when branch and bound is not invoked.
+        // This parameter is effective only in the branch and bound
+        // algorithm, for example, in a mixed integer program (MIP). It does
+        // not have the expected effect when branch and bound is not
+        // invoked.
         //
         //   So... Should we also implement the upper_cutoff as an explicit
         //   constraint (i.e a dedicated row in the tablue) ???
@@ -1506,9 +1524,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
 
     if (solver_params_get_bool(tparams, "APPLY_LOWER_CUTOFF")) {
         // NOTE:
-        // This parameter is effective only when the branch and bound algorithm
-        // is invoked, for example, in a mixed integer program (MIP). It does
-        // not have the expected effect when branch and bound is not invoked.
+        // This parameter is effective only when the branch and bound
+        // algorithm is invoked, for example, in a mixed integer program
+        // (MIP). It does not have the expected effect when branch and bound
+        // is not invoked.
 
         const double cutoff_value = compute_trivial_lower_cutoff(instance);
         log_info("%s :: Setting LOWER_CUTOFF to %f", __func__, cutoff_value);
@@ -1516,10 +1535,10 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         // FIXME:
         //      Reference:
         //      https://www.ibm.com/docs/en/icos/22.1.0?topic=parameters-lower-cutoff
-        //  The CPX_PARAM_CUTLO applies only to maximimization problems. In our
-        //  case we have a minimization problem, therefore we need to implement
-        //  the lower_cutoff value as an explicit constraint (i.e a dedicated
-        //  row in the tablue).
+        //  The CPX_PARAM_CUTLO applies only to maximimization problems. In
+        //  our case we have a minimization problem, therefore we need to
+        //  implement the lower_cutoff value as an explicit constraint (i.e
+        //  a dedicated row in the tablue).
         if (0 !=
             CPXXsetdblparam(solver->data->env, CPX_PARAM_CUTLO, cutoff_value)) {
             log_fatal(
@@ -1604,10 +1623,10 @@ Solver mip_solver_create(const Instance *instance, SolverTypedParams *tparams,
         if (solver_params_get_bool(tparams,
                                    "APPLY_POLISHING_AFTER_WARM_START")) {
 
-            log_info(
-                "%s :: CPXXsetdblparam -- Setting CPX_PARAM_POLISHAFTERTIME to "
-                "0.0 (polish the warm start solutions)",
-                __func__);
+            log_info("%s :: CPXXsetdblparam -- Setting "
+                     "CPX_PARAM_POLISHAFTERTIME to "
+                     "0.0 (polish the warm start solutions)",
+                     __func__);
             if (0 != CPXXsetdblparam(solver.data->env,
                                      CPX_PARAM_POLISHAFTERTIME, 0.0)) {
                 log_fatal("%s :: CPXXsetdbparam -- Failed to setup "

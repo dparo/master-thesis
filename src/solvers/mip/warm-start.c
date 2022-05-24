@@ -312,7 +312,7 @@ static void ins_heur(const Instance *instance, Solution *solution,
 
 #ifndef NDEBUG
     validate_tour(instance, tour, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
-    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
+    validate_primal_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 
     // NOTE(dparo):
     //    Due to the MIP structure of the formulation,
@@ -430,7 +430,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
             twoopt_exchange(solver, instance, &solution->tour, best_a, best_b);
             solution->primal_bound += best_delta_cost;
 #ifndef NDEBUG
-            validate_solution(instance, solution,
+            validate_primal_solution(instance, solution,
                               WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
         } else {
@@ -440,7 +440,7 @@ static void twoopt_refine(Solver *solver, const Instance *instance,
     }
 
 #ifndef NDEBUG
-    validate_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
+    validate_primal_solution(instance, solution, WARM_START_MIN_NUM_CUSTOMERS_SERVED);
 #endif
 }
 
