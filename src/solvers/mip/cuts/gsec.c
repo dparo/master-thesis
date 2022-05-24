@@ -278,7 +278,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
 
     // Count the number of nodes in each component
     for (int32_t i = 0; i < n; i++) {
-        int32_t c = *tour_comp(tour, i);
+        int32_t c = tour->comp[i];
         assert(c < tour->num_comps);
         if (c >= 0) {
             ++(ctx->cnnodes[c]);
@@ -297,7 +297,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
     const double rhs = 0.0;
     const char sense = 'G';
 
-    assert(*tour_comp(tour, 0) == 0);
+    assert(tour->comp[0] == 0);
 
     int32_t depot_color = 0;
     CPXNNZ nnz_upper_bound = get_nnz_upper_bound(instance);
@@ -338,6 +338,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
                 assert(i != 0);
                 assert(tour->comp[i] != tour->comp[j]);
                 assert(tour->comp[i] != depot_color);
+                assert(tour->comp[i] == c);
                 assert(tour->comp[j] != c);
                 ctx->index[pos] = (CPXDIM)get_x_mip_var_idx(instance, i, j);
                 ctx->value[pos] = +1.0;
@@ -347,6 +348,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
         }
 
+        assert(feq(flow, 0.0, EPS));
         assert(pos < nnz_upper_bound);
         assert(pos == nnz - 1);
 
@@ -363,7 +365,7 @@ static bool integral_sep(CutSeparationFunctor *self, const double obj_p,
             }
 
             double y_i = vstar[get_y_mip_var_idx(instance, i)];
-            assert(*tour_comp(tour, i) >= 1);
+            assert(tour->comp[i] >= 1);
 
             ctx->index[nnz - 1] = (CPXDIM)get_y_mip_var_idx(instance, i);
             ctx->value[nnz - 1] = -2.0;
