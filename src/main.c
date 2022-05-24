@@ -143,18 +143,18 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
         return;
     }
 
+    cJSON *root = NULL;
     FILE *fh = fopen(ctx->json_report_path, "w");
     if (!fh) {
         log_fatal("%s: failed to open file for writing JSON report",
                   ctx->json_report_path);
-        return;
+        goto cleanup;
     }
 
-    cJSON *root = cJSON_CreateObject();
+    root = cJSON_CreateObject();
     if (!root) {
         log_fatal("%s :: Failed to create JSON root object", __func__);
-        fclose(fh);
-        return;
+        goto cleanup;
     }
 
     bool feasible = is_feasible_solve_status(status);
@@ -173,10 +173,12 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     s &= cJSON_AddItemToObject(root, "inputFile",
                                cJSON_CreateString(ctx->instance_filepath));
 
-    s &= cJSON_AddItemToObject(root, "instanceName",
-                               cJSON_CreateString(instance->name));
-    s &= cJSON_AddItemToObject(root, "instanceComment",
-                               cJSON_CreateString(instance->comment));
+    s &= cJSON_AddItemToObject(
+        root, "instanceName",
+        cJSON_CreateString(instance->name ? instance->name : ""));
+    s &= cJSON_AddItemToObject(
+        root, "instanceComment",
+        cJSON_CreateString(instance->comment ? instance->comment : ""));
     s &= cJSON_AddItemToObject(root, "vehicleCap",
                                cJSON_CreateNumber(instance->vehicle_cap));
     s &= cJSON_AddItemToObject(root, "numCustomers",
@@ -230,15 +232,21 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
                                cJSON_CreateString(timerepr_str));
 
     if (!s) {
-        log_fatal("%s :: Failed to create JSON root object", __func__);
-        fclose(fh);
-        return;
+        log_fatal("%s :: Failed to add all the necessary JSON elements to the "
+                  "parent JSON root object",
+                  __func__);
+        goto cleanup;
     }
+
     char *content = cJSON_Print(root);
     fprintf(fh, "%s", content);
-    cJSON_Delete(root);
     free(content);
-    fclose(fh);
+
+cleanup:
+    if (root)
+        cJSON_Delete(root);
+    if (fh)
+        fclose(fh);
 }
 
 static int main2(AppCtx *ctx) {
