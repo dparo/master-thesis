@@ -94,10 +94,6 @@ TEST parsing_single_instance(void) {
 }
 
 TEST parsing_all_instances(void) {
-
-    STATIC_ASSERT(ARRAY_LEN(G_TEST_INSTANCES) == 31,
-                  "This is the amount of test instances that we have");
-
     for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         CHECK_CALL(validate_instance(
