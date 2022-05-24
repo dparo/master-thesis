@@ -121,7 +121,9 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     if (is_primal && valid) {
         double cost = tour_eval(instance, &solution->tour);
         double demand = tour_demand(instance, &solution->tour);
+        double profit = tour_profit(instance, &solution->tour);
         printf("%-16s %.17g\n", "TOUR COST:", cost);
+        printf("%-16s %.17g\n", "TOUR PROFIT:", profit);
         printf("%-16s %.17g   (%.3g%%)\n", "TOUR DEMAND:", demand,
                demand / instance->vehicle_cap * 100.0);
     }
@@ -158,8 +160,10 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
         goto cleanup;
     }
 
-    bool feasible = is_primal_solve_status(status);
+    bool primal = is_primal_solve_status(status);
     bool valid = is_valid_solve_status(status);
+    bool aborted = is_aborted_solve_status(status);
+    bool optimal = is_optimal_solve_status(status);
 
     bool s = true;
     s &= cJSON_AddItemToObject(root, "solverName",
@@ -174,66 +178,123 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     s &= cJSON_AddItemToObject(root, "inputFile",
                                cJSON_CreateString(ctx->instance_filepath));
 
-    s &= cJSON_AddItemToObject(
-        root, "instanceName",
-        cJSON_CreateString(instance->name ? instance->name : ""));
-    s &= cJSON_AddItemToObject(
-        root, "instanceComment",
-        cJSON_CreateString(instance->comment ? instance->comment : ""));
-    s &= cJSON_AddItemToObject(root, "vehicleCap",
-                               cJSON_CreateNumber(instance->vehicle_cap));
-    s &= cJSON_AddItemToObject(root, "numCustomers",
-                               cJSON_CreateNumber(instance->num_customers));
-    s &= cJSON_AddItemToObject(root, "numVehicles",
-                               cJSON_CreateNumber(instance->num_vehicles));
+    cJSON *instance_info_obj = cJSON_CreateObject();
+    s &= cJSON_AddItemToObject(root, "instanceInfo", instance_info_obj);
+    {
+        s &= cJSON_AddItemToObject(
+            instance_info_obj, "name",
+            cJSON_CreateString(instance->name ? instance->name : ""));
+        s &= cJSON_AddItemToObject(
+            instance_info_obj, "comment",
+            cJSON_CreateString(instance->comment ? instance->comment : ""));
+        s &= cJSON_AddItemToObject(instance_info_obj, "vehicleCap",
+                                   cJSON_CreateNumber(instance->vehicle_cap));
+        s &= cJSON_AddItemToObject(instance_info_obj, "numCustomers",
+                                   cJSON_CreateNumber(instance->num_customers));
+        s &= cJSON_AddItemToObject(instance_info_obj, "numVehicles",
+                                   cJSON_CreateNumber(instance->num_vehicles));
+    }
 
-    s &= cJSON_AddItemToObject(
-        root, "status", cJSON_CreateString(ENUM_TO_STR(SolveStatus, status)));
+    cJSON *status_obj = cJSON_CreateObject();
+    s &= cJSON_AddItemToObject(root, "solveStatus", status_obj);
+    {
+        s &= cJSON_AddItemToObject(
+            status_obj, "repr",
+            cJSON_CreateString(ENUM_TO_STR(SolveStatus, status)));
 
-    s &= cJSON_AddItemToObject(root, "valid", cJSON_CreateBool(valid));
+        s &= cJSON_AddItemToObject(status_obj, "erroredOut",
+                                   cJSON_CreateBool(!valid));
 
-    s &= cJSON_AddItemToObject(root, "feasible",
-                               cJSON_CreateBool(feasible && valid));
+        s &= cJSON_AddItemToObject(status_obj, "containsPrimalSolution",
+                                   cJSON_CreateBool(primal));
 
-    s &= cJSON_AddItemToObject(root, "dualBound",
-                               cJSON_CreateNumber(solution->dual_bound));
+        s &= cJSON_AddItemToObject(status_obj, "provenOptimality",
+                                   cJSON_CreateBool(optimal));
 
-    s &= cJSON_AddItemToObject(root, "primalBound",
-                               cJSON_CreateNumber(solution->primal_bound));
+        s &= cJSON_AddItemToObject(status_obj, "solutionWasAborted",
+                                   cJSON_CreateBool(aborted));
+    }
 
-    s &= cJSON_AddItemToObject(root, "gap",
-                               cJSON_CreateNumber(solution_relgap(solution)));
+    cJSON *timing_obj = cJSON_CreateObject();
+    s &= cJSON_AddItemToObject(root, "timing", timing_obj);
+    {
+        enum {
+            TIMEREPR_LEN = 4096,
+        };
 
-    double cost = tour_eval(instance, &solution->tour);
-    s &= cJSON_AddItemToObject(root, "tourCost", cJSON_CreateNumber(cost));
+        char timerepr_str[TIMEREPR_LEN];
+        TimeRepr timerepr = timerepr_from_usecs(timing.took_usecs);
+        timerepr_to_string(&timerepr, timerepr_str, ARRAY_LEN(timerepr_str));
 
-    s &= cJSON_AddItemToObject(root, "COST_TOLERANCE",
-                               cJSON_CreateNumber(COST_TOLERANCE));
+        s &= cJSON_AddItemToObject(
+            timing_obj, "took",
+            cJSON_CreateNumber((double)timing.took_usecs * USECS_TO_SECS));
+        s &= cJSON_AddItemToObject(timing_obj, "tookRepr",
+                                   cJSON_CreateString(timerepr_str));
 
-    char *time = ctime(&timing.started);
-    // Remove newline introduced from ctime
-    time[strlen(time) - 1] = 0;
+        char *time = ctime(&timing.started);
+        // Remove newline introduced from ctime
+        time[strlen(time) - 1] = 0;
 
-    s &= cJSON_AddItemToObject(root, "started", cJSON_CreateString(time));
+        s &= cJSON_AddItemToObject(timing_obj, "started",
+                                   cJSON_CreateString(time));
 
-    time = ctime(&timing.ended);
-    // Remove newline introduced from ctime
-    time[strlen(time) - 1] = 0;
-    s &= cJSON_AddItemToObject(root, "ended", cJSON_CreateString(time));
+        time = ctime(&timing.ended);
+        // Remove newline introduced from ctime
+        time[strlen(time) - 1] = 0;
+        s &= cJSON_AddItemToObject(timing_obj, "ended",
+                                   cJSON_CreateString(time));
+    }
 
-    enum {
-        TIMEREPR_LEN = 4096,
-    };
+    cJSON *bounds_obj = cJSON_CreateObject();
+    s &= cJSON_AddItemToObject(root, "bounds", bounds_obj);
+    {
 
-    char timerepr_str[TIMEREPR_LEN];
-    TimeRepr timerepr = timerepr_from_usecs(timing.took_usecs);
-    timerepr_to_string(&timerepr, timerepr_str, ARRAY_LEN(timerepr_str));
+        s &= cJSON_AddItemToObject(bounds_obj, "dual",
+                                   cJSON_CreateNumber(solution->dual_bound));
 
-    s &= cJSON_AddItemToObject(
-        root, "took",
-        cJSON_CreateNumber((double)timing.took_usecs * USECS_TO_SECS));
-    s &= cJSON_AddItemToObject(root, "tookRepr",
-                               cJSON_CreateString(timerepr_str));
+        s &= cJSON_AddItemToObject(bounds_obj, "primal",
+                                   cJSON_CreateNumber(solution->primal_bound));
+
+        s &= cJSON_AddItemToObject(
+            bounds_obj, "gap", cJSON_CreateNumber(solution_relgap(solution)));
+    }
+
+    if (primal) {
+        cJSON *tour_info_obj = cJSON_CreateObject();
+        s &= cJSON_AddItemToObject(root, "tourInfo", tour_info_obj);
+        {
+            double cost = tour_eval(instance, &solution->tour);
+            double profit = tour_profit(instance, &solution->tour);
+            double demand = tour_demand(instance, &solution->tour);
+
+            s &= cJSON_AddItemToObject(tour_info_obj, "cost",
+                                       cJSON_CreateNumber(cost));
+            s &= cJSON_AddItemToObject(tour_info_obj, "profit",
+                                       cJSON_CreateNumber(profit));
+            s &= cJSON_AddItemToObject(tour_info_obj, "demand",
+                                       cJSON_CreateNumber(demand));
+
+            cJSON *route_array = cJSON_CreateArray();
+            int32_t curr_vertex = 0;
+            int32_t next_vertex = curr_vertex;
+            do {
+                next_vertex = *tsucc(&solution->tour, curr_vertex);
+                cJSON_AddItemToArray(route_array,
+                                     cJSON_CreateNumber(curr_vertex));
+
+                curr_vertex = next_vertex;
+            } while (curr_vertex != 0);
+            s &= cJSON_AddItemToObject(tour_info_obj, "route", route_array);
+        }
+    }
+
+    cJSON *constants_obj = cJSON_CreateObject();
+    s &= cJSON_AddItemToObject(root, "constants", constants_obj);
+    {
+        s &= cJSON_AddItemToObject(constants_obj, "COST_TOLERANCE",
+                                   cJSON_CreateNumber(COST_TOLERANCE));
+    }
 
     if (!s) {
         log_fatal("%s :: Failed to add all the necessary JSON elements to the "

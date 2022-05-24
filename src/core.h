@@ -180,6 +180,10 @@ static inline bool is_valid_instance(Instance *instance) {
     return !invalid;
 }
 
+static inline bool is_optimal_solve_status(SolveStatus status) {
+    return status == SOLVE_STATUS_OPTIMAL || status == SOLVE_STATUS_INFEASIBLE;
+}
+
 static inline bool is_aborted_solve_status(SolveStatus status) {
     return status == SOLVE_STATUS_ABORTED_FEASIBLE ||
            status == SOLVE_STATUS_ABORTED_INVALID ||
