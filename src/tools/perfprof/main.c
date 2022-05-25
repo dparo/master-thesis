@@ -104,6 +104,7 @@ typedef struct {
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
 static Hash G_cptp_exe_hash;
+static Hash G_bapcod_virtual_exe_hash;
 static bool G_should_terminate;
 static ProcPool G_pool = {0};
 static PerfProfBatch *G_active_batch = NULL;
@@ -229,11 +230,12 @@ static void my_sighandler(int signum) {
 static void
 update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
     PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
-
-    cJSON *root = load_json(handle->json_output_path);
-    if (root) {
-        parse_cptp_solver_json_dump(&run, root);
-        cJSON_Delete(root);
+    if (handle->json_output_path[0] != '\0') {
+        cJSON *root = load_json(handle->json_output_path);
+        if (root) {
+            parse_cptp_solver_json_dump(&run, root);
+            cJSON_Delete(root);
+        }
     }
     insert_run_into_table(&handle->input.uid, &run);
 }
@@ -264,22 +266,11 @@ static void
 update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
                                            char *json_filepath) {
     PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
-    cJSON *root = load_json(json_filepath);
-    if (root) {
-        parse_bapcod_solver_json_dump(&run, root);
-        cJSON_Delete(root);
-    }
-
     if (json_filepath) {
-        char *contents = fread_all_into_cstr(json_filepath, NULL);
-        if (contents && contents[0] != '\0') {
-            cJSON *root = cJSON_Parse(contents);
-            if (root) {
-                parse_bapcod_solver_json_dump(&run, root);
-                cJSON_Delete(root);
-            }
-
-            free(contents);
+        cJSON *root = load_json(json_filepath);
+        if (root) {
+            parse_bapcod_solver_json_dump(&run, root);
+            cJSON_Delete(root);
         }
     }
     insert_run_into_table(&handle->input.uid, &run);
@@ -308,8 +299,8 @@ static void handle_bapcod_solver(PerfProfRunHandle *handle) {
     }
 }
 
-static void init_handle_json_output_path(PerfProfRunHandle *handle,
-                                         PerfProfInput *input) {
+static void make_unique_cptp_json_output_file(PerfProfRunHandle *handle,
+                                              PerfProfInput *input) {
     snprintf_safe(handle->json_output_path, ARRAY_LEN(handle->json_output_path),
                   "%s/%s/%s", PERFPROF_DUMP_ROOTDIR, "cache",
                   input->instance_name);
@@ -335,6 +326,25 @@ static double get_extended_timelimit(double timelimit) {
 
 static double get_kill_timelimit(double timelimit) {
     return ceil(1.05 * get_extended_timelimit(timelimit));
+}
+
+PerfProfRunHandle *new_perfprof_run_handle(const Hash *exe_hash,
+                                           const PerfProfInput *input,
+                                           char *args[PROC_MAX_ARGS],
+                                           int32_t num_args,
+                                           const PerfProfSolver *solver) {
+    PerfProfRunHandle *handle = malloc(sizeof(*handle));
+    handle->run_hash = compute_run_hash(exe_hash, input, args, num_args);
+    handle->input.seed = input->seed;
+    snprintf_safe(handle->solver_name, ARRAY_LEN(handle->solver_name), "%s",
+                  solver->name);
+    snprintf_safe(handle->input.filepath, ARRAY_LEN(handle->input.filepath),
+                  "%s", input->filepath);
+
+    handle->input.uid.seedidx = input->uid.seedidx;
+    strncpy_safe(handle->input.uid.hash.cstr, input->uid.hash.cstr,
+                 ARRAY_LEN(handle->input.uid.hash.cstr));
+    return handle;
 }
 
 static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
@@ -378,21 +388,10 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
         args[argidx++] = solver->args[i];
     }
 
-    PerfProfRunHandle *handle = malloc(sizeof(*handle));
-    handle->run_hash = compute_run_hash(&G_cptp_exe_hash, input, args, argidx);
-    handle->input.seed = input->seed;
-    snprintf_safe(handle->solver_name, ARRAY_LEN(handle->solver_name), "%s",
-                  solver->name);
-    snprintf_safe(handle->input.filepath, ARRAY_LEN(handle->input.filepath),
-                  "%s", input->filepath);
+    PerfProfRunHandle *handle =
+        new_perfprof_run_handle(&G_cptp_exe_hash, input, args, argidx, solver);
 
-    handle->input.uid.seedidx = input->uid.seedidx;
-    strncpy_safe(handle->input.uid.hash.cstr, input->uid.hash.cstr,
-                 ARRAY_LEN(handle->input.uid.hash.cstr));
-
-    if (0 != strcmp(solver->name, BAPCOD_SOLVER_NAME)) {
-        init_handle_json_output_path(handle, input);
-    }
+    make_unique_cptp_json_output_file(handle, input);
 
     args[argidx++] = "-i";
     args[argidx++] = (char *)input->filepath;
@@ -403,22 +402,16 @@ static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
     //
     // Check if the JSON output is already cached on disk
     //
-    if (0 == strcmp(solver->name, BAPCOD_SOLVER_NAME) &&
-        solver->args[0] == NULL) {
-        handle_bapcod_solver(handle);
-        free(handle);
+    if (!os_fexists(handle->json_output_path)) {
+        proc_pool_queue(&G_pool, handle, args);
     } else {
-        if (!os_fexists(handle->json_output_path)) {
-            proc_pool_queue(&G_pool, handle, args);
-        } else {
-            printf("Found cache for hash %s. CMD:", handle->run_hash.cstr);
-            for (int32_t i = 0; args[i] && i < argidx; i++) {
-                printf(" %s", args[i]);
-            }
-            printf("\n");
-            update_perf_tbl_with_cptp_json_perf_data(handle);
-            free(handle);
+        printf("Found cache for hash %s. CMD:", handle->run_hash.cstr);
+        for (int32_t i = 0; args[i] && i < argidx; i++) {
+            printf(" %s", args[i]);
         }
+        printf("\n");
+        update_perf_tbl_with_cptp_json_perf_data(handle);
+        free(handle);
     }
 }
 
@@ -432,9 +425,18 @@ void handle_vrp_instance(PerfProfInput *input) {
          solver_idx++) {
         PerfProfSolver *solver = &G_active_batch->solvers[solver_idx];
 
-        run_cptp_solver(solver, input);
-        if (G_pool.max_num_procs == 1) {
-            proc_pool_join(&G_pool);
+        if (0 == strcmp(solver->name, BAPCOD_SOLVER_NAME) &&
+            solver->args[0] == NULL) {
+            PerfProfRunHandle *handle = new_perfprof_run_handle(
+                &G_bapcod_virtual_exe_hash, input, NULL, 0, solver);
+
+            handle_bapcod_solver(handle);
+            free(handle);
+        } else {
+            run_cptp_solver(solver, input);
+            if (G_pool.max_num_procs == 1) {
+                proc_pool_join(&G_pool);
+            }
         }
     }
 }
@@ -576,6 +578,14 @@ static void init(void) {
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
         sha256_finalize_to_cstr(&shactx, &G_cptp_exe_hash);
     }
+    // Compute the cptp exe hash
+    {
+        SHA256_CTX shactx;
+
+        sha256_init(&shactx);
+        sha256_update(&shactx, (BYTE *)"BaPCod", strlen("BaPCod"));
+        sha256_finalize_to_cstr(&shactx, &G_bapcod_virtual_exe_hash);
+    }
 }
 
 static void generate_perfs_imgs(PerfProfBatch *batch);
@@ -648,10 +658,10 @@ static void main_loop(void) {
          }},
 #else
         {1,
-         "F-scaled-4.0-last-10",
+         "BAP_Instances_Test",
          DEFAULT_TIME_LIMIT,
          1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F/F-n45-k4"},
+         {"data/BAP_Instances_Test"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
@@ -688,10 +698,9 @@ static void main_loop(void) {
                "\n");
         printf("###########################################################"
                "\n");
-        printf("     DOING BATCH:\n");
+        printf("     DOING BATCH: %s\n", batches[i].name);
         printf("            Batch max num concurrent procs: %d\n",
                batches[i].max_num_procs);
-        printf("            Batch name: %s\n", batches[i].name);
         printf("            Batch timelimit: %g\n", batches[i].timelimit);
         printf("            Batch num seeds: %d\n", batches[i].nseeds);
         printf("            Batch dirs: [");
@@ -784,8 +793,8 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = PYTHON3_PERF_SCRIPT;
     args[argidx++] = "--delimiter";
     args[argidx++] = ",";
-    // NOTE: This parameters make little sense now that we are encoding our own
-    // custom baked data
+    // NOTE: This parameters make little sense now that we are encoding our
+    // own custom baked data
     if (!is_time_profile) {
         args[argidx++] = "--draw-separated-regions";
     }

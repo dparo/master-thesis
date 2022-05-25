@@ -1,0 +1,34 @@
+{
+    "instanceName": "E-n51-k5",
+    "comment": "(Christophides:and Eilon, Min no of trucks: 5, Optimal value: 521)",
+    "type": "CVRP",
+    "dimension": 51,
+    "vehicles": 5,
+    "capacity": 160.000000,
+    "columnGenerationIteration": 317,
+    "zeroReducedCostThreshold": 3.3905176746523789,
+    "rcsp-infos": {
+         "seconds": 0.012651000000000001,
+         "pricerSuccess": 1,
+         "generatedColumns": 1,
+         "columnsReducedCost": [-0.60948232534759361],
+         "columns": [
+                [
+                    { "id": "X[0,32]", "name": "Xi0j32_0_OspV", "val": 1 },
+                    { "id": "X[0,46]", "name": "Xi0j46_0_OspV", "val": 1 },
+                    { "id": "X[1,22]", "name": "Xi1j22_0_OspV", "val": 1 },
+                    { "id": "X[1,32]", "name": "Xi1j32_0_OspV", "val": 1 },
+                    { "id": "X[3,22]", "name": "Xi3j22_0_OspV", "val": 1 },
+                    { "id": "X[3,36]", "name": "Xi3j36_0_OspV", "val": 1 },
+                    { "id": "X[11,16]", "name": "Xi11j16_0_OspV", "val": 1 },
+                    { "id": "X[11,46]", "name": "Xi11j46_0_OspV", "val": 1 },
+                    { "id": "X[16,50]", "name": "Xi16j50_0_OspV", "val": 1 },
+                    { "id": "X[20,29]", "name": "Xi20j29_0_OspV", "val": 1 },
+                    { "id": "X[20,35]", "name": "Xi20j35_0_OspV", "val": 1 },
+                    { "id": "X[21,29]", "name": "Xi21j29_0_OspV", "val": 1 },
+                    { "id": "X[21,50]", "name": "Xi21j50_0_OspV", "val": 1 },
+                    { "id": "X[35,36]", "name": "Xi35j36_0_OspV", "val": 1 }
+                ]
+        ]
+    }
+}
