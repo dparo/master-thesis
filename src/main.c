@@ -221,7 +221,7 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     }
 
     cJSON *timing_obj = cJSON_CreateObject();
-    s &= cJSON_AddItemToObject(root, "timing", timing_obj);
+    s &= cJSON_AddItemToObject(root, "timingInfo", timing_obj);
     {
         enum {
             TIMEREPR_LEN = 4096,

@@ -20,87 +20,84 @@ cJSON *load_json(char *filepath) {
 }
 
 void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
-    cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
-    cJSON *itm_feasible = cJSON_GetObjectItemCaseSensitive(root, "feasible");
-    cJSON *itm_valid = cJSON_GetObjectItemCaseSensitive(root, "valid");
-    cJSON *itm_dual_bound = cJSON_GetObjectItemCaseSensitive(root, "dualBound");
-    cJSON *itm_primal_bound =
-        cJSON_GetObjectItemCaseSensitive(root, "primalBound");
+    cJSON *itm_solve_status = NULL;
+    cJSON *itm_timing_info = NULL;
+    cJSON *itm_bounds = NULL;
+
+    cJSON *itm_took = NULL;
+    cJSON *itm_solve_status_code = NULL;
+    cJSON *itm_primal_bound = NULL;
+
+    itm_solve_status = cJSON_GetObjectItemCaseSensitive(root, "solveStatus");
+    itm_timing_info = cJSON_GetObjectItemCaseSensitive(root, "timingInfo");
+    itm_bounds = cJSON_GetObjectItemCaseSensitive(root, "bounds");
+
+    if (itm_solve_status) {
+        itm_solve_status_code =
+            cJSON_GetObjectItemCaseSensitive(itm_solve_status, "code");
+    }
+
+    if (itm_timing_info) {
+        itm_took = cJSON_GetObjectItemCaseSensitive(itm_timing_info, "took");
+    }
+
+    if (itm_bounds) {
+        itm_primal_bound =
+            cJSON_GetObjectItemCaseSensitive(itm_bounds, "primal");
+    }
+
+    SolveStatus status = SOLVE_STATUS_NULL;
+    double time = INFINITY;
+    double primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+
+    if (itm_solve_status_code && cJSON_IsNumber(itm_solve_status_code)) {
+        status = cJSON_GetNumberValue(itm_solve_status_code);
+    } else {
+        status |= SOLVE_STATUS_ERR;
+    }
 
     if (itm_took && cJSON_IsNumber(itm_took)) {
-        run->perf.time = cJSON_GetNumberValue(itm_took);
+        time = cJSON_GetNumberValue(itm_took);
+    } else {
+        status |= SOLVE_STATUS_ERR;
     }
-
-    bool valid = false;
-    bool feasible = false;
-
-    if (itm_feasible && cJSON_IsBool(itm_feasible)) {
-        feasible = cJSON_IsTrue(itm_feasible);
-    }
-
-    if (itm_valid && cJSON_IsBool(itm_valid)) {
-        valid = cJSON_IsTrue(itm_valid);
-    }
-
-    double cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-    double primal_bound = INFINITY;
-    double dual_bound = INFINITY;
 
     if (itm_primal_bound && cJSON_IsNumber(itm_primal_bound)) {
         primal_bound = cJSON_GetNumberValue(itm_primal_bound);
-    }
-    if (itm_dual_bound && cJSON_IsNumber(itm_dual_bound)) {
-        dual_bound = cJSON_GetNumberValue(itm_dual_bound);
-    }
-
-    bool primal_bound_equal_dual_bound =
-        feq(primal_bound, dual_bound, COST_TOLERANCE);
-
-    if (valid && feasible) {
-        if (is_valid_reduced_cost(primal_bound)) {
-            cost = primal_bound;
-        } else {
-            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
-        }
-    } else if (valid && !feasible) {
-        // NOTE(dparo):
-        //    A solution may be infeasible for two reasons:
-        //    1. Given the timelimit we weren't unable to find one (which is
-        //    bad!!)
-        //    2. We proved to optimality that no solution exist (which is
-        //    good!!!)
-        if (primal_bound_equal_dual_bound) {
-            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
-        } else {
-            cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-        }
     } else {
-        assert(!valid);
-        cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
+        status |= SOLVE_STATUS_ERR;
     }
 
-    run->perf.solution.feasible = feasible;
-    run->perf.solution.cost = cost;
+    if (BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM) &&
+        !BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL)) {
+        primal_bound = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+    } else if (status == SOLVE_STATUS_NULL || BOOL(status & SOLVE_STATUS_ERR)) {
+        primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+    }
+
+    run->solution.status = status;
+    run->solution.time = time;
+    run->solution.primal_bound = primal_bound;
 }
 
 void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
     cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
 
-    run->perf.solution.feasible = true;
+    SolveStatus status =
+        SOLVE_STATUS_CLOSED_PROBLEM | SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL;
+    double primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+    double time = INFINITY;
 
     if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
-
         cJSON *columns_reduced_cost =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "columnsReducedCost");
-
         cJSON *itm_took =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
-
         cJSON *pricer_success =
             cJSON_GetObjectItemCaseSensitive(rcsp_infos, "pricerSuccess");
 
         if (itm_took && cJSON_IsNumber(itm_took)) {
-            run->perf.time = cJSON_GetNumberValue(itm_took);
+            time = cJSON_GetNumberValue(itm_took);
         }
 
         if (columns_reduced_cost && cJSON_IsArray(columns_reduced_cost)) {
@@ -112,11 +109,12 @@ void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
                 cJSON_ArrayForEach(elem, columns_reduced_cost) {
                     cJSON *itm_cost = elem;
                     if (itm_cost && cJSON_IsNumber(itm_cost)) {
-                        run->perf.solution.cost =
-                            cJSON_GetNumberValue(itm_cost);
+                        primal_bound = cJSON_GetNumberValue(itm_cost);
                     }
                     break;
                 }
+            } else {
+                status = SOLVE_STATUS_ERR;
             }
         }
 
@@ -125,9 +123,15 @@ void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
         // or if the solver crashed in the process.
         //
         if (pricer_success && cJSON_IsFalse(pricer_success)) {
-            run->perf.solution.cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-        } else if (!is_valid_reduced_cost(run->perf.solution.cost)) {
-            run->perf.solution.cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+            primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+            status = SOLVE_STATUS_ERR;
+        } else if (!is_valid_reduced_cost(primal_bound)) {
+            status = SOLVE_STATUS_CLOSED_PROBLEM;
+            primal_bound = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
         }
     }
+
+    run->solution.status = status;
+    run->solution.time = time;
+    run->solution.primal_bound = primal_bound;
 }

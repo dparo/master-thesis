@@ -11,6 +11,7 @@ extern "C" {
 #include <math.h>
 
 #include "os.h"
+#include "core.h"
 #include "proc.h"
 
 #define INSTANCE_NAME_MAX_LEN 256
@@ -56,14 +57,11 @@ typedef struct {
 } PerfProfSolver;
 
 typedef struct {
-    bool feasible;
-    double cost;
-} SolverComputedCost;
+    SolveStatus status;
 
-typedef struct {
     double time;
-    SolverComputedCost solution;
-} PerfStats;
+    double primal_bound;
+} SolverSolution;
 
 /// Unique identifier/handle to each (seed, instance).
 /// The instance itself is uniquely classified by the problem
@@ -106,7 +104,7 @@ typedef struct {
 ///       memory for the entire duration of the current batch.
 typedef struct {
     char solver_name[SOLVER_NAME_MAX_LEN];
-    PerfStats perf;
+    SolverSolution solution;
 } PerfProfRun;
 
 #if __cplusplus

@@ -133,29 +133,31 @@ STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
               "Too much number of seeds. Need to be able to encode a seed index"
               "using an uint8_t");
 
-static inline PerfStats make_invalidated_perf(PerfProfBatch *batch) {
-    PerfStats perf = {0};
-    perf.solution.feasible = true;
-    perf.solution.cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-    perf.time = 2 * batch->timelimit;
-    return perf;
+static inline SolverSolution
+make_invalidated_solver_solution(PerfProfBatch *batch) {
+    SolverSolution solution = {0};
+    solution.status = SOLVE_STATUS_ERR;
+    solution.primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+    solution.time = 2 * batch->timelimit;
+    return solution;
 }
 
 static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
                                           char *solver_name) {
     PerfProfRun run = {0};
     strncpy_safe(run.solver_name, solver_name, ARRAY_LEN(run.solver_name));
-    run.perf = make_invalidated_perf(batch);
+    run.solution = make_invalidated_solver_solution(batch);
     return run;
 }
 
 void store_perfprof_run(PerfProfInputUniqueId *uid, PerfProfRun *run) {
     printf("Inserting run into table. Instance hash: %d:%s. Run ::: "
            "solver_name = %s, "
-           "time = %.17g, feasible = %d, obj_ub "
+           "time = %.17g, closedProblem = %d, obj_ub "
            "= %.17g\n",
-           uid->seedidx, uid->hash.cstr, run->solver_name, run->perf.time,
-           run->perf.solution.feasible, run->perf.solution.cost);
+           uid->seedidx, uid->hash.cstr, run->solver_name, run->solution.time,
+           BOOL(run->solution.status & SOLVE_STATUS_CLOSED_PROBLEM),
+           run->solution.primal_bound);
 
     PerfTblKey key = {0};
     memcpy(&key.uid, uid, sizeof(key.uid));
@@ -836,7 +838,7 @@ static inline double get_timeval_for_csv(double timeval, double base_ref_val,
 
 static inline double get_raw_val_from_perf(PerfProfRun *run,
                                            bool is_time_profile) {
-    return is_time_profile ? run->perf.time : run->perf.solution.cost;
+    return is_time_profile ? run->solution.time : run->solution.primal_bound;
 }
 
 static inline double get_baked_val_from_perf(PerfProfRun *run,
