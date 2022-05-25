@@ -28,7 +28,7 @@ static SolveStatus solve(Solver *self, const Instance *instance,
     UNUSED_PARAM(instance);
     UNUSED_PARAM(solution);
     UNUSED_PARAM(begin_time);
-    return SOLVE_STATUS_INVALID;
+    return SOLVE_STATUS_NULL;
 }
 
 static void destroy(ATTRIB_MAYBE_UNUSED Solver *self) {}

@@ -1100,7 +1100,7 @@ CPXPUBLIC static int cplex_callback(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
         break;
     }
 
-    if (ctx->solver->should_terminate) {
+    if (ctx->solver->sigterm_occured) {
         CPXXcallbackabort(cplex_cb_ctx);
     }
 
@@ -1157,7 +1157,7 @@ static bool on_solve_start(Solver *self, const Instance *instance,
     // ignored. Use CPXXsetterminate and CPXsetterminate if you want to make
     // sure CPLEX terminates even in that case.
     //
-    if (0 != CPXXsetterminate(self->data->env, &self->should_terminate_int)) {
+    if (0 != CPXXsetterminate(self->data->env, &self->sigterm_occured_int)) {
         log_fatal("%s :: Failed CPXXsetterminate()", __func__);
         goto fail;
     }
@@ -1187,11 +1187,12 @@ fail:
 
 static bool process_cplex_output(Solver *self, const Instance *instance,
                                  Solution *solution, double *vstar, int lpstat,
-                                 SolveStatus result) {
-    bool found_primal_solution =
-        result == SOLVE_STATUS_FEASIBLE || result == SOLVE_STATUS_OPTIMAL;
+                                 SolveStatus status) {
+    const bool found_primal_solution =
+        BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL);
+    const bool valid_status = status != 0 && !BOOL(status & SOLVE_STATUS_ERR);
 
-    if (result != SOLVE_STATUS_ERR) {
+    if (valid_status) {
         CPXDIM num_user_cuts = 0;
 
         if (0 != CPXXgetbestobjval(self->data->env, self->data->lp,
@@ -1285,50 +1286,70 @@ failure:
 
 SolveStatus convert_mip_lpstat_to_solvestatus(int lpstat,
                                               const char *lpstat_str) {
-    SolveStatus status = 0;
+    // Usefull reference docs:
     // https://www.ibm.com/docs/en/icos/22.1.0?topic=g-cpxxgetstat-cpxgetstat
     // https://www.ibm.com/docs/en/icos/22.1.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
     // https://www.ibm.com/docs/en/icos/22.1.0?topic=micclcarm-solution-status-symbols-specific-mip-in-cplex-callable-library-c-api
+
+    SolveStatus status = SOLVE_STATUS_NULL;
+
     switch (lpstat) {
+
+    // Problem solved to optimality and primal solution available
     case CPXMIP_OPTIMAL:
     case CPXMIP_OPTIMAL_TOL:
-        status = SOLVE_STATUS_OPTIMAL;
+    case CPXMIP_OPTIMAL_INFEAS: // CPXMIP_OPTIMAL_INFEAS: Optimal solution is
+                                // available, but with infeasibilities after
+                                // unscaling.
+        status |= SOLVE_STATUS_CLOSED_PROBLEM;
+        status |= SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL;
         break;
 
-    case CPX_STAT_FEASIBLE:
+    // Problem solved to optimality, but not primal solution available
+    case CPXMIP_INFEASIBLE:
+        status |= SOLVE_STATUS_CLOSED_PROBLEM;
+        break;
+
+    // Primal solution available, but problem was not solved to optimality
+    // due to some resource (time, nodelimit, memory, user request, etc)
+    // exhaustion
     case CPXMIP_TIME_LIM_FEAS:
     case CPXMIP_NODE_LIM_FEAS:
     case CPXMIP_ABORT_FEAS:
-        status = SOLVE_STATUS_FEASIBLE;
+    case CPXMIP_MEM_LIM_FEAS:
+    case CPXMIP_FAIL_FEAS_NO_TREE:
+        status |= SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL;
+        status |= SOLVE_STATUS_ABORTION_RES_EXHAUSTED;
         break;
 
+    // No primal solution available and problem was not solved to optimality
+    // due to some resource (time, nodelimit, memory, user request, etc)
+    // exhaustion
     case CPXMIP_TIME_LIM_INFEAS:
     case CPXMIP_NODE_LIM_INFEAS:
     case CPXMIP_ABORT_INFEAS:
-    case CPX_STAT_INFEASIBLE:
-    case CPXMIP_INFEASIBLE:
-        // NOTE(dparo): 8 Jan 2022
-        //        Proven infeasible
-
-        status = SOLVE_STATUS_INFEASIBLE;
-        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
-                 lpstat_str, lpstat);
+    case CPXMIP_MEM_LIM_INFEAS:
+    case CPXMIP_FAIL_INFEAS_NO_TREE:
+        status |= SOLVE_STATUS_ABORTION_RES_EXHAUSTED;
         break;
 
+        // Erroring condition, but primal
+    case CPXMIP_FAIL_FEAS:
+        status |= SOLVE_STATUS_ERR;
+        status |= SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL;
+        break;
+
+    // Erroring condition, no primal
     case CPX_STAT_NUM_BEST: // could not converge due to number difficulties
     case CPX_STAT_UNBOUNDED:
+    case CPXMIP_SOL_LIM:
     case CPXMIP_UNBOUNDED:
     case CPXERR_CALLBACK:
-        status = SOLVE_STATUS_ERR;
-        log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
-                 lpstat_str, lpstat);
-        break;
-
+    case CPX_STAT_ABORT_USER:
     default:
+        status |= SOLVE_STATUS_ERR;
         log_warn("%s :: CPXmipopt returned with lpstat = %s [%d]", __func__,
                  lpstat_str, lpstat);
-        assert(!"Invalid code path");
-        status = SOLVE_STATUS_ERR;
         break;
     }
     return status;

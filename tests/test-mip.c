@@ -69,8 +69,10 @@ TEST solve_test_instances(void) {
         Solution solution = solution_create(&instance);
         SolveStatus status = cptp_solve(&instance, "mip", &params, &solution,
                                         TIMELIMIT, RANDOMSEED);
-        ASSERT(status == SOLVE_STATUS_OPTIMAL ||
-               status == SOLVE_STATUS_INFEASIBLE);
+        const bool success = status != 0 &&
+                             BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM) &&
+                             !BOOL(status & SOLVE_STATUS_ERR);
+        ASSERT(success);
         ASSERT(solution.dual_bound != -INFINITY);
         ASSERT(solution.primal_bound != +INFINITY);
         ASSERT(solution.tour.num_comps == 1);

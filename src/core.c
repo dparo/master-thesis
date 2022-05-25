@@ -376,40 +376,37 @@ terminate:
 }
 
 static void log_solve_status(SolveStatus status, const char *solver_name) {
-    log_info("Solver `%s` returned with solve status: %s", solver_name,
-             ENUM_TO_STR(SolveStatus, status));
+    log_info("Solver `%s` returned with solve status: %x", solver_name, status);
 }
 
 static void postprocess_solver_solution(const Instance *instance,
                                         SolveStatus status,
                                         Solution *solution) {
-    switch (status) {
-    case SOLVE_STATUS_ERR:
-    case SOLVE_STATUS_ABORTED_ERR:
-    case SOLVE_STATUS_INVALID:
-    case SOLVE_STATUS_ABORTED_INVALID:
-        solution_clear(solution);
-        break;
 
-    case SOLVE_STATUS_ABORTED_INFEASIBLE:
-    case SOLVE_STATUS_INFEASIBLE:
-        break;
+    bool primal_avail = BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL);
+    bool closed_problem = BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM);
 
-    case SOLVE_STATUS_ABORTED_FEASIBLE:
-    case SOLVE_STATUS_FEASIBLE:
-    case SOLVE_STATUS_OPTIMAL:
+    if (primal_avail) {
         validate_primal_solution(instance, solution, 1);
-
-        if (status == SOLVE_STATUS_OPTIMAL) {
+        if (closed_problem) {
 #ifndef NDEBUG
             // If solution is optimal it should remain within a 6% optimal
             // gap
             double gap = solution_relgap(solution);
-            assert(feq(gap, 0.0, 6.0 / 100));
+            const double SIX_PERCENT = 6.0 / 100;
+            assert(feq(gap, 0.0, SIX_PERCENT));
 #endif
         }
+    } else {
+        if (closed_problem) {
+            double gap = solution_relgap(solution);
+            // The gap should be highly negative
+            assert(gap < -1000.0);
+        }
+    }
 
-        break;
+    if (status == SOLVE_STATUS_NULL || BOOL(status & SOLVE_STATUS_ERR)) {
+        solution_clear(solution);
     }
 }
 
@@ -430,8 +427,8 @@ static void cptp_sighandler(int signum) {
     }
     if (signum == SIGTERM || signum == SIGINT) {
         if (sighandler_ctx_solver_ptr) {
-            sighandler_ctx_solver_ptr->should_terminate = true;
-            sighandler_ctx_solver_ptr->should_terminate_int = 1;
+            sighandler_ctx_solver_ptr->sigterm_occured = true;
+            sighandler_ctx_solver_ptr->sigterm_occured_int = 1;
         }
     }
 }
@@ -439,7 +436,7 @@ static void cptp_sighandler(int signum) {
 SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
                        const SolverParams *params, Solution *solution,
                        double timelimit, int32_t randomseed) {
-    SolveStatus status = SOLVE_STATUS_INVALID;
+    SolveStatus status = SOLVE_STATUS_NULL;
     const SolverLookup *lookup = lookup_solver(solver_name);
 
     if (lookup == NULL) {
@@ -476,8 +473,8 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         lookup->create_fn(instance, &tparams, timelimit, randomseed);
 
     {
-        solver.should_terminate = false;
-        solver.should_terminate_int = 0;
+        solver.sigterm_occured = false;
+        solver.sigterm_occured_int = 0;
 
         // Setup signals
         sighandler_ctx_solver_ptr = &solver;
@@ -493,23 +490,8 @@ SolveStatus cptp_solve(const Instance *instance, const char *solver_name,
         sighandler_ctx_solver_ptr = NULL;
     }
 
-    if (solver.should_terminate) {
-        switch (status) {
-        case SOLVE_STATUS_ERR:
-            status = SOLVE_STATUS_ABORTED_ERR;
-            break;
-        case SOLVE_STATUS_INVALID:
-            status = SOLVE_STATUS_ABORTED_INVALID;
-            break;
-        case SOLVE_STATUS_FEASIBLE:
-            status = SOLVE_STATUS_ABORTED_FEASIBLE;
-            break;
-        case SOLVE_STATUS_INFEASIBLE:
-            status = SOLVE_STATUS_ABORTED_INFEASIBLE;
-            break;
-        default:
-            break;
-        }
+    if (solver.sigterm_occured) {
+        status |= SOLVE_STATUS_ABORTION_SIGTERM;
     }
 
     solver.destroy(&solver);

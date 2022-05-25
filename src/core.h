@@ -102,34 +102,18 @@ typedef struct SolverDescriptor {
 } SolverDescriptor;
 
 typedef enum SolveStatus {
-    SOLVE_STATUS_ERR = -127,
-    SOLVE_STATUS_ABORTED_ERR = -63,
-    // Greater or equal than 0
-    SOLVE_STATUS_INVALID = 0,
-    SOLVE_STATUS_ABORTED_INVALID,
-    SOLVE_STATUS_INFEASIBLE,
-    SOLVE_STATUS_ABORTED_INFEASIBLE,
-    SOLVE_STATUS_FEASIBLE,
-    SOLVE_STATUS_ABORTED_FEASIBLE,
-    SOLVE_STATUS_OPTIMAL,
+    SOLVE_STATUS_NULL = 0,
+    SOLVE_STATUS_ERR = (1 << 0),
+    SOLVE_STATUS_CLOSED_PROBLEM = (1 << 1),
+    SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL = (1 << 2),
+    SOLVE_STATUS_ABORTION_RES_EXHAUSTED = (1 << 3),
+    SOLVE_STATUS_ABORTION_SIGTERM = (1 << 4),
 } SolveStatus;
-
-static const ENUM_TO_STR_TABLE_DECL(SolveStatus) = {
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ERR),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_ERR),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INVALID),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INVALID),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_INFEASIBLE),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_INFEASIBLE),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_FEASIBLE),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_ABORTED_FEASIBLE),
-    ENUM_TO_STR_TABLE_FIELD(SOLVE_STATUS_OPTIMAL),
-};
 
 typedef struct Solver {
     SolverData *data;
-    volatile bool should_terminate;
-    volatile int should_terminate_int;
+    volatile bool sigterm_occured;
+    volatile int sigterm_occured_int;
 
     // TODO: set_params
     bool (*set_params)(struct Solver *self, const SolverParams *params);
@@ -178,29 +162,6 @@ static inline bool is_valid_instance(Instance *instance) {
                    instance->num_vehicles <= 0 || instance->vehicle_cap <= 0 ||
                    !instance->demands;
     return !invalid;
-}
-
-static inline bool is_optimal_solve_status(SolveStatus status) {
-    return status == SOLVE_STATUS_OPTIMAL || status == SOLVE_STATUS_INFEASIBLE;
-}
-
-static inline bool is_aborted_solve_status(SolveStatus status) {
-    return status == SOLVE_STATUS_ABORTED_FEASIBLE ||
-           status == SOLVE_STATUS_ABORTED_INVALID ||
-           status == SOLVE_STATUS_ABORTED_INFEASIBLE ||
-           status == SOLVE_STATUS_ABORTED_ERR;
-}
-
-static inline bool is_primal_solve_status(SolveStatus status) {
-    return status == SOLVE_STATUS_FEASIBLE ||
-           status == SOLVE_STATUS_ABORTED_FEASIBLE ||
-           status == SOLVE_STATUS_OPTIMAL;
-}
-
-static inline bool is_valid_solve_status(SolveStatus status) {
-    return is_primal_solve_status(status) ||
-           status == SOLVE_STATUS_INFEASIBLE ||
-           status == SOLVE_STATUS_ABORTED_INFEASIBLE;
 }
 
 #if __cplusplus

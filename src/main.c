@@ -76,7 +76,7 @@ make_solver_params_from_cmdline(const char **defines, int32_t num_defines) {
 
 typedef struct {
     int32_t loglvl;
-    bool treat_abort_as_failure;
+    bool treat_sigterm_as_failure;
     const char *instance_filepath;
     const char *solver;
     double timelimit;
@@ -96,8 +96,8 @@ typedef struct {
 static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
                              Instance *instance, Solution *solution,
                              SolveStatus status, Timing timing) {
-    bool is_primal = is_primal_solve_status(status);
-    bool valid = is_valid_solve_status(status);
+    bool primal_sol_avail = BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL);
+    bool valid = status != 0 && !BOOL(status & SOLVE_STATUS_ERR);
 
     fprintf(fh, "%-16s %s\n", "SOLVER:", ctx->solver);
     fprintf(fh, "%-16s %f\n", "TIMELIM:", ctx->timelimit);
@@ -105,20 +105,20 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
     fprintf(fh, "%-16s %.17g\n", "VEHICLE_CAP:", instance->vehicle_cap);
 
-    fprintf(fh, "%-16s %s\n", "STATUS:", ENUM_TO_STR(SolveStatus, status));
+    fprintf(fh, "%-16s %x\n", "STATUS:", status);
 
     if (valid) {
         printf("%-16s [%.17g, %.17g]\n", "BOUNDS:", solution->dual_bound,
                solution->primal_bound);
         printf("%-16s %.17g\n", "GAP", solution_relgap(solution));
-        if (is_primal) {
+        if (primal_sol_avail) {
             print_tour(&solution->tour);
         }
     } else if (!valid) {
         printf("%-16s Could not solve\n", "ERR:");
     }
 
-    if (is_primal && valid) {
+    if (primal_sol_avail && valid) {
         double cost = tour_eval(instance, &solution->tour);
         double demand = tour_demand(instance, &solution->tour);
         double profit = tour_profit(instance, &solution->tour);
@@ -160,10 +160,12 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
         goto cleanup;
     }
 
-    bool primal = is_primal_solve_status(status);
-    bool valid = is_valid_solve_status(status);
-    bool aborted = is_aborted_solve_status(status);
-    bool optimal = is_optimal_solve_status(status);
+    bool primal_sol_avail = BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL);
+    bool valid = status != 0 && !BOOL(status & SOLVE_STATUS_ERR);
+    bool sigterm_abortion = BOOL(status & SOLVE_STATUS_ABORTION_SIGTERM);
+    bool res_exhaustion_abortion =
+        BOOL(status & SOLVE_STATUS_ABORTION_RES_EXHAUSTED);
+    bool closed_problem = BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM);
 
     bool s = true;
     s &= cJSON_AddItemToObject(root, "solverName",
@@ -198,21 +200,24 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
     cJSON *status_obj = cJSON_CreateObject();
     s &= cJSON_AddItemToObject(root, "solveStatus", status_obj);
     {
-        s &= cJSON_AddItemToObject(
-            status_obj, "repr",
-            cJSON_CreateString(ENUM_TO_STR(SolveStatus, status)));
+        s &= cJSON_AddItemToObject(status_obj, "code",
+                                   cJSON_CreateNumber(status));
 
-        s &= cJSON_AddItemToObject(status_obj, "erroredOut",
-                                   cJSON_CreateBool(!valid));
+        s &= cJSON_AddItemToObject(
+            status_obj, "erroredOut",
+            cJSON_CreateBool(BOOL(status & SOLVE_STATUS_ERR)));
 
         s &= cJSON_AddItemToObject(status_obj, "containsPrimalSolution",
-                                   cJSON_CreateBool(primal));
+                                   cJSON_CreateBool(primal_sol_avail));
 
-        s &= cJSON_AddItemToObject(status_obj, "provenOptimality",
-                                   cJSON_CreateBool(optimal));
+        s &= cJSON_AddItemToObject(status_obj, "closedProblem",
+                                   cJSON_CreateBool(closed_problem));
 
-        s &= cJSON_AddItemToObject(status_obj, "solutionWasAborted",
-                                   cJSON_CreateBool(aborted));
+        s &= cJSON_AddItemToObject(status_obj, "resExhaustionAbortion",
+                                   cJSON_CreateBool(res_exhaustion_abortion));
+
+        s &= cJSON_AddItemToObject(status_obj, "sigTermAbortion",
+                                   cJSON_CreateBool(sigterm_abortion));
     }
 
     cJSON *timing_obj = cJSON_CreateObject();
@@ -260,7 +265,7 @@ static void writeout_json_report(AppCtx *ctx, Instance *instance,
             bounds_obj, "gap", cJSON_CreateNumber(solution_relgap(solution)));
     }
 
-    if (primal) {
+    if (primal_sol_avail) {
         cJSON *tour_info_obj = cJSON_CreateObject();
         s &= cJSON_AddItemToObject(root, "tourInfo", tour_info_obj);
         {
@@ -336,9 +341,11 @@ static int main2(AppCtx *ctx) {
             timing.ended = time(NULL);
             timing.took_usecs = os_get_usecs() - begin_solve_time;
 
-            const bool valid = is_valid_solve_status(status);
-            const bool aborted = is_aborted_solve_status(status);
-            success = ctx->treat_abort_as_failure ? valid && !aborted : valid;
+            success = status != 0 && !BOOL(status & SOLVE_STATUS_ERR);
+            if (ctx->treat_sigterm_as_failure &&
+                BOOL(status & SOLVE_STATUS_ABORTION_SIGTERM)) {
+                success = false;
+            }
 
             printf("\n\n###\n###\n###\n\n");
             writeout_results(stdout, ctx, success, &instance, &solution, status,
@@ -387,9 +394,9 @@ int main(int argc, char **argv) {
         arg_int0("s", "seed", NULL,
                  "define the random seed to use (default is 0, eg compute it "
                  "from the current time)");
-    struct arg_lit *treat_abort_as_failure =
-        arg_lit0("a", "treat-abort-as-failure",
-                 "treat abortion, eg a SIGTERM (CTRL-C), as failure and exit "
+    struct arg_lit *treat_sigterm_as_failure =
+        arg_lit0("a", "treat-sigterm-as-failure",
+                 "treat SIGTERM/SIGINT (CTRL-C) abortion as failure and exit "
                  "with non zero exit status. The JSON report output file will "
                  "not be generated");
     struct arg_str *defines =
@@ -421,7 +428,7 @@ int main(int argc, char **argv) {
                         version,
                         loglvl,
                         logfile,
-                        treat_abort_as_failure,
+                        treat_sigterm_as_failure,
                         timelimit,
                         randomseed,
                         defines,
@@ -509,7 +516,8 @@ int main(int argc, char **argv) {
 
     AppCtx ctx = {.loglvl = iloglvl,
                   .instance_filepath = instance->filename[0],
-                  .treat_abort_as_failure = treat_abort_as_failure->count > 0,
+                  .treat_sigterm_as_failure =
+                      treat_sigterm_as_failure->count > 0,
                   .solver = solver->sval[0],
                   .timelimit = timelimit->dval[0],
                   .randomseed = randomseed->ival[0],
