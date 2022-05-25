@@ -403,9 +403,7 @@ static void handle_cptp_solver_run(PerfProfSolver *solver,
     //
     // Check if the JSON output is already cached on disk
     //
-    if (!os_fexists(handle->json_output_path)) {
-        proc_pool_queue(&G_pool, handle, args);
-    } else {
+    if (os_fexists(handle->json_output_path)) {
         printf("Found cache for hash %s. CMD:", handle->run_hash.cstr);
         for (int32_t i = 0; args[i] && i < argidx; i++) {
             printf(" %s", args[i]);
@@ -413,6 +411,8 @@ static void handle_cptp_solver_run(PerfProfSolver *solver,
         printf("\n");
         update_perf_tbl_with_cptp_json_perf_data(handle);
         free(handle);
+    } else {
+        proc_pool_queue(&G_pool, handle, args);
     }
 }
 

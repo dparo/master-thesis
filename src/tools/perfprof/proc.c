@@ -74,7 +74,11 @@ pid_t proc_spawn(char *const args[]) {
 
     printf("Spawning process [PID=%d]:", pid);
     for (int32_t i = 0; args[i] != NULL; i++) {
-        printf(" %s", args[i]);
+        if (strchr(args[i], ' ')) {
+            printf(" '%s'", args[i]);
+        } else {
+            printf(" %s", args[i]);
+        }
     }
     printf("\n");
     return pid;
