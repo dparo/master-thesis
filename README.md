@@ -9,9 +9,9 @@
 A Mixed Integer Programming (MIP) model and branch-and-cut framework algorithm for solving the CPTP.
 The CPTP appears as the pricing sub-problem in column generation schemes for the CVRP.
 
-## Core Technical Concepts/Inspiration
+## About
 
-TThe Capacitated Vehicle Routing Problem, CVRP for short,
+The Capacitated Vehicle Routing Problem, CVRP for short,
 is a combinatorial optimization routing problem in which,
 a geographically distributed set of customers with associated known demands,
 must be served with a fleet of vehicles stationed at a central facility.
