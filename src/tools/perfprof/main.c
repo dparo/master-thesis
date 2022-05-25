@@ -35,6 +35,11 @@
 #include <stdint.h>
 #include <signal.h>
 
+#include <ftw.h>
+
+#include <sha256.h>
+#include <cJSON.h>
+
 #include "types.h"
 #include "utils.h"
 #include "misc.h"
@@ -43,87 +48,7 @@
 #include "parser.h"
 #include "core-utils.h"
 #include "core.h"
-
-#include <ftw.h>
-
-#include <sha256.h>
-#include <cJSON.h>
-
-#define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
-
-/// Default cost value attributed to a crashed solver, or a solver
-/// which cannot produce any cost within the computation resource limits
-/// specified (eg timelimit)
-#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)10.0)
-
-#define HASH_CSTR_LEN 65
-typedef struct {
-    char cstr[HASH_CSTR_LEN];
-} Hash;
-
-typedef struct {
-    int32_t a, b;
-} int32_interval_t;
-
-typedef struct {
-    char *family; /// TODO: Not supported yet
-    int32_interval_t ncustomers;
-    int32_interval_t nvehicles;
-} Filter;
-
-typedef struct {
-    char *name;
-    char *args[PROC_MAX_ARGS];
-} PerfProfSolver;
-
-typedef enum StatKind {
-    STAT_TIME,
-    STAT_COST,
-    STAT_REL_COST,
-
-    //
-    // Last field
-    //
-    MAX_NUM_STATS,
-} StatKind;
-
-typedef struct {
-    bool feasible;
-    double cost;
-} SolverComputedCost;
-
-typedef struct {
-    double time;
-    SolverComputedCost solution;
-} PerfStats;
-
-typedef struct {
-    uint8_t seedidx;
-    Hash hash;
-} PerfProfInputUniqueId;
-
-typedef struct {
-    char instance_name[256];
-    char filepath[OS_MAX_PATH];
-    PerfProfInputUniqueId uid;
-    int32_t seed;
-} PerfProfInput;
-
-typedef struct {
-    char solver_name[48];
-    PerfProfInput input;
-    Hash run_hash;
-    char json_output_path[OS_MAX_PATH + 32];
-} PerfProfRunHandle;
-
-/// NOTE: This struct should remain as packed and as small as possible,
-///       since it will be the main cause of memory consumption in
-///       this program. It will be stored in a hashmap and will live in memory
-///       for the entire duration of the current batch.
-typedef struct {
-    char solver_name[48];
-    PerfStats perf;
-} PerfProfRun;
+#include "common.h"
 
 #define MAX_NUM_SOLVERS_PER_BATCH 8
 #define BATCH_MAX_NUM_DIRS 64
@@ -142,6 +67,25 @@ typedef struct {
     PerfTblValue value;
 } PerfTblEntry;
 
+/// Each batch may have an associated filter to reduce the number
+/// of instances considered.
+typedef struct {
+    char *family; /// TODO: Not supported yet
+    int32_interval_t ncustomers;
+    int32_interval_t nvehicles;
+} Filter;
+
+/// A batch is set of instances extracted from a list of directories, which
+/// are recursively scanned.
+/// Each instance passes through a filter: for example of all the instances
+/// found, keep the ones having a number of customers less than 100. Each
+/// instance is solved by the solvers specified by the batch. The batch
+/// accumulates the performance of each solver on the
+/// considered instances. For each batch a separate performance profile is
+/// generated.
+/// Caching of the pair (seed, instance, solver_name, params) spans all the
+/// batches. Therefore the same (seed, instance, solver_name, params) tuple will
+/// be solved exactly once, even it belongs to multiple batches.
 typedef struct {
     int32_t max_num_procs;
     char *name;
