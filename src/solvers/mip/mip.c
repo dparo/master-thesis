@@ -1283,49 +1283,12 @@ failure:
     return false;
 }
 
-SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
-                  int64_t begin_time) {
-    self->data->begin_time = begin_time;
-
-    SolveStatus status = SOLVE_STATUS_ERR;
-
-    CplexCallbackCtx callback_ctx = {0};
-    callback_ctx.solver = self;
-    callback_ctx.instance = instance;
-
-    if (!on_solve_start(self, instance, &callback_ctx)) {
-        return SOLVE_STATUS_ERR;
-    }
-
-    if (CPXXmipopt(self->data->env, self->data->lp) != 0) {
-        log_fatal("%s :: CPXmipopt() error", __func__);
-        return SOLVE_STATUS_ERR;
-    }
-
-    if (!on_solve_end(self, instance, &callback_ctx)) {
-        return SOLVE_STATUS_ERR;
-    }
-
-    assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
-
-    double *vstar = malloc(sizeof(*vstar) * self->data->num_mip_vars);
-
-    char lpstat_string_buf[CPXMESSAGEBUFSIZE];
-    int lpstat = CPXXgetstat(self->data->env, self->data->lp);
-    if (lpstat == 0) {
-        log_fatal("%s :: CPXXgetstat failed", __func__);
-        goto terminate;
-    }
-    char *lpstat_str =
-        CPXXgetstatstring(self->data->env, lpstat, lpstat_string_buf);
-
-    log_info("%s :: CPXmipopt terminated with lpstat = \"%s\" [%d]", __func__,
-             lpstat_str, lpstat);
-
-    // https://www.ibm.com/docs/en/icos/12.10.0?topic=g-cpxxgetstat-cpxgetstat
-    // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
-    // https://www.ibm.com/docs/en/icos/12.10.0?topic=micclcarm-solution-status-symbols-specific-mip-in-cplex-callable-library-c-api
-
+SolveStatus convert_mip_lpstat_to_solvestatus(int lpstat,
+                                              const char *lpstat_str) {
+    SolveStatus status = 0;
+    // https://www.ibm.com/docs/en/icos/22.1.0?topic=g-cpxxgetstat-cpxgetstat
+    // https://www.ibm.com/docs/en/icos/22.1.0?topic=micclcarm-solution-status-symbols-in-cplex-callable-library-c-api
+    // https://www.ibm.com/docs/en/icos/22.1.0?topic=micclcarm-solution-status-symbols-specific-mip-in-cplex-callable-library-c-api
     switch (lpstat) {
     case CPXMIP_OPTIMAL:
     case CPXMIP_OPTIMAL_TOL:
@@ -1368,6 +1331,49 @@ SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
         status = SOLVE_STATUS_ERR;
         break;
     }
+    return status;
+}
+
+SolveStatus solve(Solver *self, const Instance *instance, Solution *solution,
+                  int64_t begin_time) {
+    self->data->begin_time = begin_time;
+
+    SolveStatus status = SOLVE_STATUS_ERR;
+
+    CplexCallbackCtx callback_ctx = {0};
+    callback_ctx.solver = self;
+    callback_ctx.instance = instance;
+
+    if (!on_solve_start(self, instance, &callback_ctx)) {
+        return SOLVE_STATUS_ERR;
+    }
+
+    if (CPXXmipopt(self->data->env, self->data->lp) != 0) {
+        log_fatal("%s :: CPXmipopt() error", __func__);
+        return SOLVE_STATUS_ERR;
+    }
+
+    if (!on_solve_end(self, instance, &callback_ctx)) {
+        return SOLVE_STATUS_ERR;
+    }
+
+    assert(CPXXgetmethod(self->data->env, self->data->lp) == CPX_ALG_MIP);
+
+    double *vstar = malloc(sizeof(*vstar) * self->data->num_mip_vars);
+
+    char lpstat_string_buf[CPXMESSAGEBUFSIZE];
+    int lpstat = CPXXgetstat(self->data->env, self->data->lp);
+    if (lpstat == 0) {
+        log_fatal("%s :: CPXXgetstat failed", __func__);
+        goto terminate;
+    }
+    char *lpstat_str =
+        CPXXgetstatstring(self->data->env, lpstat, lpstat_string_buf);
+
+    log_info("%s :: CPXmipopt terminated with lpstat = \"%s\" [%d]", __func__,
+             lpstat_str, lpstat);
+
+    status = convert_mip_lpstat_to_solvestatus(lpstat, lpstat_str);
 
     if (!process_cplex_output(self, instance, solution, vstar, lpstat,
                               status)) {
