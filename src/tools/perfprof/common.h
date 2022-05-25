@@ -14,10 +14,11 @@ extern "C" {
 
 #define INSTANCE_NAME_MAX_LEN 256
 #define SOLVER_NAME_MAX_LEN 48
+#define JSON_OUTPUT_FILEPATH_MAX_LEN (OS_MAX_PATH + 32)
 
-#define HASH_CSTR_LEN 65
+#define SHA256_CSTR_LEN 65
 
-#define DEFAULT_TIME_LIMIT ((double)600.0) // 10 minutes
+#define DEFAULT_TIME_LIMIT ((double)1200.0) // 20 minutes
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.
@@ -25,7 +26,7 @@ extern "C" {
 
 /// Struct that stores an SHA256 hash as a printable c-string
 typedef struct {
-    char cstr[HASH_CSTR_LEN];
+    char cstr[SHA256_CSTR_LEN];
 } Hash;
 
 typedef struct {
@@ -84,16 +85,16 @@ typedef struct {
 } PerfProfInput;
 
 /// This struct uniquely identifies a currently running
-/// perf-prof run, i.e. a solver called on a given instance and seed
-/// is still running and its output has yet to be resolved.
-/// This struct may be larger compared to @PerfProfRun,
+/// perf-prof run, i.e. a solver solving a specific (seed, problem) instance
+/// which is still running and its output has yet to be resolved.
+/// This struct may be larger compared to the @PerfProfRun struct,
 /// since at most a few dozens of PerfProfRunHandle may be active
 /// at the same time.
 typedef struct {
     char solver_name[SOLVER_NAME_MAX_LEN];
     PerfProfInput input;
     Hash run_hash;
-    char json_output_path[OS_MAX_PATH + 32];
+    char json_output_path[JSON_OUTPUT_FILEPATH_MAX_LEN];
 } PerfProfRunHandle;
 
 /// This struct uniquely identifies a resolved run of a solver
