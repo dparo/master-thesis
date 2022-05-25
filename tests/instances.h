@@ -35,7 +35,7 @@ static struct {
     double best_primal;
 } const G_TEST_INSTANCES[] = {
     // Family F
-    {"data/ESPPRC - Test Instances/vrps/F-n45-k4_a.vrp", 75, 7, -11.967},
+    {"data/ESPPRC - Test Instances/vrps/F-n45-k4_a.vrp", 44, 4, -11.967},
 
     // Family E
     {"data/ESPPRC - Test Instances/vrps/E-n76-k7_a.vrp", 75, 7, -6.032},
