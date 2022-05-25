@@ -1318,6 +1318,7 @@ SolveStatus convert_mip_lpstat_to_solvestatus(int lpstat,
     case CPXMIP_ABORT_FEAS:
     case CPXMIP_MEM_LIM_FEAS:
     case CPXMIP_FAIL_FEAS_NO_TREE:
+    case CPXMIP_DETTIME_LIM_FEAS:
         status |= SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL;
         status |= SOLVE_STATUS_ABORTION_RES_EXHAUSTED;
         break;
@@ -1330,6 +1331,7 @@ SolveStatus convert_mip_lpstat_to_solvestatus(int lpstat,
     case CPXMIP_ABORT_INFEAS:
     case CPXMIP_MEM_LIM_INFEAS:
     case CPXMIP_FAIL_INFEAS_NO_TREE:
+    case CPXMIP_DETTIME_LIM_INFEAS:
         status |= SOLVE_STATUS_ABORTION_RES_EXHAUSTED;
         break;
 
