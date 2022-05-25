@@ -35,11 +35,6 @@
 #include <stdint.h>
 #include <signal.h>
 
-#include <ftw.h>
-
-#include <sha256.h>
-#include <cJSON.h>
-
 #include "types.h"
 #include "utils.h"
 #include "misc.h"
@@ -48,7 +43,13 @@
 #include "parser.h"
 #include "core-utils.h"
 #include "core.h"
-#include "common.h"
+
+#include <sha256.h>
+#include <cJSON.h>
+#include <ftw.h>
+
+#include "json-loader.h"
+#include "hashing.h"
 
 #define MAX_NUM_SOLVERS_PER_BATCH 8
 #define BATCH_MAX_NUM_DIRS 64
@@ -96,26 +97,11 @@ typedef struct {
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_BATCH];
 } PerfProfBatch;
 
-#ifndef NDEBUG
-#define CPTP_EXE "./build/Debug/src/cptp"
-#else
 #define CPTP_EXE "./build/Release/src/cptp"
-#endif
 
 #define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/plot.py"
 #define BAPCOD_SOLVER_NAME "BaPCod"
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
-
-#define SHA256_UPDATE_WITH_VAR(shactx, var)                                    \
-    do {                                                                       \
-        sha256_update((shactx), (const BYTE *)(&(var)), sizeof(var));          \
-    } while (0)
-
-#define SHA256_UPDATE_WITH_ARRAY(shactx, array, num_elems)                     \
-    do {                                                                       \
-        sha256_update((shactx), (const BYTE *)(array),                         \
-                      (num_elems) * sizeof(*(array)));                         \
-    } while (0)
 
 static Hash G_cptp_exe_hash;
 static bool G_should_terminate;
@@ -240,93 +226,15 @@ static void my_sighandler(int signum) {
     }
 }
 
-void extract_perf_data_from_cptp_json_file(PerfProfRun *run, cJSON *root) {
-    cJSON *itm_took = cJSON_GetObjectItemCaseSensitive(root, "took");
-    cJSON *itm_feasible = cJSON_GetObjectItemCaseSensitive(root, "feasible");
-    cJSON *itm_valid = cJSON_GetObjectItemCaseSensitive(root, "valid");
-    cJSON *itm_dual_bound = cJSON_GetObjectItemCaseSensitive(root, "dualBound");
-    cJSON *itm_primal_bound =
-        cJSON_GetObjectItemCaseSensitive(root, "primalBound");
-
-    if (itm_took && cJSON_IsNumber(itm_took)) {
-        run->perf.time = cJSON_GetNumberValue(itm_took);
-    }
-
-    bool valid = false;
-    bool feasible = false;
-
-    if (itm_feasible && cJSON_IsBool(itm_feasible)) {
-        feasible = cJSON_IsTrue(itm_feasible);
-    }
-
-    if (itm_valid && cJSON_IsBool(itm_valid)) {
-        valid = cJSON_IsTrue(itm_valid);
-    }
-
-    double cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-    double primal_bound = INFINITY;
-    double dual_bound = INFINITY;
-
-    if (itm_primal_bound && cJSON_IsNumber(itm_primal_bound)) {
-        primal_bound = cJSON_GetNumberValue(itm_primal_bound);
-    }
-    if (itm_dual_bound && cJSON_IsNumber(itm_dual_bound)) {
-        dual_bound = cJSON_GetNumberValue(itm_dual_bound);
-    }
-
-    bool primal_bound_equal_dual_bound =
-        feq(primal_bound, dual_bound, COST_TOLERANCE);
-
-    if (valid && feasible) {
-        if (is_valid_reduced_cost(primal_bound)) {
-            cost = primal_bound;
-        } else {
-            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
-        }
-    } else if (valid && !feasible) {
-        // NOTE(dparo):
-        //    A solution may be infeasible for two reasons:
-        //    1. Given the timelimit we weren't unable to find one (which is
-        //    bad!!)
-        //    2. We proved to optimality that no solution exist (which is
-        //    good!!!)
-        if (primal_bound_equal_dual_bound) {
-            cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
-        } else {
-            cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-        }
-    } else {
-        assert(!valid);
-        cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-    }
-
-    run->perf.solution.feasible = feasible;
-    run->perf.solution.cost = cost;
-}
-
-void update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
+static void
+update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
     PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
 
-    char *contents =
-        fread_all_into_null_terminated_string(handle->json_output_path, NULL);
-    if (!contents) {
-        log_warn("Failed to load JSON contents from `%s`\n",
-                 handle->json_output_path);
-    } else if (contents && contents[0] != '\0') {
-        cJSON *root = cJSON_Parse(contents);
-        if (!root) {
-            log_warn("Failed to parse JSON contents from `%s`\n",
-                     handle->json_output_path);
-        } else {
-            extract_perf_data_from_cptp_json_file(&run, root);
-            cJSON_Delete(root);
-        }
+    cJSON *root = load_json(handle->json_output_path);
+    if (root) {
+        parse_cptp_solver_json_dump(&run, root);
+        cJSON_Delete(root);
     }
-
-    if (contents) {
-        free(contents);
-    }
-
     insert_run_into_table(&handle->input.uid, &run);
 }
 
@@ -352,156 +260,22 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     free(handle);
 }
 
-static void sha256_hash_finalize(SHA256_CTX *shactx, Hash *hash) {
-
-    BYTE bytes[32];
-
-    sha256_final(shactx, bytes);
-
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(bytes); i++) {
-        snprintf_safe(hash->cstr + 2 * i, 65 - 2 * i, "%02x", bytes[i]);
-    }
-
-    hash->cstr[ARRAY_LEN(hash->cstr) - 1] = 0;
-}
-
-static Hash hash_instance(const Instance *instance) {
-    SHA256_CTX shactx;
-    sha256_init(&shactx);
-
-    SHA256_UPDATE_WITH_VAR(&shactx, instance->num_customers);
-    SHA256_UPDATE_WITH_VAR(&shactx, instance->num_vehicles);
-    SHA256_UPDATE_WITH_VAR(&shactx, instance->vehicle_cap);
-
-    int32_t n = instance->num_customers + 1;
-
-    if (instance->positions) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->positions, n);
-    }
-
-    if (instance->demands) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->demands, n);
-    }
-
-    if (instance->demands) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->demands, n);
-    }
-
-    if (instance->profits) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->profits, n);
-    }
-
-    if (instance->edge_weight) {
-        SHA256_UPDATE_WITH_ARRAY(&shactx, instance->edge_weight,
-                                 hm_nentries(n));
-    }
-
-    Hash result = {0};
-    sha256_hash_finalize(&shactx, &result);
-    return result;
-}
-
-static void sha256_hash_file_contents(const char *fpath, Hash *hash) {
-
-    SHA256_CTX shactx;
-    sha256_init(&shactx);
-    size_t len = 0;
-    char *contents = fread_all_into_null_terminated_string(fpath, &len);
-    if (contents) {
-        sha256_update(&shactx, (const BYTE *)contents, len);
-    } else {
-        log_fatal("%s: Failed to hash (sha256) file contents\n", fpath);
-        abort();
-    }
-    sha256_hash_finalize(&shactx, hash);
-    free(contents);
-}
-
-Hash compute_run_hash(const Hash *exe_hash, const PerfProfInput *input,
-                      char *args[PROC_MAX_ARGS], int32_t num_args) {
-    assert(input);
-
-    SHA256_CTX shactx;
-    sha256_init(&shactx);
-
-    for (int32_t i = 0; i < num_args; i++) {
-        sha256_update(&shactx, (const BYTE *)(&args[i][0]), strlen(args[i]));
-    }
-
-    if (exe_hash) {
-        sha256_update(&shactx, (const BYTE *)(&exe_hash->cstr[0]), 64);
-    }
-
-    sha256_update(&shactx, (const BYTE *)(&input->uid.seedidx),
-                  sizeof(input->uid.seedidx));
-    sha256_update(&shactx, (const BYTE *)(&input->uid.hash.cstr[0]), 64);
-
-    Hash result = {0};
-    sha256_hash_finalize(&shactx, &result);
-    return result;
-}
-
-void extract_perf_data_from_bapcod_json_file(PerfProfRun *run, cJSON *root) {
-    cJSON *rcsp_infos = cJSON_GetObjectItemCaseSensitive(root, "rcsp-infos");
-
-    run->perf.solution.feasible = true;
-
-    if (rcsp_infos && cJSON_IsObject(rcsp_infos)) {
-
-        cJSON *columns_reduced_cost =
-            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "columnsReducedCost");
-
-        cJSON *itm_took =
-            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "seconds");
-
-        cJSON *pricer_success =
-            cJSON_GetObjectItemCaseSensitive(rcsp_infos, "pricerSuccess");
-
-        if (itm_took && cJSON_IsNumber(itm_took)) {
-            run->perf.time = cJSON_GetNumberValue(itm_took);
-        }
-
-        if (columns_reduced_cost && cJSON_IsArray(columns_reduced_cost)) {
-            cJSON *elem = NULL;
-            int32_t num_elems = 0;
-            cJSON_ArrayForEach(elem, columns_reduced_cost) { num_elems += 1; }
-
-            if (num_elems == 1) {
-                cJSON_ArrayForEach(elem, columns_reduced_cost) {
-                    cJSON *itm_cost = elem;
-                    if (itm_cost && cJSON_IsNumber(itm_cost)) {
-                        run->perf.solution.cost =
-                            cJSON_GetNumberValue(itm_cost);
-                    }
-                    break;
-                }
-            }
-        }
-
-        //
-        // Replace the cost if it is non valid negative reduced cost,
-        // or if the solver crashed in the process.
-        //
-        if (pricer_success && cJSON_IsFalse(pricer_success)) {
-            run->perf.solution.cost = CRASHED_SOLVER_DEFAULT_COST_VAL;
-        } else if (!is_valid_reduced_cost(run->perf.solution.cost)) {
-            run->perf.solution.cost = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
-        }
-    }
-}
-
 static void
 update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
                                            char *json_filepath) {
     PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
+    cJSON *root = load_json(json_filepath);
+    if (root) {
+        parse_bapcod_solver_json_dump(&run, root);
+        cJSON_Delete(root);
+    }
 
     if (json_filepath) {
-        char *contents =
-            fread_all_into_null_terminated_string(json_filepath, NULL);
+        char *contents = fread_all_into_cstr(json_filepath, NULL);
         if (contents && contents[0] != '\0') {
             cJSON *root = cJSON_Parse(contents);
             if (root) {
-                extract_perf_data_from_bapcod_json_file(&run, root);
+                parse_bapcod_solver_json_dump(&run, root);
                 cJSON_Delete(root);
             }
 
@@ -800,7 +574,7 @@ static void init(void) {
 
         sha256_init(&shactx);
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
-        sha256_hash_finalize(&shactx, &G_cptp_exe_hash);
+        sha256_finalize_to_cstr(&shactx, &G_cptp_exe_hash);
     }
 }
 
@@ -808,6 +582,7 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
     PerfProfBatch batches[] = {
+#if 0
         {1,
          "F-scaled-1.0-last-10",
          240.0,
@@ -871,6 +646,18 @@ static void main_loop(void) {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
+#else
+        {1,
+         "F-scaled-4.0-last-10",
+         240.0,
+         1,
+         {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F/F-n45-k4"},
+         DEFAULT_FILTER,
+         {
+             {"My CPTP MIP pricer", {}},
+             BAPCOD_SOLVER,
+         }},
+#endif
 
     };
 
