@@ -7,19 +7,39 @@
 # A Branch-and-Cut based Pricer for the Capacitated Vehicle Routing Problem
 
 A Mixed Integer Programming (MIP) model and branch-and-cut framework algorithm for solving the CPTP.
-
-This project verifies the feasibility of employing a branch-and-cut framework for solving the Pricing Problem (PP) induced from the Set Partition (SP) formulation of the Capacitated Vehicle Routing Problem.
+The CPTP appears as the pricing sub-problem in column generation schemes for the CVRP.
 
 ## Core Technical Concepts/Inspiration
 
-The CPTP is a subproblem that appears in the column generation procedure of the commonly known [Vehicle Routing Problem](https://en.wikipedia.org/wiki/Vehicle_routing_problem) (**VRP**).
-Current state-of-the art solutions for CPTP are based on dynamic programming paradigms.
-Substantial literature was devoted at studying the use of a MIP solver for solving the pricing problem in VRP [[1]](#Jepsen2014) [[2]](#baldacci2008exact) [[3]](#baldacci2011new).
+TThe Capacitated Vehicle Routing Problem, CVRP for short,
+is a combinatorial optimization routing problem in which,
+a geographically distributed set of customers with associated known demands,
+must be served with a fleet of vehicles stationed at a central facility.
+In the last two decades,
+column generation techniques embedded inside branch-price-and-cut frameworks
+have been the de facto state-of-the-art dominant approach
+for building exact algorithms for the CVRP.
+The pricer, an important component in column generation, needs to solve
+the so-called Pricing Problem (PP) which asks for an
+Elementary Shortest Path Problem with Resource Constraints (ESPPRC)
+in a reduced cost network.
+Little scientific efforts have been dedicated in studying
+branch-and-cut based approaches for tackling the PP.
+The ESPPRC has been traditionally relaxed and solved through dynamic programming
+algorithms.
+This approach, however, has two main downsides.
+First, it leads to a worsening of the obtained dual bounds.
+Second, the running time deteriorates as the length of the generated paths increases.
 
-In particular, in 2014, Jepsen [[1]](#Jepsen2014) studied extensively this problem by employing a MIP solver.
-Almost ten years have passed, and commercial MIP solvers have made extensive progress.
+Little scientific efforts were devoted at studying branch-and-cut approaches for tackling
+the PP.
+Jepsen et al. (2014) [[1]](#Jepsen2014) studied the CPTP problem in the context of pricing.
+Almost ten years have passed from their work, and both, dynamic programming algorithms
+and MIP optimizers have improved a lot.
 
-This work tries to revisit, and if possible improve, the original work of Jepsen in 2014 [[1]](#Jepsen2014).
+This work revisits the original efforts of Jepsen et al. (2014) [[1]](#Jepsen2014)
+and verifies whether branch-and-cut algorithms may be effectively employed
+for tackling the PP.
 
 
 ## Getting Started
