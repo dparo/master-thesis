@@ -242,7 +242,21 @@ update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
     store_perfprof_run(&handle->input.uid, &run);
 }
 
-void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
+static void
+update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
+                                           char *json_filepath) {
+    PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
+    if (json_filepath) {
+        cJSON *root = load_json(json_filepath);
+        if (root) {
+            parse_bapcod_solver_json_dump(&run, root);
+            cJSON_Delete(root);
+        }
+    }
+    store_perfprof_run(&handle->input.uid, &run);
+}
+
+void on_proc_termination(Process *p, int exit_status, void *user_handle) {
     if (!user_handle) {
         return;
     }
@@ -262,20 +276,6 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
     }
 
     free(handle);
-}
-
-static void
-update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
-                                           char *json_filepath) {
-    PerfProfRun run = make_solver_run(G_active_batch, handle->solver_name);
-    if (json_filepath) {
-        cJSON *root = load_json(json_filepath);
-        if (root) {
-            parse_bapcod_solver_json_dump(&run, root);
-            cJSON_Delete(root);
-        }
-    }
-    store_perfprof_run(&handle->input.uid, &run);
 }
 
 static void handle_bapcod_solver_run(PerfProfRunHandle *handle) {
@@ -301,7 +301,7 @@ static void handle_bapcod_solver_run(PerfProfRunHandle *handle) {
     }
 }
 
-static void make_unique_cptp_json_output_file(PerfProfRunHandle *handle,
+static void prep_unique_cptp_json_output_file(PerfProfRunHandle *handle,
                                               PerfProfInput *input) {
     snprintf_safe(handle->json_output_path, ARRAY_LEN(handle->json_output_path),
                   "%s/%s/%s", PERFPROF_DUMP_ROOTDIR, "cache",
@@ -394,7 +394,7 @@ static void handle_cptp_solver_run(PerfProfSolver *solver,
     PerfProfRunHandle *handle =
         new_perfprof_run_handle(&G_cptp_exe_hash, input, args, argidx, solver);
 
-    make_unique_cptp_json_output_file(handle, input);
+    prep_unique_cptp_json_output_file(handle, input);
 
     args[argidx++] = "-i";
     args[argidx++] = (char *)input->filepath;
@@ -528,7 +528,7 @@ static void do_batch(PerfProfBatch *bgroup) {
     proc_pool_join(&G_pool);
     G_active_batch = bgroup;
     G_pool.max_num_procs = bgroup->max_num_procs;
-    G_pool.on_async_proc_exit = on_async_proc_exit;
+    G_pool.on_async_proc_exit = on_proc_termination;
 
     // Adjust zero-initialized filters
     {
