@@ -585,7 +585,7 @@ static void main_loop(void) {
 #if 0
         {1,
          "F-scaled-1.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-1.0/F"},
          DEFAULT_FILTER,
@@ -595,7 +595,7 @@ static void main_loop(void) {
          }},
         {1,
          "F-scaled-2.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-2.0/F"},
          DEFAULT_FILTER,
@@ -606,7 +606,7 @@ static void main_loop(void) {
 
         {1,
          "F-scaled-4.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F"},
          DEFAULT_FILTER,
@@ -617,7 +617,7 @@ static void main_loop(void) {
 
         {1,
          "E-scaled-1.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-1.0/E"},
          DEFAULT_FILTER,
@@ -627,7 +627,7 @@ static void main_loop(void) {
          }},
         {1,
          "E-scaled-2.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-2.0/E"},
          DEFAULT_FILTER,
@@ -638,7 +638,7 @@ static void main_loop(void) {
 
         {1,
          "E-scaled-4.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-4.0/E"},
          DEFAULT_FILTER,
@@ -649,7 +649,7 @@ static void main_loop(void) {
 #else
         {1,
          "F-scaled-4.0-last-10",
-         240.0,
+         DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F/F-n45-k4"},
          DEFAULT_FILTER,
