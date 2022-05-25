@@ -149,7 +149,7 @@ static inline PerfProfRun make_solver_run(PerfProfBatch *batch,
     return run;
 }
 
-void insert_run_into_table(PerfProfInputUniqueId *uid, PerfProfRun *run) {
+void store_perfprof_run(PerfProfInputUniqueId *uid, PerfProfRun *run) {
     printf("Inserting run into table. Instance hash: %d:%s. Run ::: "
            "solver_name = %s, "
            "time = %.17g, feasible = %d, obj_ub "
@@ -237,7 +237,7 @@ update_perf_tbl_with_cptp_json_perf_data(PerfProfRunHandle *handle) {
             cJSON_Delete(root);
         }
     }
-    insert_run_into_table(&handle->input.uid, &run);
+    store_perfprof_run(&handle->input.uid, &run);
 }
 
 void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
@@ -255,7 +255,7 @@ void on_async_proc_exit(Process *p, int exit_status, void *user_handle) {
                      handle->solver_name, exit_status);
             PerfProfRun run =
                 make_solver_run(G_active_batch, handle->solver_name);
-            insert_run_into_table(&handle->input.uid, &run);
+            store_perfprof_run(&handle->input.uid, &run);
         }
     }
 
@@ -273,10 +273,10 @@ update_perf_tbl_with_bapcod_json_perf_data(PerfProfRunHandle *handle,
             cJSON_Delete(root);
         }
     }
-    insert_run_into_table(&handle->input.uid, &run);
+    store_perfprof_run(&handle->input.uid, &run);
 }
 
-static void handle_bapcod_solver(PerfProfRunHandle *handle) {
+static void handle_bapcod_solver_run(PerfProfRunHandle *handle) {
     Path instance_filepath_dirname;
     Path instance_filepath_basename;
     char *dirname =
@@ -347,7 +347,8 @@ PerfProfRunHandle *new_perfprof_run_handle(const Hash *exe_hash,
     return handle;
 }
 
-static void run_cptp_solver(PerfProfSolver *solver, PerfProfInput *input) {
+static void handle_cptp_solver_run(PerfProfSolver *solver,
+                                   PerfProfInput *input) {
     if (G_should_terminate) {
         return;
     }
@@ -430,10 +431,10 @@ void handle_vrp_instance(PerfProfInput *input) {
             PerfProfRunHandle *handle = new_perfprof_run_handle(
                 &G_bapcod_virtual_exe_hash, input, NULL, 0, solver);
 
-            handle_bapcod_solver(handle);
+            handle_bapcod_solver_run(handle);
             free(handle);
         } else {
-            run_cptp_solver(solver, input);
+            handle_cptp_solver_run(solver, input);
             if (G_pool.max_num_procs == 1) {
                 proc_pool_join(&G_pool);
             }
@@ -506,7 +507,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
     return G_should_terminate ? FTW_STOP : FTW_CONTINUE;
 }
 
-void scan_dir_and_solve(const char *dirpath) {
+void scan_dir(const char *dirpath) {
     if (!dirpath || dirpath[0] == 0) {
         return;
     }
@@ -559,7 +560,7 @@ static void do_batch(PerfProfBatch *bgroup) {
             for (int32_t dir_idx = 0;
                  dir_idx < BATCH_MAX_NUM_DIRS && bgroup->dirs[dir_idx];
                  dir_idx++) {
-                scan_dir_and_solve(bgroup->dirs[dir_idx]);
+                scan_dir(bgroup->dirs[dir_idx]);
             }
         }
     }
