@@ -105,7 +105,7 @@ static void writeout_results(FILE *fh, AppCtx *ctx, bool success,
     fprintf(fh, "%-16s %s\n", "INPUT:", ctx->instance_filepath);
     fprintf(fh, "%-16s %.17g\n", "VEHICLE_CAP:", instance->vehicle_cap);
 
-    fprintf(fh, "%-16s %x\n", "STATUS:", status);
+    fprintf(fh, "%-16s 0x%x\n", "STATUS:", status);
 
     if (valid) {
         printf("%-16s [%.17g, %.17g]\n", "BOUNDS:", solution->dual_bound,
