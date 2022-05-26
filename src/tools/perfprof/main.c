@@ -595,7 +595,7 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
     PerfProfBatch batches[] = {
-#if 0
+#if 1
         {1,
          "F-scaled-1.0-last-10",
          DEFAULT_TIME_LIMIT,
