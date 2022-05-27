@@ -92,7 +92,12 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
 
     if (BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM) &&
         !BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL)) {
-        primal_bound = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+
+    } else if (BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM) &&
+               BOOL(status & SOLVE_STATUS_PRIMAL_SOLUTION_AVAIL)) {
+        if (!is_valid_reduced_cost(primal_bound)) {
+            primal_bound = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+        }
     } else if (!BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM)) {
         primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
     } else if (status == SOLVE_STATUS_NULL || BOOL(status & SOLVE_STATUS_ERR)) {
