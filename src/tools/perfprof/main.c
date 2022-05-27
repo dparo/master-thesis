@@ -627,16 +627,6 @@ static void main_loop(void) {
              {"My CPTP MIP pricer", {}},
              BAPCOD_SOLVER,
          }},
-        {1,
-         "F-scaled-5.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-5.0/F"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
 
         {1,
          "E-scaled-1.0-last-10",
@@ -663,16 +653,6 @@ static void main_loop(void) {
          DEFAULT_TIME_LIMIT,
          1,
          {"data/BAP_Instances/last-10/CVRP-scaled-4.0/E"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "E-scaled-5.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-5.0/E"},
          DEFAULT_FILTER,
          {
              {"My CPTP MIP pricer", {}},
