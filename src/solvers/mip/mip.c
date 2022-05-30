@@ -1592,7 +1592,7 @@ bool cplex_setup(Solver *solver, const Instance *instance,
         }
     }
 
-    if (solver_params_get_bool(tparams, "AMORTIZE_FRACTIONAL_LABELING")) {
+    if (solver_params_get_bool(tparams, "AMORTIZED_FRACTIONAL_LABELING")) {
         solver->data->amortized_fractional_labeling = true;
     } else {
         solver->data->amortized_fractional_labeling = false;

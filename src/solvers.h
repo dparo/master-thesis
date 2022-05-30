@@ -58,7 +58,7 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
          "beginning "
          "the Branch&Cut procedure"},
 
-        {"AMORTIZE_FRACTIONAL_LABELING", TYPED_PARAM_BOOL, "false",
+        {"AMORTIZED_FRACTIONAL_LABELING", TYPED_PARAM_BOOL, "false",
          "Amortize the min-cut/max-flow fractional labeling over multiple "
          "iterations."
          "Setting this parateter to false essentially enforces exhaustive "
