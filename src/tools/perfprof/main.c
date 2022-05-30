@@ -617,7 +617,7 @@ static void main_loop(void) {
             if (num_batches == MAX_NUM_BATCHES) {
                 fprintf(
                     stderr,
-                    "INTERNAL PERFPROF ERROR: Excedded MAX_NUM_BATCHES = %d\n",
+                    "INTERNAL PERFPROF ERROR: Exceeded MAX_NUM_BATCHES = %d\n",
                     MAX_NUM_BATCHES);
                 exit(1);
             }
