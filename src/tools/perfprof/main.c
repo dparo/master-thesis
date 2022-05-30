@@ -595,11 +595,11 @@ static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
     enum {
-        NUM_BATCHES = 1024,
+        MAX_NUM_BATCHES = 1024,
         STRING_BUF_SIZE = 1024,
     };
 
-    PerfProfBatch *batches = calloc(NUM_BATCHES, sizeof(*batches));
+    PerfProfBatch *batches = calloc(MAX_NUM_BATCHES, sizeof(*batches));
 
     int32_t num_batches = 0;
     const char *FAMILIES[] = {"F", "E"};
@@ -613,6 +613,15 @@ static void main_loop(void) {
         for (int32_t scale_factor_idx = 0;
              scale_factor_idx < (int32_t)ARRAY_LEN(SCALE_FACTORS);
              scale_factor_idx++) {
+
+            if (num_batches == MAX_NUM_BATCHES) {
+                fprintf(
+                    stderr,
+                    "INTERNAL PERFPROF ERROR: Excedded MAX_NUM_BATCHES = %d\n",
+                    MAX_NUM_BATCHES);
+                exit(1);
+            }
+
             char batch_name[STRING_BUF_SIZE];
             char dirpath[STRING_BUF_SIZE];
 
