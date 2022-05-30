@@ -680,6 +680,10 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     CallbackThreadLocalData *tld = &ctx->thread_local_data[threadid];
     double *vstar = tld->vstar;
 
+    if (!solver->data->fractional_separation_enabled) {
+        return 0;
+    }
+
     if (!vstar) {
         log_fatal("%s :: Failed memory allocation", __func__);
         goto terminate;
@@ -693,9 +697,13 @@ static int cplex_on_new_relaxation(CPXCALLBACKCONTEXTptr cplex_cb_ctx,
     }
 
     const bool any_fractional = is_any_fractional_cut_enabled(tld);
-    // const bool do_fractional_sep =
-    //     (tld->fractional_sep_it % (instance->num_customers + 1) == 0);
-    const bool do_fractional_sep = true;
+    bool do_fractional_sep = true;
+    if (solver->data->amortized_fractional_labeling) {
+        do_fractional_sep =
+            (tld->fractional_sep_it % (instance->num_customers + 1) == 0);
+    } else {
+        do_fractional_sep = true;
+    }
 
     if (any_fractional && do_fractional_sep) {
         FlowNetwork *net = &tld->network;
@@ -1126,8 +1134,11 @@ static bool on_solve_start(Solver *self, const Instance *instance,
 
     CPXLONG contextmask =
         CPX_CALLBACKCONTEXT_BRANCHING | CPX_CALLBACKCONTEXT_CANDIDATE |
-        CPX_CALLBACKCONTEXT_RELAXATION | CPX_CALLBACKCONTEXT_THREAD_UP |
-        CPX_CALLBACKCONTEXT_THREAD_DOWN;
+        CPX_CALLBACKCONTEXT_THREAD_UP | CPX_CALLBACKCONTEXT_THREAD_DOWN;
+
+    if (self->data->fractional_separation_enabled) {
+        contextmask |= CPX_CALLBACKCONTEXT_RELAXATION;
+    }
 
 #ifndef NDEBUG
     contextmask |= CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS;
@@ -1579,6 +1590,18 @@ bool cplex_setup(Solver *solver, const Instance *instance,
                 __func__, cutoff_value);
             goto fail;
         }
+    }
+
+    if (solver_params_get_bool(tparams, "AMORTIZE_FRACTIONAL_LABELING")) {
+        solver->data->amortized_fractional_labeling = true;
+    } else {
+        solver->data->amortized_fractional_labeling = false;
+    }
+
+    if (solver_params_get_bool(tparams, "DISABLE_FRACTIONAL_SEPARATION")) {
+        solver->data->fractional_separation_enabled = false;
+    } else {
+        solver->data->fractional_separation_enabled = true;
     }
 
     enable_cuts(tparams);

@@ -57,10 +57,18 @@ static const SolverDescriptor MIP_SOLVER_DESCRIPTOR = {
          "Polish the initial warm start solutions right away before "
          "beginning "
          "the Branch&Cut procedure"},
+
+        {"AMORTIZE_FRACTIONAL_LABELING", TYPED_PARAM_BOOL, "false",
+         "Amortize the min-cut/max-flow fractional labeling over multiple "
+         "iterations."
+         "Setting this parateter to false essentially enforces exhaustive "
+         "labeling."},
         {"GSEC_CUTS", TYPED_PARAM_BOOL, "true", "Enable GSEC cut separation"},
         {"GLM_CUTS", TYPED_PARAM_BOOL, "true", "Enable GLM cuts separation"},
         {"RCI_CUTS", TYPED_PARAM_BOOL, "true", "Enable RCI cuts separation"},
-
+        {"DISABLE_FRACTIONAL_SEPARATION", TYPED_PARAM_BOOL, "false",
+         "Disable any form of labeling and separation for fractional "
+         "solutions. Disables the CPLEX callback entirely."},
         {"GSEC_FRAC_CUTS", TYPED_PARAM_BOOL, "true",
          "Enable GSEC cut separation for fractional solutions. Param "
          "`GSEC_CUTS` must also be enabled for this to take effect."},

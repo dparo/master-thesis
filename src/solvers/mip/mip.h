@@ -50,6 +50,8 @@ typedef struct SolverData {
     bool heur_pricer_mode;
     CPXDIM num_mip_vars;
     CPXDIM num_mip_constraints;
+    bool fractional_separation_enabled;
+    bool amortized_fractional_labeling;
 } SolverData;
 
 struct CutSeparationIface;
