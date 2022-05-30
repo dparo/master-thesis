@@ -92,7 +92,7 @@ typedef struct {
     char *name;
     double timelimit;
     int32_t nseeds;
-    const char *dirs[BATCH_MAX_NUM_DIRS];
+    char *dirs[BATCH_MAX_NUM_DIRS];
     Filter filter;
     PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_BATCH];
 } PerfProfBatch;
@@ -594,88 +594,54 @@ static void init(void) {
 static void generate_perfs_imgs(PerfProfBatch *batch);
 
 static void main_loop(void) {
-    PerfProfBatch batches[] = {
-#if 1
-        {1,
-         "F-scaled-1.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-1.0/F"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "F-scaled-2.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-2.0/F"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-
-        {1,
-         "F-scaled-4.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-4.0/F"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-
-        {1,
-         "E-scaled-1.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-1.0/E"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "E-scaled-2.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-2.0/E"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-        {1,
-         "E-scaled-4.0-last-10",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances/last-10/CVRP-scaled-4.0/E"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-
-#else
-        {1,
-         "BAP_Instances_Test",
-         DEFAULT_TIME_LIMIT,
-         1,
-         {"data/BAP_Instances_Test"},
-         DEFAULT_FILTER,
-         {
-             {"My CPTP MIP pricer", {}},
-             BAPCOD_SOLVER,
-         }},
-#endif
-
+    enum {
+        NUM_BATCHES = 1024,
+        STRING_BUF_SIZE = 1024,
     };
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(batches); i++) {
-        for (int32_t j = 0; j < (int32_t)ARRAY_LEN(batches); j++) {
+    PerfProfBatch *batches = calloc(NUM_BATCHES, sizeof(*batches));
+
+    int32_t num_batches = 0;
+    const char *FAMILIES[] = {"F", "E"};
+    const char *SCALE_FACTORS[] = {
+        "1.0", "2.0", "4.0",
+        //"5.0", "8.0", "10.0", "20.0"
+    };
+
+    for (int32_t family_idx = 0; family_idx < (int32_t)ARRAY_LEN(FAMILIES);
+         family_idx++) {
+        for (int32_t scale_factor_idx = 0;
+             scale_factor_idx < (int32_t)ARRAY_LEN(SCALE_FACTORS);
+             scale_factor_idx++) {
+            char batch_name[STRING_BUF_SIZE];
+            char dirpath[STRING_BUF_SIZE];
+
+            snprintf_safe(batch_name, ARRAY_LEN(batch_name),
+                          "%s-scaled-%s-last-10", FAMILIES[family_idx],
+                          SCALE_FACTORS[scale_factor_idx]);
+
+            snprintf_safe(dirpath, ARRAY_LEN(dirpath),
+                          "data/BAP_Instances/last-10/CVRP-scaled-%s/%s",
+                          SCALE_FACTORS[scale_factor_idx],
+                          FAMILIES[family_idx]);
+
+            batches[num_batches].max_num_procs = 1;
+            batches[num_batches].name = strdup(batch_name);
+            batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
+            batches[num_batches].nseeds = 1;
+            batches[num_batches].dirs[0] = strdup(dirpath);
+            batches[num_batches].dirs[1] = NULL;
+            batches[num_batches].filter = DEFAULT_FILTER;
+
+            batches[num_batches].solvers[0] =
+                (PerfProfSolver){"My CPTP MIP pricer", {}};
+            batches[num_batches].solvers[1] = BAPCOD_SOLVER;
+            ++num_batches;
+        }
+    }
+
+    for (int32_t i = 0; i < num_batches; i++) {
+        for (int32_t j = 0; j < num_batches; j++) {
             if (i == j) {
                 continue;
             }
@@ -690,8 +656,7 @@ static void main_loop(void) {
         }
     }
 
-    for (int32_t i = 0; !G_should_terminate && i < (int32_t)ARRAY_LEN(batches);
-         i++) {
+    for (int32_t i = 0; !G_should_terminate && i < num_batches; i++) {
         batches[i].timelimit = ceil(batches[i].timelimit);
 
         printf("\n\n");
@@ -735,6 +700,16 @@ static void main_loop(void) {
 
     proc_pool_join(&G_pool);
     clear_perf_table();
+
+    for (int32_t i = 0; i < num_batches; i++) {
+        free(batches[i].name);
+        for (int32_t dir_idx = 0;
+             dir_idx < BATCH_MAX_NUM_DIRS && batches[i].dirs[dir_idx];
+             dir_idx++) {
+            free(batches[i].dirs[dir_idx]);
+        }
+    }
+    free(batches);
 }
 
 int main(int argc, char *argv[]) {
