@@ -42,11 +42,38 @@ extern "C" {
 
 #define SHA256_CSTR_LEN 65
 
-#define DEFAULT_TIME_LIMIT ((double)1200) // 20 minutes
+#define DEFAULT_TIME_LIMIT ((double)4) // 20 minutes
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.
 #define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)10.0)
+
+#define CPTP_EXE "./build/Release/src/cptp"
+#define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/plot.py"
+#define BAPCOD_SOLVER_NAME "libRCSP DP pricer"
+#define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
+
+#define MAX_NUM_SOLVERS_PER_BATCH 8
+#define BATCH_MAX_NUM_DIRS 64
+
+// 100 Random integer numbers from [0, 32767] range generated from
+// https://www.random.org/integers/
+static const int32_t RANDOM_SEEDS[] = {
+    8111,  9333,  16884, 2228,  20278, 22042, 18309, 15176, 19175, 21292,
+    12903, 19891, 6359,  14333, 27486, 12791, 31021, 855,   2552,  8691,
+    12612, 11744, 15720, 20122, 401,   21650, 7144,  21018, 28549, 2660,
+    10504, 2060,  1374,  11723, 10932, 21808, 22998, 23168, 31770, 7616,
+    26891, 8217,  31272, 28626, 29539, 6930,  29356, 2885,  24150, 15753,
+    15869, 6260,  13922, 23839, 27864, 820,   2392,  15204, 10215, 16686,
+    26072, 18447, 6101,  5554,  6739,  23735, 31277, 12123, 363,   4562,
+    12773, 18146, 22084, 14991, 23488, 5131,  27575, 31055, 25576, 28122,
+    32632, 21942, 18007, 11716, 13917, 31899, 15279, 23520, 8192,  24349,
+    13567, 32028, 15076, 6717,  1311,  20275, 5547,  5904,  7098,  4718,
+};
+
+STATIC_ASSERT(ARRAY_LEN(RANDOM_SEEDS) < UINT8_MAX,
+              "Too much number of seeds. Need to be able to encode a seed index"
+              "using an uint8_t");
 
 /// Struct that stores an SHA256 hash as a printable c-string
 typedef struct {
@@ -128,6 +155,62 @@ typedef struct {
     char solver_name[SOLVER_NAME_MAX_LEN];
     SolverSolution solution;
 } PerfProfRun;
+
+typedef struct {
+    int32_t num_runs;
+    PerfProfRun runs[MAX_NUM_SOLVERS_PER_BATCH];
+} PerfTblValue;
+
+typedef struct {
+    PerfProfInputUniqueId uid;
+} PerfTblKey;
+
+typedef struct {
+    PerfTblKey key;
+    PerfTblValue value;
+} PerfTblEntry;
+
+/// Each batch may have an associated filter to reduce the number
+/// of instances considered.
+typedef struct {
+    char *family; /// TODO: Not supported yet
+    int32_interval_t ncustomers;
+    int32_interval_t nvehicles;
+} Filter;
+
+/// A batch is set of instances extracted from a list of directories, which
+/// are recursively scanned.
+/// Each instance passes through a filter: for example of all the instances
+/// found, keep the ones having a number of customers less than 100. Each
+/// instance is solved by the solvers specified by the batch. The batch
+/// accumulates the performance of each solver on the
+/// considered instances. For each batch a separate performance profile is
+/// generated.
+/// Caching of the pair (seed, instance, solver_name, params) spans all the
+/// batches. Therefore the same (seed, instance, solver_name, params) tuple will
+/// be solved exactly once, even it belongs to multiple batches.
+typedef struct {
+    int32_t max_num_procs;
+    char *name;
+    double timelimit;
+    int32_t nseeds;
+    char *dirs[BATCH_MAX_NUM_DIRS];
+    Filter filter;
+    PerfProfSolver solvers[MAX_NUM_SOLVERS_PER_BATCH];
+} PerfProfBatch;
+
+typedef struct {
+    PerfTblEntry *buf;
+} PerfTbl;
+
+typedef struct {
+    Hash cptp_exe_hash;
+    Hash bapcod_virtual_exe_hash;
+    bool should_terminate;
+    ProcPool pool;
+    PerfProfBatch *current_batch;
+    PerfTbl perf_tbl;
+} AppCtx;
 
 #if __cplusplus
 }

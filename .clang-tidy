@@ -1,1 +1,1 @@
-Checks:          '-*,clang-diagnostic-*,clang-analyzer-*,clang-analyzer-cplusplus-*,cppcoreguidelines-*'
+Checks:          '-*,clang-diagnostic-*,clang-analyzer-*,clang-analyzer-cplusplus-*,cppcoreguidelines-*,-cppcoreguidelines-avoid-magic-numbers'
