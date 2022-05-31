@@ -509,8 +509,6 @@ static void do_batch(AppCtx *ctx, PerfProfBatch *current_batch) {
 }
 
 static void init(AppCtx *ctx) {
-    G_app_ctx_ptr = ctx;
-
     os_mkdir(PERFPROF_DUMP_ROOTDIR, true);
     os_mkdir(PERFPROF_DUMP_ROOTDIR "/cache", true);
 
@@ -668,13 +666,31 @@ int main(int argc, char *argv[]) {
     UNUSED_PARAM(argc);
     UNUSED_PARAM(argv);
 
-    AppCtx ctx;
+    AppCtx ctx = {0};
     init(&ctx);
-    sighandler_t prev_sigterm_handler = signal(SIGTERM, my_sighandler);
-    sighandler_t prev_sigint_handler = signal(SIGINT, my_sighandler);
-    { main_loop(&ctx); }
-    signal(SIGTERM, prev_sigterm_handler);
-    signal(SIGINT, prev_sigint_handler);
+
+    G_app_ctx_ptr = &ctx;
+
+    const int SIGNALS_TO_CATCH[] = {
+        SIGTERM,
+        SIGINT,
+    };
+
+    sighandler_t prev_sighandlers[ARRAY_LEN(SIGNALS_TO_CATCH)] = {0};
+
+    // Setup signals to catch callback
+    for (int32_t i = 0; i < (int)ARRAY_LEN(SIGNALS_TO_CATCH); i++) {
+        prev_sighandlers[i] = signal(SIGNALS_TO_CATCH[i], my_sighandler);
+    }
+
+    // Start with the main loop
+    main_loop(&ctx);
+
+    // Restore the signals to catch previous callback
+    for (int32_t i = 0; i < (int)ARRAY_LEN(SIGNALS_TO_CATCH); i++) {
+        signal(SIGNALS_TO_CATCH[i], prev_sighandlers[i]);
+    }
+
     proc_pool_join(&ctx.pool);
     return 0;
 }
