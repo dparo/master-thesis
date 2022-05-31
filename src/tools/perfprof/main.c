@@ -66,8 +66,9 @@ static inline SolverSolution
 make_invalidated_solver_solution(PerfProfBatch *batch) {
     SolverSolution solution = {0};
     solution.status = SOLVE_STATUS_ERR;
-    solution.primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
-    solution.time = 2 * batch->timelimit;
+    solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] =
+        CRASHED_SOLVER_DEFAULT_COST_VAL;
+    solution.stats[PERFPROF_STAT_KIND_TIME] = 2 * batch->timelimit;
     return solution;
 }
 
@@ -85,9 +86,10 @@ void store_perfprof_run(PerfTbl *tbl, PerfProfInputUniqueId *uid,
            "solver_name = %s, "
            "time = %.17g, closedProblem = %d, obj_ub "
            "= %.17g\n",
-           uid->seedidx, uid->hash.cstr, run->solver_name, run->solution.time,
+           uid->seedidx, uid->hash.cstr, run->solver_name,
+           run->solution.stats[PERFPROF_STAT_KIND_TIME],
            BOOL(run->solution.status & SOLVE_STATUS_CLOSED_PROBLEM),
-           run->solution.primal_bound);
+           run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND]);
 
     PerfTblKey key = {0};
     memcpy(&key.uid, uid, sizeof(key.uid));

@@ -105,8 +105,8 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
     }
 
     run->solution.status = status;
-    run->solution.time = time;
-    run->solution.primal_bound = primal_bound;
+    run->solution.stats[PERFPROF_STAT_KIND_TIME] = time;
+    run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] = primal_bound;
 }
 
 void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
@@ -161,6 +161,6 @@ void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
     }
 
     run->solution.status = status;
-    run->solution.time = time;
-    run->solution.primal_bound = primal_bound;
+    run->solution.stats[PERFPROF_STAT_KIND_TIME] = time;
+    run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] = primal_bound;
 }

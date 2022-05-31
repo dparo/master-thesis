@@ -42,7 +42,7 @@ extern "C" {
 
 #define SHA256_CSTR_LEN 65
 
-#define DEFAULT_TIME_LIMIT ((double)4) // 20 minutes
+#define DEFAULT_TIME_LIMIT ((double)1200.0) // 20 minutes
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.
@@ -105,11 +105,17 @@ typedef struct {
     char *args[PROC_MAX_ARGS];
 } PerfProfSolver;
 
+typedef enum {
+    PERFPROF_STAT_KIND_TIME,
+    PERFPROF_STAT_KIND_PRIMAL_BOUND,
+
+    // To employ it as an array
+    PERFPROF_MAX_NUM_STATS,
+} PerfProfStatKind;
+
 typedef struct {
     SolveStatus status;
-
-    double time;
-    double primal_bound;
+    double stats[PERFPROF_MAX_NUM_STATS];
 } SolverSolution;
 
 /// Unique identifier/handle to each (seed, instance).

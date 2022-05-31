@@ -1,56 +1,54 @@
 /*
  * Copyright (c) 2022 Davide Paro
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
 
 #include "output.h"
 
-static inline double get_costval_for_csv(double costval, double base_ref_val,
-                                         double shift) {
-    return fratio(base_ref_val, costval, shift);
+static inline double get_raw_stat_val_from_perf(const PerfProfRun *run,
+                                                PerfProfStatKind kind) {
+    return run->solution.stats[kind];
 }
 
-static inline double get_timeval_for_csv(double timeval, double base_ref_val,
-                                         double shift) {
-    return (timeval + shift) / base_ref_val;
+static inline double get_ratioed_stat_val_from_perf(const PerfProfRun *run,
+                                                    PerfProfStatKind kind,
+                                                    double max_ratio,
+                                                    double shift) {
+    double v = get_raw_stat_val_from_perf(run, kind);
+    return (v + shift) / max_ratio;
 }
 
-static inline double get_raw_val_from_perf(const PerfProfRun *run,
-                                           bool is_time_profile) {
-    return is_time_profile ? run->solution.time : run->solution.primal_bound;
-}
-
-static inline double get_baked_val_from_perf(const PerfProfRun *run,
-                                             bool is_time_profile,
-                                             double base_ref_val,
-                                             double shift) {
-    double val = get_raw_val_from_perf(run, is_time_profile);
+static inline double
+get_properly_encoded_stat_val_from_perf(const PerfProfRun *run,
+                                        bool is_time_profile, double max_ratio,
+                                        double shift) {
     if (is_time_profile) {
-        return get_timeval_for_csv(val, base_ref_val, shift);
+        return get_ratioed_stat_val_from_perf(run, PERFPROF_STAT_KIND_TIME,
+                                              max_ratio, shift);
     } else {
-        return get_raw_val_from_perf(run, is_time_profile);
-        // return get_costval_for_csv(val, base_ref_val, shift);
+        return get_raw_stat_val_from_perf(run, PERFPROF_STAT_KIND_PRIMAL_BOUND);
     }
 }
 
 static void generate_performance_profile_using_python_script(
-    PerfProfBatch *batch, char *csv_input_file, bool is_time_profile) {
+    const PerfProfBatch *batch, char *csv_input_file, bool is_time_profile) {
     char *args[PROC_MAX_ARGS];
     int32_t argidx = 0;
 
@@ -127,7 +125,7 @@ static void generate_performance_profile_using_python_script(
     proc_spawn_sync(args);
 }
 
-void generate_perfs_imgs(AppCtx *ctx, PerfProfBatch *batch) {
+void generate_perfs_imgs(const AppCtx *ctx, const PerfProfBatch *batch) {
     printf("\n\n\n");
     char dump_dir[OS_MAX_PATH];
     char data_csv_file[OS_MAX_PATH];
@@ -142,7 +140,7 @@ void generate_perfs_imgs(AppCtx *ctx, PerfProfBatch *batch) {
         bool is_time_profile = data_dump_idx == 0;
         char *filename = is_time_profile ? "time-data.csv" : "cost-data.csv";
 
-        const double shift = is_time_profile ? 1e-4 : 1e-4;
+        const double shift = is_time_profile ? 1e-3 : 1e-9;
 
         snprintf_safe(data_csv_file, ARRAY_LEN(data_csv_file), "%s/%s",
                       dump_dir, filename);
@@ -185,7 +183,7 @@ void generate_perfs_imgs(AppCtx *ctx, PerfProfBatch *batch) {
             assert(value->num_runs == num_solvers);
             for (int32_t run_idx = 0; run_idx < value->num_runs; run_idx++) {
                 const PerfProfRun *run = &value->runs[run_idx];
-                double val = get_raw_val_from_perf(run, is_time_profile);
+                double val = get_raw_stat_val_from_perf(run, is_time_profile);
                 min_val = MIN(min_val, val);
                 max_val = MAX(max_val, val);
             }
@@ -204,8 +202,9 @@ void generate_perfs_imgs(AppCtx *ctx, PerfProfBatch *batch) {
                      run_idx++) {
                     const PerfProfRun *run = &value->runs[run_idx];
                     if (0 == strcmp(run->solver_name, solver_name)) {
-                        double baked_data = get_baked_val_from_perf(
-                            run, is_time_profile, min_val, shift);
+                        double baked_data =
+                            get_properly_encoded_stat_val_from_perf(
+                                run, is_time_profile, min_val, shift);
                         fprintf(fh, ",%.17g", baked_data);
                     }
                 }
