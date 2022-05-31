@@ -212,6 +212,14 @@ typedef struct {
     PerfTbl perf_tbl;
 } AppCtx;
 
+static inline double get_extended_timelimit(double timelimit) {
+    return ceil(1.05 * timelimit + 2);
+}
+
+static inline double get_kill_timelimit(double timelimit) {
+    return ceil(1.05 * get_extended_timelimit(timelimit));
+}
+
 #if __cplusplus
 }
 #endif
