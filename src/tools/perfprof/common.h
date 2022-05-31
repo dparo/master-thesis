@@ -42,7 +42,7 @@ extern "C" {
 
 #define SHA256_CSTR_LEN 65
 
-#define DEFAULT_TIME_LIMIT ((double)5.0) // 20 minutes
+#define DEFAULT_TIME_LIMIT ((double)1200) // 20 minutes
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.

@@ -100,7 +100,7 @@ typedef struct {
 #define CPTP_EXE "./build/Release/src/cptp"
 
 #define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/plot.py"
-#define BAPCOD_SOLVER_NAME "BaPCod"
+#define BAPCOD_SOLVER_NAME "libRCSP DP pricer"
 #define PERFPROF_DUMP_ROOTDIR "perfprof-dump"
 
 static Hash G_cptp_exe_hash;
@@ -581,12 +581,13 @@ static void init(void) {
         sha256_update(&shactx, (BYTE *)CPTP_EXE, strlen(CPTP_EXE));
         sha256_finalize_to_cstr(&shactx, &G_cptp_exe_hash);
     }
-    // Compute the cptp exe hash
+    // Compute the BAPCOD exe hash
     {
         SHA256_CTX shactx;
 
         sha256_init(&shactx);
-        sha256_update(&shactx, (BYTE *)"BaPCod", strlen("BaPCod"));
+        sha256_update(&shactx, (BYTE *)BAPCOD_SOLVER_NAME,
+                      strlen(BAPCOD_SOLVER_NAME));
         sha256_finalize_to_cstr(&shactx, &G_bapcod_virtual_exe_hash);
     }
 }
@@ -643,7 +644,7 @@ static void main_loop(void) {
             batches[num_batches].filter = DEFAULT_FILTER;
 
             batches[num_batches].solvers[0] =
-                (PerfProfSolver){"My CPTP MIP pricer", {}};
+                (PerfProfSolver){"BAC MIP Pricer", {}};
             batches[num_batches].solvers[1] = BAPCOD_SOLVER;
             ++num_batches;
         }
