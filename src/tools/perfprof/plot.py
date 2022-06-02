@@ -22,8 +22,8 @@
 ##      Performance Profile by D. Salvagnin (2016)
 ##      Internal use only, not to be distributed
 ##
-## The script was modified:
-##   - Porting to python3
+## The script was modified in the following ways:
+##   - Ported the script to python3
 ##   - More command line options
 ##   - Visual enhancements of the generated plot
 ##   - Generalized how data is processed. Ratios computations are in fact now optional.
@@ -32,14 +32,19 @@
 # !/usr/bin/env python3
 
 from argparse import ArgumentParser
-from math import inf
+from typing import List
 
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 import numpy as np
+import sys
 
-# parameters
+def errprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+# Constants
 PLOT_LINE_WIDTH = 1.2
 PLOT_MARKER_SIZE = 7
 PLOT_MAX_LEGEND_NAME_LEN = 64
@@ -63,23 +68,6 @@ COLORS = [
 
 matplotlib.use("PDF")
 matplotlib.rcParams["figure.dpi"] = 300
-
-
-def remove_duplicates_from_list(x):
-    return list(dict.fromkeys(x))
-
-
-def get_plt_ticks(lb, ub, cnt):
-    if ub == lb:
-        ub = lb + 1.0
-    return np.array(
-        [
-            round(x, 3)
-            for x in remove_duplicates_from_list(
-                [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
-            )
-        ]
-    )
 
 
 class CmdLineParser(object):
@@ -179,6 +167,41 @@ class CmdLineParser(object):
         return self.parser.parse_args()
 
 
+class ParsedCsvContents:
+    solver_names: List[str]
+    instance_names: List[str]
+    data: np.ndarray
+
+    def __init__(self, instance_names: List[str], solver_names: List[str], data: np.ndarray):
+        self.instance_names = instance_names
+        self.solver_names = solver_names
+        self.data = data
+
+    def truncate_solver_names(self):
+        for i in range(0, len(self.solver_names)):
+            if len(self.solver_names[i]) >= PLOT_MAX_LEGEND_NAME_LEN:
+                self.solver_names[i] = (self.solver_names[i])[0 : PLOT_MAX_LEGEND_NAME_LEN - 4] + " ..."
+
+
+
+def list_keep_uniqs(x):
+    return list(dict.fromkeys(x))
+
+
+def get_plt_ticks(lb, ub, cnt):
+    if ub == lb:
+        ub = lb + 1.0
+    return np.array(
+        [
+            round(x, 3)
+            for x in list_keep_uniqs(
+                [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
+            )
+        ]
+    )
+
+
+
 def read_csv(fp, delimiter):
     """
     read a CSV file with performance profile specification
@@ -189,18 +212,22 @@ def read_csv(fp, delimiter):
     """
     firstline = fp.readline().strip().split(delimiter)
     ncols = len(firstline) - 1
-    cnames = firstline[1:]
-    rnames = []
+    solver_names = firstline[1:]
+    instance_names = []
     rows = []
     for row in fp:
         row = row.strip().split(delimiter)
-        rnames.append(row[0])
+        instance_names.append(row[0])
         rdata = np.empty(ncols)
         for j in range(ncols):
             rdata[j] = float(row[j + 1])
         rows.append(rdata)
-    data = np.array(rows)
-    return rnames, cnames, data
+
+    return ParsedCsvContents(
+            instance_names,
+            solver_names,
+            np.array(rows)
+    )
 
 
 def draw_regions(data, ncols):
@@ -246,26 +273,25 @@ def draw_regions(data, ncols):
 def main():
     parser = CmdLineParser()
     opt = parser.parse()
-    rnames, cnames, data = read_csv(open(opt.input, "r"), opt.delimiter)
 
-    for i in range(0, len(cnames)):
-        if len(cnames[i]) >= PLOT_MAX_LEGEND_NAME_LEN:
-            cnames[i] = (cnames[i])[0 : PLOT_MAX_LEGEND_NAME_LEN - 4] + " ..."
+    p = read_csv(open(opt.input, "r"), opt.delimiter)
+    p.truncate_solver_names()
 
-    if data.shape == (0,):
-        return
+    if p.data.shape == (0,):
+        errprint(f"Cannot retrieve data from `{opt.input}` input file")
+        sys.exit(-1)
 
-    nrows, ncols = data.shape
+    nrows, ncols = p.data.shape
     # add shift
-    data = data + opt.shift
+    p.data = p.data + opt.shift
 
     eps = 1e6
 
     # compute ratios
     if opt.plot_as_ratios:
-        minima = data.min(axis=1)
+        minima = p.data.min(axis=1)
         for j in range(ncols):
-            data[:, j] = data[:, j] / minima
+            p.data[:, j] = p.data[:, j] / minima
         opt.x_lower_limit /= minima
         opt.x_upper_limit /= minima
         opt.x_min /= minima
@@ -274,24 +300,24 @@ def main():
 
     # Deduce minratio and maxratio if they are not specified on the command line
     if opt.x_min is None or (opt.x_min <= -1e21):
-        opt.x_min = max(opt.x_lower_limit, data.min())
+        opt.x_min = max(opt.x_lower_limit, p.data.min())
 
     if opt.x_max is None or (opt.x_max >= 1e21):
-        opt.x_max = min(opt.x_upper_limit, data.max())
+        opt.x_max = min(opt.x_upper_limit, p.data.max())
 
     # any time value exceeds limit, we push the sample out of bounds
     for i in range(nrows):
         for j in range(ncols):
-            if data[i, j] >= opt.x_upper_limit:
-                data[i, j] = opt.x_max + eps
-            if data[i, j] <= opt.x_lower_limit:
-                data[i, j] = opt.x_min - eps
+            if p.data[i, j] >= opt.x_upper_limit:
+                p.data[i, j] = opt.x_max + eps
+            if p.data[i, j] <= opt.x_lower_limit:
+                p.data[i, j] = opt.x_min - eps
 
     if opt.x_min == opt.x_max:
         opt.x_max = opt.x_min + 1.0
 
     # sort data
-    data.sort(axis=0)
+    p.data.sort(axis=0)
     # plot first
     y = np.arange(nrows, dtype=np.float64) / nrows
     for j in range(ncols):
@@ -300,7 +326,7 @@ def main():
         color = COLORS[(opt.startidx + j) % len(COLORS)]
 
         options = dict(
-            label=cnames[j],
+            label=p.solver_names[j],
             drawstyle="steps-post",
             linewidth=PLOT_LINE_WIDTH,
             linestyle=linestyle,
@@ -316,9 +342,9 @@ def main():
         else:
             options["color"] = color
         if opt.logplot:
-            plt.semilogx(data[:, j], y, **options)
+            plt.semilogx(p.data[:, j], y, **options)
         else:
-            plt.plot(data[:, j], y, **options)
+            plt.plot(p.data[:, j], y, **options)
 
     xticks = get_plt_ticks(opt.x_min, opt.x_max, 8)
     yticks = get_plt_ticks(0.0, 1.0, 8)
@@ -329,7 +355,7 @@ def main():
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
     if opt.draw_separated_regions is not None and opt.draw_separated_regions:
-        draw_regions(data, ncols)
+        draw_regions(p.data, ncols)
 
     if opt.plotlegend is not None and opt.plotlegend is True:
         plt.legend(loc="best", fontsize=6, prop={"size": 6})
