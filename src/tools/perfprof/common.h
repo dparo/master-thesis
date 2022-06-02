@@ -42,7 +42,13 @@ extern "C" {
 
 #define SHA256_CSTR_LEN 65
 
+#ifndef NDEBUG
+// Release build
 #define DEFAULT_TIME_LIMIT ((double)1200.0) // 20 minutes
+#else
+// Debug build
+#define DEFAULT_TIME_LIMIT ((double)10.0) // 10 seconds
+#endif
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.
