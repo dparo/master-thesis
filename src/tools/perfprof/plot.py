@@ -17,20 +17,21 @@
 # IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## This script is a highly customized version of the perfprof.py script from:
+# This script is a highly customized version of the perfprof.py script from:
 ##
-##      Performance Profile by D. Salvagnin (2016)
-##      Internal use only, not to be distributed
+# Performance Profile by D. Salvagnin (2016)
+# Internal use only, not to be distributed
 ##
-## The script was modified in the following ways:
-##   - Ported the script to python3
-##   - More command line options
-##   - Visual enhancements of the generated plot
-##   - Generalized how data is processed. Ratios computations are in fact now optional.
+# The script was modified in the following ways:
+# - Ported the script to python3
+# - More command line options
+# - Visual enhancements of the generated plot
+# - Generalized how data is processed. Ratios computations are in fact now optional.
 #      Thus, this utility can be used to plot different kinds of already processed data.
 
 # !/usr/bin/env python3
 
+import sys
 from argparse import ArgumentParser
 from typing import List
 
@@ -38,7 +39,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
 import numpy as np
-import sys
+
 
 def errprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
@@ -172,7 +173,9 @@ class ParsedCsvContents:
     instance_names: List[str]
     data: np.ndarray
 
-    def __init__(self, instance_names: List[str], solver_names: List[str], data: np.ndarray):
+    def __init__(
+        self, instance_names: List[str], solver_names: List[str], data: np.ndarray
+    ):
         self.instance_names = instance_names
         self.solver_names = solver_names
         self.data = data
@@ -180,8 +183,9 @@ class ParsedCsvContents:
     def truncate_solver_names(self):
         for i in range(0, len(self.solver_names)):
             if len(self.solver_names[i]) >= PLOT_MAX_LEGEND_NAME_LEN:
-                self.solver_names[i] = (self.solver_names[i])[0 : PLOT_MAX_LEGEND_NAME_LEN - 4] + " ..."
-
+                self.solver_names[i] = (self.solver_names[i])[
+                    0 : PLOT_MAX_LEGEND_NAME_LEN - 4
+                ] + " ..."
 
 
 def list_keep_uniqs(x):
@@ -201,14 +205,14 @@ def get_plt_ticks(lb, ub, cnt):
     )
 
 
-
 def read_csv(fp, delimiter):
     """
-    read a CSV file with performance profile specification
-    the format is as follows:
-    ncols algo1 algo2 ...
-    nome_istanza tempo(algo1) tempo(algo2) ...
-    ...
+    Read a CSV file with performance profile specification.
+
+    The format is as follows:
+
+        ncols          algo1           algo2 ...
+        nome_istanza   tempo(algo1)    tempo(algo2) ...
     """
     firstline = fp.readline().strip().split(delimiter)
     ncols = len(firstline) - 1
@@ -223,11 +227,7 @@ def read_csv(fp, delimiter):
             rdata[j] = float(row[j + 1])
         rows.append(rdata)
 
-    return ParsedCsvContents(
-            instance_names,
-            solver_names,
-            np.array(rows)
-    )
+    return ParsedCsvContents(instance_names, solver_names, np.array(rows))
 
 
 def draw_regions(data, ncols):
@@ -286,17 +286,17 @@ def main():
     p.data = p.data + opt.shift
 
     eps = 1e6
+    baseline = p.data.min(axis=1)
 
     # compute ratios
     if opt.plot_as_ratios:
-        minima = p.data.min(axis=1)
         for j in range(ncols):
-            p.data[:, j] = p.data[:, j] / minima
-        opt.x_lower_limit /= minima
-        opt.x_upper_limit /= minima
-        opt.x_min /= minima
-        opt.x_max /= minima
-        eps /= minima
+            p.data[:, j] = p.data[:, j] / baseline
+        opt.x_lower_limit /= baseline
+        opt.x_upper_limit /= baseline
+        opt.x_min /= baseline
+        opt.x_max /= baseline
+        eps /= baseline
 
     # Deduce minratio and maxratio if they are not specified on the command line
     if opt.x_min is None or (opt.x_min <= -1e21):
