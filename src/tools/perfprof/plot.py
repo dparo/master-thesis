@@ -1,40 +1,19 @@
-# Copyright (c) 2022 Davide Paro
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of
-# this software and associated documentation files (the "Software"), to deal in
-# the Software without restriction, including without limitation the rights to
-# use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-# the Software, and to permit persons to whom the Software is furnished to do so,
-# subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-# FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-# COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-# IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-# This script is a highly customized version of the perfprof.py script from:
 ##
 # Performance Profile by D. Salvagnin (2016)
 # Internal use only, not to be distributed
 ##
-# The script was modified in the following ways:
-# - Ported the script to python3
-# - More command line options
-# - Visual enhancements of the generated plot
-# - Generalized how data is processed. Ratios computations are in fact now optional.
-#      Thus, this utility can be used to plot different kinds of already processed data.
+# Modified by Davide Paro (@dparo) in 2022:
+# - Ported to python3
+# - Ability to plot raw data directly  (no mandatory ratio computation)
+# - Generalized some commandline options to allow for plotting
+#   of arbitrary quantities/statistics
 
 # !/usr/bin/env python3
 
 import sys
-from argparse import ArgumentParser
 from typing import List
 
+import argparse
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
@@ -43,6 +22,10 @@ import numpy as np
 
 def errprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
+
+
+def list_keep_uniqs(x):
+    return list(dict.fromkeys(x))
 
 
 # Constants
@@ -67,13 +50,10 @@ COLORS = [
     "magenta",
 ]
 
-matplotlib.use("PDF")
-matplotlib.rcParams["figure.dpi"] = 300
-
 
 class CmdLineParser(object):
     def __init__(self):
-        self.parser = ArgumentParser(
+        self.parser = argparse.ArgumentParser(
             usage="Usage: python3 perfprof.py [options] cvsfile.csv outputfile.pdf"
         )
         # default options
@@ -101,7 +81,12 @@ class CmdLineParser(object):
             help="Minimum X value for perf. profile",
         )
         self.parser.add_argument(
-            "-S", "--shift", dest="shift", default=0, type=float, help="shift for data"
+            "-S",
+            "--shift",
+            dest="shift",
+            default=0.0,
+            type=float,
+            help="shift for data",
         )
         self.parser.add_argument(
             "--logplot",
@@ -111,18 +96,18 @@ class CmdLineParser(object):
             help="Enable logscale for X",
         )
         self.parser.add_argument(
-            "--x-lower-limit",
-            dest="x_lower_limit",
-            default=-1e99,
+            "--x-raw-lower-limit",
+            dest="x_raw_lower_limit",
+            default=None,
             type=float,
-            help="Lower limit for runs",
+            help="Raw Lower limit for the X axis",
         )
         self.parser.add_argument(
-            "--x-upper-limit",
-            dest="x_upper_limit",
-            default=+1e99,
+            "--x-raw-upper-limit",
+            dest="x_raw_upper_limit",
+            default=None,
             type=float,
-            help="Upper limit for runs",
+            help="Raw Upper limit for the X axis",
         )
         self.parser.add_argument(
             "-P", "--plot-title", dest="plottitle", default=None, help="plot title"
@@ -131,24 +116,29 @@ class CmdLineParser(object):
             "-l", "--legend", dest="plotlegend", default=True, help="plot the legend"
         )
         self.parser.add_argument(
-            "-X", "--x-label", dest="xlabel", default="Time Ratio", help="x axis label"
+            "-X",
+            "--x-label",
+            dest="xlabel",
+            type=str,
+            default=None,
+            help="x axis label",
         )
         self.parser.add_argument(
             "-B", "--bw", dest="bw", action="store_true", default=False, help="plot B/W"
         )
         self.parser.add_argument(
-            "--plot-as-ratios",
-            dest="plot_as_ratios",
+            "--raw-data",
+            dest="raw_data",
             action="store_true",
             default=False,
-            help="To plot data as ratios or not",
+            help="Keep raw data and do not apply further processing before plotting",
         )
         self.parser.add_argument(
-            "--startidx",
-            dest="startidx",
+            "--style-offset",
+            dest="style_offset",
             default=0,
             type=int,
-            help="Start index to associate with the colors",
+            help="Start index offset to associate with the line style/colors",
         )
         self.parser.add_argument(
             "--draw-separated-regions",
@@ -179,30 +169,6 @@ class ParsedCsvContents:
         self.instance_names = instance_names
         self.solver_names = solver_names
         self.data = data
-
-    def truncate_solver_names(self):
-        for i in range(0, len(self.solver_names)):
-            if len(self.solver_names[i]) >= PLOT_MAX_LEGEND_NAME_LEN:
-                self.solver_names[i] = (self.solver_names[i])[
-                    0 : PLOT_MAX_LEGEND_NAME_LEN - 4
-                ] + " ..."
-
-
-def list_keep_uniqs(x):
-    return list(dict.fromkeys(x))
-
-
-def get_plt_ticks(lb, ub, cnt):
-    if ub == lb:
-        ub = lb + 1.0
-    return np.array(
-        [
-            round(x, 3)
-            for x in list_keep_uniqs(
-                [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
-            )
-        ]
-    )
 
 
 def read_csv(fp, delimiter):
@@ -270,63 +236,102 @@ def draw_regions(data, ncols):
         plt.axvline(x=0.0, linewidth=12.0 * PLOT_GRID_LINE_WIDTH, alpha=0.8, color="r")
 
 
-def main():
-    parser = CmdLineParser()
-    opt = parser.parse()
+class ProcessedData:
+    x_min: float
+    x_max: float
+    data: np.ndarray
+    nrows: int
+    ncols: int
 
-    p = read_csv(open(opt.input, "r"), opt.delimiter)
-    p.truncate_solver_names()
+    def __init__(self, x_min: float, x_max: float, data: np.ndarray):
+        self.x_min = x_min
+        self.x_max = x_max
+        self.data = data
+        self.nrows, self.ncols = data.shape
 
-    if p.data.shape == (0,):
-        errprint(f"Cannot retrieve data from `{opt.input}` input file")
-        sys.exit(-1)
 
+def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
     nrows, ncols = p.data.shape
-    # add shift
-    p.data = p.data + opt.shift
 
-    eps = 1e6
-    baseline = p.data.min(axis=1)
+    data = None
+    raw_data = np.copy(p.data)
+    x_min = opt.x_min
+    x_max = opt.x_max
 
-    # compute ratios
-    if opt.plot_as_ratios:
+    if opt.raw_data:
+        data = np.copy(raw_data)
+    else:
+        data = p.data + opt.shift
+        baseline = p.data.min(axis=1)
         for j in range(ncols):
-            p.data[:, j] = p.data[:, j] / baseline
-        opt.x_lower_limit /= baseline
-        opt.x_upper_limit /= baseline
-        opt.x_min /= baseline
-        opt.x_max /= baseline
-        eps /= baseline
+            data[:, j] = data[:, j] / baseline
 
-    # Deduce minratio and maxratio if they are not specified on the command line
-    if opt.x_min is None or (opt.x_min <= -1e21):
-        opt.x_min = max(opt.x_lower_limit, p.data.min())
+    # x_min, x_max are either cmdline provided or auto-computed from the data
+    x_min = x_min if x_min is not None else data.min()
+    x_max = x_max if x_max is not None else data.max()
 
-    if opt.x_max is None or (opt.x_max >= 1e21):
-        opt.x_max = min(opt.x_upper_limit, p.data.max())
+    if x_min >= x_max:
+        x_max = x_min + 1.0
 
-    # any time value exceeds limit, we push the sample out of bounds
+    # Any time the statistic under analysis exceeds
+    # the upper and lower limit of the x axis
+    # remap its value to x_min/x_max   +/-  1e6
     for i in range(nrows):
         for j in range(ncols):
-            if p.data[i, j] >= opt.x_upper_limit:
-                p.data[i, j] = opt.x_max + eps
-            if p.data[i, j] <= opt.x_lower_limit:
-                p.data[i, j] = opt.x_min - eps
+            if (
+                opt.x_raw_upper_limit is not None
+                and raw_data[i, j] >= opt.x_raw_upper_limit
+            ):
+                data[i, j] = x_max + 1e6
+            if (
+                opt.x_raw_lower_limit is not None
+                and raw_data[i, j] <= opt.x_raw_lower_limit
+            ):
+                data[i, j] = x_min - 1e6
 
-    if opt.x_min == opt.x_max:
-        opt.x_max = opt.x_min + 1.0
+    return ProcessedData(x_min, x_max, data)
 
-    # sort data
-    p.data.sort(axis=0)
-    # plot first
+
+def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[str]):
+
+    # Helper functions
+    def truncate_solver_name(name: str):
+        if len(name) >= PLOT_MAX_LEGEND_NAME_LEN:
+            return name[0 : PLOT_MAX_LEGEND_NAME_LEN - 4] + " ..."
+        return name
+
+    def get_plt_ticks(lb, ub, cnt):
+        if ub == lb:
+            ub = lb + 1.0
+        return np.array(
+            [
+                round(x, 3)
+                for x in list_keep_uniqs(
+                    [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
+                )
+            ]
+        )
+
+    nrows, ncols = p.data.shape
+
+    # Compute ideal data to plot
+    x = np.copy(p.data).sort(axis=0)
+    # Evenly spaced values within the Y axis.
     y = np.arange(nrows, dtype=np.float64) / nrows
+
+    # Truncate solver names if they are too long
+    solver_names = solver_names.copy()
+    for i in range(0, len(solver_names)):
+        solver_names[i] = truncate_solver_name(solver_names[i])
+
     for j in range(ncols):
-        linestyle = DASHES[(opt.startidx + j) % len(DASHES)]
-        marker = MARKERS[(opt.startidx + j) % len(MARKERS)]
-        color = COLORS[(opt.startidx + j) % len(COLORS)]
+        off = opt.style_offset
+        linestyle = DASHES[(off + j) % len(DASHES)]
+        marker = MARKERS[(off + j) % len(MARKERS)]
+        color = COLORS[(off + j) % len(COLORS)]
 
         options = dict(
-            label=p.solver_names[j],
+            label=solver_names[j],
             drawstyle="steps-post",
             linewidth=PLOT_LINE_WIDTH,
             linestyle=linestyle,
@@ -335,33 +340,66 @@ def main():
             markersize=PLOT_MARKER_SIZE,
             alpha=0.75,
         )
+
+        # Setup colors options
         if opt.bw:
             options["markerfacecolor"] = "w"
             options["markeredgecolor"] = "k"
             options["color"] = "k"
         else:
             options["color"] = color
-        if opt.logplot:
-            plt.semilogx(p.data[:, j], y, **options)
-        else:
-            plt.plot(p.data[:, j], y, **options)
 
-    xticks = get_plt_ticks(opt.x_min, opt.x_max, 8)
+        # Plot
+        if opt.logplot:
+            plt.semilogx(x[:, j], y, **options)
+        else:
+            plt.plot(x[:, j], y, **options)
+
+    xticks = get_plt_ticks(p.x_min, p.x_max, 8)
     yticks = get_plt_ticks(0.0, 1.0, 8)
-    plt.axis([opt.x_min, opt.x_max, 0, 1])
+    plt.axis([p.x_min, p.x_max, 0, 1])
     plt.xticks(xticks)
     plt.yticks(yticks)
 
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
     if opt.draw_separated_regions is not None and opt.draw_separated_regions:
-        draw_regions(p.data, ncols)
+        draw_regions(x, ncols)
 
+    # Customize the plot with additional details
     if opt.plotlegend is not None and opt.plotlegend is True:
         plt.legend(loc="best", fontsize=6, prop={"size": 6})
     if opt.plottitle is not None:
         plt.title(opt.plottitle)
-    plt.xlabel(opt.xlabel)
+    if opt.xlabel is not None:
+        plt.xlabel(opt.xlabel)
+
+
+def init():
+    matplotlib.use("PDF")
+    matplotlib.rcParams["figure.dpi"] = 300
+
+
+def main():
+    init()
+
+    parser = CmdLineParser()
+    opt = parser.parse()
+
+    parsed_contents = read_csv(open(opt.input, "r"), opt.delimiter)
+
+    if parsed_contents.data.shape == (0,):
+        errprint(f"Cannot retrieve data from `{opt.input}` input file")
+        sys.exit(-1)
+
+    p = process_data(parsed_contents, opt)
+    if p.data is None:
+        errprint(f"Failed to parse data contents from `{opt.input}` input file")
+        sys.exit(-1)
+
+    generate_plot(p, opt, parsed_contents.solver_names)
+
+    # Save the plot
     plt.savefig(opt.output)
 
 

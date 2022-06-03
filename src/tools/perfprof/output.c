@@ -29,19 +29,19 @@ static inline double get_raw_stat_val_from_perf(const PerfProfRun *run,
 
 static inline double get_ratioed_stat_val_from_perf(const PerfProfRun *run,
                                                     PerfProfStatKind kind,
-                                                    double max_ratio,
+                                                    double baseline,
                                                     double shift) {
     double v = get_raw_stat_val_from_perf(run, kind);
-    return (v + shift) / max_ratio;
+    return (v + shift) / baseline;
 }
 
 static inline double
 get_properly_encoded_stat_val_from_perf(const PerfProfRun *run,
-                                        bool is_time_profile, double max_ratio,
+                                        bool is_time_profile, double baseline,
                                         double shift) {
     if (is_time_profile) {
         return get_ratioed_stat_val_from_perf(run, PERFPROF_STAT_KIND_TIME,
-                                              max_ratio, shift);
+                                              baseline, shift);
     } else {
         return get_raw_stat_val_from_perf(run, PERFPROF_STAT_KIND_PRIMAL_BOUND);
     }
@@ -105,16 +105,12 @@ static void generate_performance_profile_using_python_script(
     args[argidx++] = x_min_str;
     args[argidx++] = "--x-max";
     args[argidx++] = x_max_str;
-    args[argidx++] = "--x-lower-limit";
-    args[argidx++] = x_lower_limit_str;
     args[argidx++] = "--x-upper-limit";
     args[argidx++] = x_upper_limit_str;
 #endif
     args[argidx++] = "--plot-title";
     args[argidx++] = title;
-    args[argidx++] = "--startidx"; // Start index to associated with the colors
-    args[argidx++] = "0";
-    args[argidx++] = "--x-label"; // Start index to associated with the colors
+    args[argidx++] = "--x-label";
     args[argidx++] = xlabel_str;
     args[argidx++] = "-i";
     args[argidx++] = csv_input_file;
@@ -181,9 +177,11 @@ void generate_perfs_imgs(const AppCtx *ctx, const PerfProfBatch *batch) {
             double min_val = INFINITY;
             double max_val = -INFINITY;
             assert(value->num_runs == num_solvers);
-            for (int32_t run_idx = 0; run_idx < value->num_runs; run_idx++) {
-                const PerfProfRun *run = &value->runs[run_idx];
-                double val = get_raw_stat_val_from_perf(run, is_time_profile);
+            for (int32_t solver_idx = 0; solver_idx < num_solvers;
+                 solver_idx++) {
+                const PerfProfRun *run = &value->runs[solver_idx];
+                double val =
+                    get_raw_stat_val_from_perf(run, is_time_profile) + shift;
                 min_val = MIN(min_val, val);
                 max_val = MAX(max_val, val);
             }
@@ -193,10 +191,10 @@ void generate_perfs_imgs(const AppCtx *ctx, const PerfProfBatch *batch) {
             // the solvers considered when outputting the CSV file.
             // Therefore fix a solver name, and find its perf in the list,
             // to output the perf data in the expected order
-            for (int32_t curr_solver_idx = 0; curr_solver_idx < num_solvers;
-                 curr_solver_idx++) {
+            for (int32_t solver_idx = 0; solver_idx < num_solvers;
+                 solver_idx++) {
                 // Fix the solver name as in order
-                char *solver_name = batch->solvers[curr_solver_idx].name;
+                char *solver_name = batch->solvers[solver_idx].name;
 
                 for (int32_t run_idx = 0; run_idx < value->num_runs;
                      run_idx++) {
