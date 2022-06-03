@@ -42,7 +42,7 @@ extern "C" {
 
 #define SHA256_CSTR_LEN 65
 
-#ifndef NDEBUG
+#ifdef NDEBUG
 // Release build
 #define DEFAULT_TIME_LIMIT ((double)1200.0) // 20 minutes
 #else

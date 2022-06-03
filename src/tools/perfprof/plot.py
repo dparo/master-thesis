@@ -24,16 +24,15 @@ def errprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
 
-def list_keep_uniqs(x):
-    return list(dict.fromkeys(x))
-
-
 # Constants
 PLOT_LINE_WIDTH = 1.2
 PLOT_MARKER_SIZE = 7
 PLOT_MAX_LEGEND_NAME_LEN = 64
 PLOT_GRID_LINE_WIDTH = 0.1
 PLOT_GRID_ALPHA = 0.5
+LEGEND_FONT_SIZE = 6
+NUM_TICKS_IN_PLOT = 8
+TICKS_NUM_DECIMALS = 3
 
 DASHES = ["solid", "dotted", "dashed", "dashdot"]
 MARKERS = ["s", "^", "o", "d", "v", "<", ">", "*", "2", "x", "+"]
@@ -308,21 +307,17 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
     def get_plt_ticks(lb, ub, cnt):
         if ub == lb:
             ub = lb + 1.0
-        return np.array(
-            [
-                round(x, 3)
-                for x in list_keep_uniqs(
-                    [lb, ub] + list(np.arange(lb, ub, step=(ub - lb) / cnt))
-                )
-            ]
-        )
+        return np.linspace(lb, ub, cnt).round(TICKS_NUM_DECIMALS)
 
     nrows, ncols = p.data.shape
 
     # Compute ideal data to plot
-    x = np.copy(p.data).sort(axis=0)
+    x = np.sort(p.data, axis=0)
     # Evenly spaced values within the Y axis.
-    y = np.arange(nrows, dtype=np.float64) / nrows
+    y_min = 0.0
+    y_max = 1.0
+    y = np.linspace(y_min, y_max, nrows)
+    assert y.shape[0] == nrows
 
     # Truncate solver names if they are too long
     solver_names = solver_names.copy()
@@ -363,11 +358,9 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
             plt.plot(x[:, j], y, **options)
 
     # Add ticks and grid to the plot
-    xticks = get_plt_ticks(p.x_min, p.x_max, 8)
-    yticks = get_plt_ticks(0.0, 1.0, 8)
-    plt.axis([p.x_min, p.x_max, 0, 1])
-    plt.xticks(xticks)
-    plt.yticks(yticks)
+    plt.axis([p.x_min, p.x_max, y_min, y_max])
+    plt.xticks(get_plt_ticks(p.x_min, p.x_max, NUM_TICKS_IN_PLOT))
+    plt.yticks(get_plt_ticks(y_min, y_max, NUM_TICKS_IN_PLOT))
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
     if opt.draw_separated_regions is not None and opt.draw_separated_regions:
@@ -375,7 +368,7 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
 
     # Customize the plot with additional effects/information
     if opt.plotlegend is not None and opt.plotlegend is True:
-        plt.legend(loc="best", fontsize=6, prop={"size": 6})
+        plt.legend(loc="best", fontsize=LEGEND_FONT_SIZE, prop={"size": 6})
     if opt.plottitle is not None:
         plt.title(opt.plottitle)
     if opt.xlabel is not None:
