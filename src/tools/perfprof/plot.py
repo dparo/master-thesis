@@ -10,10 +10,10 @@
 
 # !/usr/bin/env python3
 
+import argparse
 import sys
 from typing import List
 
-import argparse
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.transforms as mtransforms
@@ -177,23 +177,28 @@ def read_csv(fp, delimiter):
 
     The format is as follows:
 
-        ncols          algo1           algo2 ...
-        nome_istanza   tempo(algo1)    tempo(algo2) ...
+        ncols          |  solver1      |  solver2       |  ...
+        ======================================================
+        instance_name1    time(algo1)     time(algo2)      ...
+        instance_name2    time(algo1)     time(algo2)      ...
+        instance_name3    time(algo1)     time(algo2)      ...
+        ...               ...             ...              ...
     """
     firstline = fp.readline().strip().split(delimiter)
-    ncols = len(firstline) - 1
     solver_names = firstline[1:]
+    num_solvers = len(solver_names)
     instance_names = []
-    rows = []
-    for row in fp:
-        row = row.strip().split(delimiter)
+    data = []
+    for line in fp:
+        row = line.strip().split(delimiter)
         instance_names.append(row[0])
-        rdata = np.empty(ncols)
-        for j in range(ncols):
-            rdata[j] = float(row[j + 1])
-        rows.append(rdata)
+        row_data = np.empty(num_solvers)
+        assert len(row[1:]) == num_solvers
+        for j in range(num_solvers):
+            row_data[j] = float(row[j + 1])
+        data.append(row_data)
 
-    return ParsedCsvContents(instance_names, solver_names, np.array(rows))
+    return ParsedCsvContents(instance_names, solver_names, np.array(data))
 
 
 def draw_regions(data, ncols):
@@ -259,9 +264,9 @@ def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
     x_max = opt.x_max
 
     if opt.raw_data:
-        data = np.copy(raw_data)
+        data = raw_data
     else:
-        data = p.data + opt.shift
+        data = raw_data + opt.shift
         baseline = p.data.min(axis=1)
         for j in range(ncols):
             data[:, j] = data[:, j] / baseline
@@ -324,6 +329,8 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
     for i in range(0, len(solver_names)):
         solver_names[i] = truncate_solver_name(solver_names[i])
 
+    assert ncols == len(solver_names)
+
     for j in range(ncols):
         off = opt.style_offset
         linestyle = DASHES[(off + j) % len(DASHES)]
@@ -349,24 +356,24 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
         else:
             options["color"] = color
 
-        # Plot
+        # Plot solver
         if opt.logplot:
             plt.semilogx(x[:, j], y, **options)
         else:
             plt.plot(x[:, j], y, **options)
 
+    # Add ticks and grid to the plot
     xticks = get_plt_ticks(p.x_min, p.x_max, 8)
     yticks = get_plt_ticks(0.0, 1.0, 8)
     plt.axis([p.x_min, p.x_max, 0, 1])
     plt.xticks(xticks)
     plt.yticks(yticks)
-
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
     if opt.draw_separated_regions is not None and opt.draw_separated_regions:
         draw_regions(x, ncols)
 
-    # Customize the plot with additional details
+    # Customize the plot with additional effects/information
     if opt.plotlegend is not None and opt.plotlegend is True:
         plt.legend(loc="best", fontsize=6, prop={"size": 6})
     if opt.plottitle is not None:
