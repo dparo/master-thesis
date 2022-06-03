@@ -114,6 +114,7 @@ typedef struct {
 typedef enum {
     PERFPROF_STAT_KIND_TIME,
     PERFPROF_STAT_KIND_PRIMAL_BOUND,
+    PERFPROF_STAT_KIND_DUAL_BOUND,
 
     // To employ it as an array
     PERFPROF_MAX_NUM_STATS,

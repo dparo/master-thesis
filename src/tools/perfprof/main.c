@@ -634,7 +634,7 @@ static void main_loop(AppCtx *ctx) {
 
         if (!ctx->should_terminate) {
             // Process the perf_table to generate the csv file
-            generate_perfs_imgs(ctx, &batches[i]);
+            dump_performance_profiles(ctx, &batches[i]);
         }
 
         clear_perf_table(&ctx->perf_tbl);

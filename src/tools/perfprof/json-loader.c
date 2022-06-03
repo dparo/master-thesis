@@ -49,6 +49,7 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
     cJSON *itm_took = NULL;
     cJSON *itm_solve_status_code = NULL;
     cJSON *itm_primal_bound = NULL;
+    cJSON *itm_dual_bound = NULL;
 
     itm_solve_status = cJSON_GetObjectItemCaseSensitive(root, "solveStatus");
     itm_timing_info = cJSON_GetObjectItemCaseSensitive(root, "timingInfo");
@@ -66,11 +67,13 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
     if (itm_bounds) {
         itm_primal_bound =
             cJSON_GetObjectItemCaseSensitive(itm_bounds, "primal");
+        itm_dual_bound = cJSON_GetObjectItemCaseSensitive(itm_bounds, "dual");
     }
 
     SolveStatus status = SOLVE_STATUS_NULL;
     double time = INFINITY;
     double primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
+    double dual_bound = 1e-99;
 
     if (itm_solve_status_code && cJSON_IsNumber(itm_solve_status_code)) {
         status = cJSON_GetNumberValue(itm_solve_status_code);
@@ -86,6 +89,12 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
 
     if (itm_primal_bound && cJSON_IsNumber(itm_primal_bound)) {
         primal_bound = cJSON_GetNumberValue(itm_primal_bound);
+    } else {
+        status |= SOLVE_STATUS_ERR;
+    }
+
+    if (itm_dual_bound && cJSON_IsNumber(itm_dual_bound)) {
+        dual_bound = cJSON_GetNumberValue(itm_dual_bound);
     } else {
         status |= SOLVE_STATUS_ERR;
     }
@@ -107,6 +116,7 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
     run->solution.status = status;
     run->solution.stats[PERFPROF_STAT_KIND_TIME] = time;
     run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] = primal_bound;
+    run->solution.stats[PERFPROF_STAT_KIND_DUAL_BOUND] = dual_bound;
 }
 
 void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
@@ -163,4 +173,5 @@ void parse_bapcod_solver_json_dump(PerfProfRun *run, cJSON *root) {
     run->solution.status = status;
     run->solution.stats[PERFPROF_STAT_KIND_TIME] = time;
     run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] = primal_bound;
+    run->solution.stats[PERFPROF_STAT_KIND_DUAL_BOUND] = primal_bound;
 }

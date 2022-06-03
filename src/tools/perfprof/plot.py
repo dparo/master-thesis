@@ -259,8 +259,8 @@ def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
             data[:, j] = data[:, j] / baseline
 
     # x_min, x_max are either cmdline provided or auto-computed from the data
-    x_min = x_min if x_min is not None else data.min()
-    x_max = x_max if x_max is not None else data.max()
+    x_min = max(x_min, data.min()) if x_min is not None else data.min()
+    x_max = min(x_max, data.max()) if x_max is not None else data.max()
 
     if x_min >= x_max:
         x_max = x_min + 1.0

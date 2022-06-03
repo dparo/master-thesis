@@ -28,7 +28,7 @@ extern "C" {
 
 #include "common.h"
 
-void generate_perfs_imgs(const AppCtx *ctx, const PerfProfBatch *batch);
+void dump_performance_profiles(const AppCtx *ctx, const PerfProfBatch *batch);
 
 #if __cplusplus
 }
