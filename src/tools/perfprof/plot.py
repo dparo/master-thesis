@@ -176,7 +176,7 @@ class ProcessedData:
     y_max: float
     x: np.ndarray
     y: np.ndarray
-    processed_data: np.ndarray
+    data: np.ndarray
     nrows: int
     ncols: int
 
@@ -188,7 +188,7 @@ class ProcessedData:
 
         self.nrows, self.ncols = data.shape
 
-        self.processed_data = data
+        self.data = data
 
         # Plottable X, Y arrays
         self.x = np.sort(data, axis=0)
@@ -310,6 +310,7 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
         marker = MARKERS[(off + j) % len(MARKERS)]
         color = COLORS[(off + j) % len(COLORS)]
 
+        # Setup style options for plotting this solver
         options = dict(
             label=solver_names[j],
             drawstyle="steps-post",
@@ -371,7 +372,7 @@ def main():
         sys.exit(-1)
 
     p = process_data(parsed_contents, opt)
-    if p.processed_data is None:
+    if p.data is None:
         errprint(f"Failed to parse data contents from `{opt.input}` input file")
         sys.exit(-1)
 
