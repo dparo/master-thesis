@@ -16,7 +16,6 @@ from typing import List
 
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.transforms as mtransforms
 import numpy as np
 
 
@@ -140,8 +139,8 @@ class CmdLineParser(object):
             help="Start index offset to associate with the line style/colors",
         )
         self.parser.add_argument(
-            "--draw-separated-regions",
-            dest="draw_separated_regions",
+            "--draw-reduced-cost-regions",
+            dest="draw_reduced_cost_regions",
             action="store_true",
             default=False,
             help="Draw red/green separation region",
@@ -168,6 +167,34 @@ class ParsedCsvContents:
         self.instance_names = instance_names
         self.solver_names = solver_names
         self.data = data
+
+
+class ProcessedData:
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+    x: np.ndarray
+    y: np.ndarray
+    processed_data: np.ndarray
+    nrows: int
+    ncols: int
+
+    def __init__(self, x_min: float, x_max: float, data: np.ndarray):
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = 0.0
+        self.y_max = 1.0
+
+        self.nrows, self.ncols = data.shape
+
+        self.processed_data = data
+
+        # Plottable X, Y arrays
+        self.x = np.sort(data, axis=0)
+        self.y = np.linspace(self.y_min, self.y_max, self.nrows)
+
+        assert self.y.shape[0] == self.nrows
 
 
 def read_csv(fp, delimiter):
@@ -200,58 +227,19 @@ def read_csv(fp, delimiter):
     return ParsedCsvContents(instance_names, solver_names, np.array(data))
 
 
-def draw_regions(data, ncols):
-    x = [0.0]
-    for j in range(ncols):
-        x.extend(data[:, j])
+def draw_reduced_cost_regions(p: ProcessedData, ncols):
+    plt.axvspan(p.x_min, -1e-6, facecolor="green", alpha=0.15, zorder=-100)
+    plt.axvspan(0.0, p.x_max, facecolor="red", alpha=0.15, zorder=-100)
 
-    x = sorted(x)
-    x = np.array(x)
-
-    ax = plt.gca()
-    trans = mtransforms.blended_transform_factory(ax.transData, ax.transAxes)
-
-    zero = 0.0
-    x_gte_0 = x >= zero
-    x_lt_0 = x < zero
-
-    if np.any(x_gte_0):
-        plt.fill_between(
-            x,
-            -1.0,
-            2.0,
-            where=x_gte_0,
-            facecolor="red",
-            alpha=0.2,
-            transform=trans,
-        )
-    if np.any(x_lt_0):
-        plt.fill_between(
-            x,
-            -1.0,
-            2.0,
-            where=x_lt_0,
-            facecolor="green",
-            alpha=0.2,
-            transform=trans,
-        )
-
-    if False:
-        plt.axvline(x=0.0, linewidth=12.0 * PLOT_GRID_LINE_WIDTH, alpha=0.8, color="r")
-
-
-class ProcessedData:
-    x_min: float
-    x_max: float
-    data: np.ndarray
-    nrows: int
-    ncols: int
-
-    def __init__(self, x_min: float, x_max: float, data: np.ndarray):
-        self.x_min = x_min
-        self.x_max = x_max
-        self.data = data
-        self.nrows, self.ncols = data.shape
+    plt.vlines(
+        x=0.0,
+        ymin=0.05 * (p.y_max - p.y_min),
+        ymax=0.95 * (p.y_max - p.y_min),
+        colors="black",
+        lw=PLOT_LINE_WIDTH * 1.0,
+        alpha=0.5,
+        label="Reduced cost threshold",
+    )
 
 
 def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
@@ -309,24 +297,14 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
             ub = lb + 1.0
         return np.linspace(lb, ub, cnt).round(TICKS_NUM_DECIMALS)
 
-    nrows, ncols = p.data.shape
-
-    # Compute ideal data to plot
-    x = np.sort(p.data, axis=0)
-    # Evenly spaced values within the Y axis.
-    y_min = 0.0
-    y_max = 1.0
-    y = np.linspace(y_min, y_max, nrows)
-    assert y.shape[0] == nrows
-
     # Truncate solver names if they are too long
     solver_names = solver_names.copy()
     for i in range(0, len(solver_names)):
         solver_names[i] = truncate_solver_name(solver_names[i])
 
-    assert ncols == len(solver_names)
+    assert p.ncols == len(solver_names)
 
-    for j in range(ncols):
+    for j in range(p.ncols):
         off = opt.style_offset
         linestyle = DASHES[(off + j) % len(DASHES)]
         marker = MARKERS[(off + j) % len(MARKERS)]
@@ -353,18 +331,18 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
 
         # Plot solver
         if opt.logplot:
-            plt.semilogx(x[:, j], y, **options)
+            plt.semilogx(p.x[:, j], p.y, **options)
         else:
-            plt.plot(x[:, j], y, **options)
+            plt.plot(p.x[:, j], p.y, **options)
 
     # Add ticks and grid to the plot
-    plt.axis([p.x_min, p.x_max, y_min, y_max])
+    plt.axis([p.x_min, p.x_max, p.y_min, p.y_max])
     plt.xticks(get_plt_ticks(p.x_min, p.x_max, NUM_TICKS_IN_PLOT))
-    plt.yticks(get_plt_ticks(y_min, y_max, NUM_TICKS_IN_PLOT))
+    plt.yticks(get_plt_ticks(p.y_min, p.y_max, NUM_TICKS_IN_PLOT))
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
-    if opt.draw_separated_regions is not None and opt.draw_separated_regions:
-        draw_regions(x, ncols)
+    if opt.draw_reduced_cost_regions is not None and opt.draw_reduced_cost_regions:
+        draw_reduced_cost_regions(p, p.ncols)
 
     # Customize the plot with additional effects/information
     if opt.plotlegend is not None and opt.plotlegend is True:
@@ -393,7 +371,7 @@ def main():
         sys.exit(-1)
 
     p = process_data(parsed_contents, opt)
-    if p.data is None:
+    if p.processed_data is None:
         errprint(f"Failed to parse data contents from `{opt.input}` input file")
         sys.exit(-1)
 

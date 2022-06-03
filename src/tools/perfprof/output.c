@@ -98,16 +98,17 @@ static void generate_performance_profile_using_python_script(
     // NOTE: This parameters make little sense now that we are encoding our
     // own custom baked data
     if (!is_time_profile) {
-        args[argidx++] = "--draw-separated-regions";
+        args[argidx++] = "--draw-reduced-cost-regions";
     }
 #if 0
     args[argidx++] = "--x-min";
     args[argidx++] = x_min_str;
     args[argidx++] = "--x-max";
     args[argidx++] = x_max_str;
-    args[argidx++] = "--x-upper-limit";
+    args[argidx++] = "--x-raw-upper-limit";
     args[argidx++] = x_upper_limit_str;
 #endif
+    args[argidx++] = "--raw-data";
     args[argidx++] = "--plot-title";
     args[argidx++] = title;
     args[argidx++] = "--x-label";
