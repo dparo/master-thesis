@@ -525,15 +525,11 @@ static void init(AppCtx *ctx) {
         sha256_finalize_to_cstr(&shactx, &ctx->bapcod_virtual_exe_hash);
     }
 }
+enum {
+    MAX_NUM_BATCHES = 2048,
+};
 
-static void main_loop(AppCtx *ctx) {
-    enum {
-        MAX_NUM_BATCHES = 2048,
-        STRING_BUF_SIZE = 1024,
-    };
-
-    PerfProfBatch *batches = calloc(MAX_NUM_BATCHES, sizeof(*batches));
-
+int32_t define_batches(PerfProfBatch *batches) {
     int32_t num_batches = 0;
 
     const char DIRPATH_FMT_TEMPLATE[] =
@@ -560,8 +556,8 @@ static void main_loop(AppCtx *ctx) {
                     continue;
                 }
 
-                char batch_name[STRING_BUF_SIZE];
-                char dirpath[STRING_BUF_SIZE];
+                char batch_name[256];
+                char dirpath[2048];
 
                 snprintf_safe(batch_name, ARRAY_LEN(batch_name),
                               "%s-scaled-%d.0-last-10", family, scale_factor);
@@ -592,6 +588,12 @@ static void main_loop(AppCtx *ctx) {
         }
     }
 
+    return num_batches;
+}
+
+static void verify_batches_consistency(const PerfProfBatch *batches,
+                                       int32_t num_batches) {
+
     //
     // Complain and exit if we exceed the maximum number of allowed batches
     //
@@ -600,7 +602,7 @@ static void main_loop(AppCtx *ctx) {
                 "INTERNAL PERFPROF ERROR: Exceeded MAX_NUM_BATCHES "
                 "= %d\n",
                 MAX_NUM_BATCHES);
-        exit(1);
+        abort();
     }
 
     //
@@ -622,6 +624,14 @@ static void main_loop(AppCtx *ctx) {
             }
         }
     }
+}
+
+static void main_loop(AppCtx *ctx) {
+    PerfProfBatch *batches = calloc(MAX_NUM_BATCHES, sizeof(*batches));
+
+    // Define batches and verify consistency
+    int32_t num_batches = define_batches(batches);
+    verify_batches_consistency(batches, num_batches);
 
     for (int32_t i = 0; !ctx->should_terminate && i < num_batches; i++) {
         batches[i].timelimit = ceil(batches[i].timelimit);
