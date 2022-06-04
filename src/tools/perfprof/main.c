@@ -476,22 +476,6 @@ static void do_batch(AppCtx *ctx, PerfProfBatch *current_batch) {
         }
     }
 
-    // Detect duplicate names in solver names
-    for (int32_t i = 0; current_batch->solvers[i].name; i++) {
-        for (int32_t j = 0; current_batch->solvers[j].name; j++) {
-            if (i != j) {
-                if (0 == strcmp(current_batch->solvers[i].name,
-                                current_batch->solvers[j].name)) {
-                    log_fatal("\n\nInternal perfprof error: detected duplicate "
-                              "name `%s` in group %s\n",
-                              current_batch->solvers[i].name,
-                              current_batch->name);
-                    abort();
-                }
-            }
-        }
-    }
-
     if (current_batch->nseeds > 0) {
         if (!ctx->should_terminate) {
             for (int32_t dir_idx = 0;
@@ -621,6 +605,24 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
                     "names (`%s`)\n",
                     batches[i].name);
                 abort();
+            }
+        }
+    }
+
+    // Detect presence of duplicate solver names in each batch
+    for (int32_t batch_idx = 0; batch_idx < num_batches; batch_idx++) {
+        const PerfProfBatch *b = &batches[batch_idx];
+        for (int32_t i = 0; b->solvers[i].name; i++) {
+            for (int32_t j = 0; b->solvers[j].name; j++) {
+                if (i != j) {
+                    if (0 == strcmp(b->solvers[i].name, b->solvers[j].name)) {
+                        log_fatal(
+                            "\n\nInternal perfprof error: detected duplicate "
+                            "name `%s` in group %s\n",
+                            b->solvers[i].name, b->name);
+                        abort();
+                    }
+                }
             }
         }
     }
