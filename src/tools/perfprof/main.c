@@ -519,7 +519,7 @@ int32_t define_batches(PerfProfBatch *batches) {
     const char DIRPATH_FMT_TEMPLATE[] =
         "data/BAP_Instances/last-10/CVRP-scaled-%d.0/%s";
     const char *FAMILIES[] = {"A", "B", "F", "E", "P"};
-    const int32_t SCALES[] = {1, 2, 4, 5, 8, 10, 20};
+    const int32_t SFACTORS[] = {1, 2, 4, 5, 8, 10, 20};
 
     //
     // Compare the EFL, AFL dual bounds on families E, F and scales {1, 2, 4}
@@ -533,9 +533,9 @@ int32_t define_batches(PerfProfBatch *batches) {
                 continue;
             }
 
-            for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SCALES); sidx++) {
+            for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
 
-                const int32_t scale_factor = SCALES[sidx];
+                const int32_t scale_factor = SFACTORS[sidx];
                 if (scale_factor > 4) {
                     continue;
                 }
@@ -572,6 +572,52 @@ int32_t define_batches(PerfProfBatch *batches) {
         }
     }
 
+    //
+    // Compare the BAC MIP Pricer (AFL) against BapCod with DEFAULT_TIME_LIMIT
+    //
+    {
+        for (int32_t fidx = 0; fidx < ARRAY_LEN_i32(FAMILIES); fidx++) {
+
+            const char *family = FAMILIES[fidx];
+            if (0 != strcmp(family, "E") && 0 != strcmp(family, "F")) {
+                continue;
+            }
+
+            for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
+
+                const int32_t scale_factor = SFACTORS[sidx];
+                if (scale_factor > 10) {
+                    continue;
+                }
+
+                char batch_name[256];
+                char dirpath[2048];
+
+                snprintf_safe(batch_name, ARRAY_LEN(batch_name),
+                              "%s-scaled-%d.0-last-10", family, scale_factor);
+
+                snprintf_safe(dirpath, ARRAY_LEN(dirpath), DIRPATH_FMT_TEMPLATE,
+                              scale_factor, family);
+
+                if (num_batches < MAX_NUM_BATCHES) {
+                    batches[num_batches].max_num_procs = 1;
+                    batches[num_batches].name = strdup(batch_name);
+                    batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
+                    batches[num_batches].nseeds = 1;
+                    batches[num_batches].dirs[0] = strdup(dirpath);
+                    batches[num_batches].dirs[1] = NULL;
+                    batches[num_batches].filter = DEFAULT_FILTER;
+
+                    int32_t num_solvers = 0;
+                    batches[num_batches].solvers[num_solvers++] =
+                        (PerfProfSolver){"BAC MIP Pricer (AFL)",
+                                         {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
+                    batches[num_batches].solvers[num_solvers++] = BAPCOD_SOLVER;
+                }
+            }
+        }
+    }
+
     return num_batches;
 }
 
@@ -579,7 +625,8 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
                                        int32_t num_batches) {
 
     //
-    // Complain and exit if we exceed the maximum number of allowed batches
+    // Complain and exit if we exceed the maximum number of allowed
+    // batches
     //
     if (num_batches >= MAX_NUM_BATCHES) {
         fprintf(stderr,
@@ -590,8 +637,8 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
     }
 
     //
-    // Abort if there exists duplicate batches identified univocally by their
-    // name
+    // Abort if there exists duplicate batches identified univocally by
+    // their name
     //
     for (int32_t i = 0; i < num_batches; i++) {
         for (int32_t j = 0; j < num_batches; j++) {
@@ -600,10 +647,10 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
             }
 
             if (0 == strcmp(batches[i].name, batches[j].name)) {
-                log_fatal(
-                    "\n\nInternal perfprof error: detected duplicate batch "
-                    "names (`%s`)\n",
-                    batches[i].name);
+                log_fatal("\n\nInternal perfprof error: detected "
+                          "duplicate batch "
+                          "names (`%s`)\n",
+                          batches[i].name);
                 abort();
             }
         }
@@ -616,10 +663,10 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
             for (int32_t j = 0; b->solvers[j].name; j++) {
                 if (i != j) {
                     if (0 == strcmp(b->solvers[i].name, b->solvers[j].name)) {
-                        log_fatal(
-                            "\n\nInternal perfprof error: detected duplicate "
-                            "name `%s` in group %s\n",
-                            b->solvers[i].name, b->name);
+                        log_fatal("\n\nInternal perfprof error: "
+                                  "detected duplicate "
+                                  "name `%s` in group %s\n",
+                                  b->solvers[i].name, b->name);
                         abort();
                     }
                 }
@@ -635,43 +682,38 @@ static void main_loop(AppCtx *ctx) {
     int32_t num_batches = define_batches(batches);
     verify_batches_consistency(batches, num_batches);
 
-    for (int32_t i = 0; !ctx->should_terminate && i < num_batches; i++) {
-        batches[i].timelimit = ceil(batches[i].timelimit);
+    for (int32_t bidx = 0; !ctx->should_terminate && bidx < num_batches;
+         bidx++) {
+        batches[bidx].timelimit = ceil(batches[bidx].timelimit);
 
         printf("\n\n");
-        printf("###########################################################"
-               "\n");
-        printf("###########################################################"
-               "\n");
-        printf("###########################################################"
-               "\n");
-        printf("     DOING BATCH: %s\n", batches[i].name);
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("     DOING BATCH: %s\n", batches[bidx].name);
         printf("            Batch max num concurrent procs: %d\n",
-               batches[i].max_num_procs);
-        printf("            Batch timelimit: %g\n", batches[i].timelimit);
-        printf("            Batch num seeds: %d\n", batches[i].nseeds);
+               batches[bidx].max_num_procs);
+        printf("            Batch timelimit: %g\n", batches[bidx].timelimit);
+        printf("            Batch num seeds: %d\n", batches[bidx].nseeds);
         printf("            Batch dirs: [");
         for (int32_t dir_idx = 0;
-             dir_idx < BATCH_MAX_NUM_DIRS && batches[i].dirs[dir_idx];
+             dir_idx < BATCH_MAX_NUM_DIRS && batches[bidx].dirs[dir_idx];
              dir_idx++) {
-            printf("%s, ", batches[i].dirs[dir_idx]);
+            printf("%s, ", batches[bidx].dirs[dir_idx]);
         }
         printf("]\n");
-        printf("###########################################################"
-               "\n");
-        printf("###########################################################"
-               "\n");
-        printf("###########################################################"
-               "\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
+        printf("###########################################################\n");
         printf("\n\n");
 
         clear_perf_table(&ctx->perf_tbl);
-        do_batch(ctx, &batches[i]);
+        do_batch(ctx, &batches[bidx]);
         proc_pool_join(&ctx->pool);
 
         if (!ctx->should_terminate) {
             // Process the perf_table to generate the csv file
-            dump_performance_profiles(ctx, &batches[i]);
+            dump_performance_profiles(ctx, &batches[bidx]);
         }
 
         clear_perf_table(&ctx->perf_tbl);
@@ -689,6 +731,8 @@ static void main_loop(AppCtx *ctx) {
             free(batches[i].dirs[dir_idx]);
         }
     }
+
+    // Free the batches
     free(batches);
 }
 
