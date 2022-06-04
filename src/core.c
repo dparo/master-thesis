@@ -162,8 +162,8 @@ void cptp_print_list_of_solvers_and_params(void) {
 
     printf("\n");
     printf("Available Solvers and Settable Params:\n");
-    for (int32_t solver_idx = 0;
-         solver_idx < (int32_t)ARRAY_LEN(SOLVERS_REGISTRY); solver_idx++) {
+    for (int32_t solver_idx = 0; solver_idx < ARRAY_LEN_i32(SOLVERS_REGISTRY);
+         solver_idx++) {
         const SolverDescriptor *d = SOLVERS_REGISTRY[solver_idx].descriptor;
         if (d->name != NULL && *d->name != '\0') {
             printf("  - %s:\n", d->name);
@@ -194,7 +194,7 @@ typedef struct SolverLookup SolverLookup;
 
 static const SolverLookup *lookup_solver(const char *solver_name) {
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(SOLVERS_REGISTRY); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(SOLVERS_REGISTRY); i++) {
         if (0 == strcmp(solver_name, SOLVERS_REGISTRY[i].descriptor->name)) {
             return &SOLVERS_REGISTRY[i];
         }

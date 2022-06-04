@@ -149,18 +149,16 @@ typedef struct EnumToStrMapping {
 
 #define ENUM_TO_STR(ENUM_TYPE, x)                                              \
     (__enum_to_str(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                      \
-                   (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
-                   (x)))
+                   ARRAY_LEN_i32(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE), (x)))
 
 #define STR_TO_ENUM(ENUM_TYPE, x)                                              \
     (__str_to_enum(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                      \
-                   (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE),  \
-                   (x)))
+                   ARRAY_LEN_i32(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE), (x)))
 
 #define STR_TO_ENUM_DEFAULT(ENUM_TYPE, x, default_val)                         \
     ((ENUM_TYPE)(__str_to_enum_default(                                        \
         ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE,                                 \
-        (int32_t)ARRAY_LEN(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE), (x),        \
+        ARRAY_LEN_i32(ENUM_TO_STR_MAPPING_TABLE_##ENUM_TYPE), (x),             \
         (default_val))))
 
 const char *__enum_to_str(const EnumToStrMapping *table, int32_t table_len,

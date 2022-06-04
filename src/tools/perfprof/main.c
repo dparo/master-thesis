@@ -122,7 +122,7 @@ void store_perfprof_run(PerfTbl *tbl, PerfProfInputUniqueId *uid,
         }
     }
 
-    if (i == v->num_runs && (v->num_runs < (int32_t)ARRAY_LEN(v->runs))) {
+    if (i == v->num_runs && (v->num_runs < ARRAY_LEN_i32(v->runs))) {
         v->num_runs++;
     } else {
         assert(0);
@@ -416,7 +416,7 @@ int file_walk_cb(const char *fpath, const struct stat *sb, int typeflag,
 
                     const uint8_t num_seeds = (uint8_t)(MIN(
                         UINT8_MAX, MIN(ctx->current_batch->nseeds,
-                                       (int32_t)ARRAY_LEN(RANDOM_SEEDS))));
+                                       ARRAY_LEN_i32(RANDOM_SEEDS))));
 
                     for (uint8_t seedidx = 0;
                          seedidx < num_seeds && !ctx->should_terminate;
@@ -528,60 +528,85 @@ static void init(AppCtx *ctx) {
 
 static void main_loop(AppCtx *ctx) {
     enum {
-        MAX_NUM_BATCHES = 1024,
+        MAX_NUM_BATCHES = 2048,
         STRING_BUF_SIZE = 1024,
     };
 
     PerfProfBatch *batches = calloc(MAX_NUM_BATCHES, sizeof(*batches));
 
     int32_t num_batches = 0;
-    const char *FAMILIES[] = {"F", "E"};
-    const char *SCALE_FACTORS[] = {
-        "1.0", "2.0", "4.0",
-        //"5.0", "8.0", "10.0", "20.0"
-    };
 
-    for (int32_t family_idx = 0; family_idx < (int32_t)ARRAY_LEN(FAMILIES);
-         family_idx++) {
-        for (int32_t scale_factor_idx = 0;
-             scale_factor_idx < (int32_t)ARRAY_LEN(SCALE_FACTORS);
-             scale_factor_idx++) {
+    const char DIRPATH_FMT_TEMPLATE[] =
+        "data/BAP_Instances/last-10/CVRP-scaled-%d.0/%s";
+    const char *FAMILIES[] = {"A", "B", "F", "E", "P"};
+    const int32_t SCALES[] = {1, 2, 4, 5, 8, 10, 20};
 
-            if (num_batches == MAX_NUM_BATCHES) {
-                fprintf(
-                    stderr,
-                    "INTERNAL PERFPROF ERROR: Exceeded MAX_NUM_BATCHES = %d\n",
-                    MAX_NUM_BATCHES);
-                exit(1);
+    //
+    // Compare the EFL, AFL dual bounds on families E, F and scales {1, 2, 4}
+    // with DEFAULT_TIME_LIMIT
+    //
+    {
+        for (int32_t fidx = 0; fidx < ARRAY_LEN_i32(FAMILIES); fidx++) {
+
+            const char *family = FAMILIES[fidx];
+            if (0 != strcmp(family, "E") && 0 != strcmp(family, "F")) {
+                continue;
             }
 
-            char batch_name[STRING_BUF_SIZE];
-            char dirpath[STRING_BUF_SIZE];
+            for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SCALES); sidx++) {
 
-            snprintf_safe(batch_name, ARRAY_LEN(batch_name),
-                          "%s-scaled-%s-last-10", FAMILIES[family_idx],
-                          SCALE_FACTORS[scale_factor_idx]);
+                const int32_t scale_factor = SCALES[sidx];
+                if (scale_factor > 4) {
+                    continue;
+                }
 
-            snprintf_safe(dirpath, ARRAY_LEN(dirpath),
-                          "data/BAP_Instances/last-10/CVRP-scaled-%s/%s",
-                          SCALE_FACTORS[scale_factor_idx],
-                          FAMILIES[family_idx]);
+                char batch_name[STRING_BUF_SIZE];
+                char dirpath[STRING_BUF_SIZE];
 
-            batches[num_batches].max_num_procs = 1;
-            batches[num_batches].name = strdup(batch_name);
-            batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
-            batches[num_batches].nseeds = 1;
-            batches[num_batches].dirs[0] = strdup(dirpath);
-            batches[num_batches].dirs[1] = NULL;
-            batches[num_batches].filter = DEFAULT_FILTER;
+                snprintf_safe(batch_name, ARRAY_LEN(batch_name),
+                              "%s-scaled-%d.0-last-10", family, scale_factor);
 
-            batches[num_batches].solvers[0] =
-                (PerfProfSolver){"BAC MIP Pricer", {}};
-            batches[num_batches].solvers[1] = BAPCOD_SOLVER;
-            ++num_batches;
+                snprintf_safe(dirpath, ARRAY_LEN(dirpath), DIRPATH_FMT_TEMPLATE,
+                              scale_factor, family);
+
+                if (num_batches < MAX_NUM_BATCHES) {
+                    batches[num_batches].max_num_procs = 1;
+                    batches[num_batches].name = strdup(batch_name);
+                    batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
+                    batches[num_batches].nseeds = 1;
+                    batches[num_batches].dirs[0] = strdup(dirpath);
+                    batches[num_batches].dirs[1] = NULL;
+                    batches[num_batches].filter = DEFAULT_FILTER;
+
+                    int32_t num_solvers = 0;
+                    batches[num_batches].solvers[num_solvers++] =
+                        (PerfProfSolver){"BAC MIP Pricer (EFL)", {}};
+                    batches[num_batches].solvers[num_solvers++] =
+                        (PerfProfSolver){"BAC MIP Pricer (AFL)",
+                                         {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
+                    // batches[num_batches].solvers[num_solvers++] =
+                    // BAPCOD_SOLVER;
+                }
+                ++num_batches;
+            }
         }
     }
 
+    //
+    // Complain and exit if we exceed the maximum number of allowed batches
+    //
+    if (num_batches >= MAX_NUM_BATCHES) {
+        fprintf(stderr,
+                "INTERNAL PERFPROF ERROR: Exceeded MAX_NUM_BATCHES "
+                "= %d\n",
+                MAX_NUM_BATCHES);
+        exit(1);
+    }
+
+    //
+    // Abort if there exists duplicate batches identified univocally by their
+    // name
+    //
     for (int32_t i = 0; i < num_batches; i++) {
         for (int32_t j = 0; j < num_batches; j++) {
             if (i == j) {

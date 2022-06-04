@@ -61,7 +61,7 @@ TEST creation(void) {
 }
 
 TEST solve_test_instances(void) {
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(G_TEST_INSTANCES); i++) {
 
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         ASSERT(is_valid_instance(&instance));

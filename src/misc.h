@@ -94,6 +94,8 @@ extern "C" {
                               zero to trigger a warning */
 #endif
 
+#define ARRAY_LEN_i32(arr) ((int32_t)ARRAY_LEN(arr))
+
 /* Compute the length of a c-string literal known at compile time */
 #define STRLIT_LEN(S) (ARRAY_LEN(S) - 1)
 

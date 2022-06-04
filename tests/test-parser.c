@@ -94,7 +94,7 @@ TEST parsing_single_instance(void) {
 }
 
 TEST parsing_all_instances(void) {
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_TEST_INSTANCES); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(G_TEST_INSTANCES); i++) {
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         CHECK_CALL(validate_instance(
             &instance, G_TEST_INSTANCES[i].expected_num_customers,

@@ -87,7 +87,7 @@ TEST parsing_int32(void) {
 #undef S
 #undef F
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(i32_tests); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(i32_tests); i++) {
         const char *in = i32_tests[i].string;
         int32_t expected = i32_tests[i].expected;
         int32_t obtained;
@@ -156,7 +156,7 @@ TEST parsing_usize(void) {
 #undef S
 #undef F
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(usize_tests); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(usize_tests); i++) {
         const char *in = usize_tests[i].string;
         size_t expected = usize_tests[i].expected;
         size_t obtained;
@@ -257,7 +257,7 @@ TEST parsing_float(void) {
 #undef S
 #undef F
     const float EPSILON = 0.0001;
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(float_tests); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(float_tests); i++) {
         const char *in = float_tests[i].string;
         float expected = float_tests[i].expected;
         float obtained;
@@ -358,7 +358,7 @@ TEST parsing_double(void) {
 #undef S
 #undef F
     const float EPSILON = 0.0001;
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(double_tests); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(double_tests); i++) {
         const char *in = double_tests[i].string;
         double expected = double_tests[i].expected;
         double obtained;
@@ -418,7 +418,7 @@ TEST parsing_bool(void) {
 #undef S
 #undef F
 
-    for (int32_t i = 0; i < (int32_t)ARRAY_LEN(bool_tests); i++) {
+    for (int32_t i = 0; i < ARRAY_LEN_i32(bool_tests); i++) {
         const char *in = bool_tests[i].string;
         bool expected = bool_tests[i].expected;
         bool obtained;

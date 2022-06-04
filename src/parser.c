@@ -165,7 +165,7 @@ typedef enum EdgeWeightFormat {
 static struct {
     char *name;
     EdgeWeightType fmt;
-} const G_supported_edgew_types[] = {
+} const SUPPORTED_EDGEW[] = {
     {"EUC_2D", EDGE_WEIGHT_FORMAT_FUNCTION},
     {"EXPLICIT", EDGE_WEIGHT_FORMAT_EXPLICIT},
 };
@@ -350,11 +350,10 @@ static bool parse_vrplib_hdr(VrplibParser *p, Instance *instance) {
             instance->num_vehicles = MAX(0, num_vehicles);
         } else if ((value = parse_hdr_field(p, "EDGE_WEIGHT_TYPE"))) {
             bool is_supported = false;
-            for (int32_t i = 0; i < (int32_t)ARRAY_LEN(G_supported_edgew_types);
-                 i++) {
-                if (0 == strcmp(value, G_supported_edgew_types[i].name)) {
+            for (int32_t i = 0; i < ARRAY_LEN_i32(SUPPORTED_EDGEW); i++) {
+                if (0 == strcmp(value, SUPPORTED_EDGEW[i].name)) {
                     is_supported = true;
-                    p->edgew_format = G_supported_edgew_types[i].fmt;
+                    p->edgew_format = SUPPORTED_EDGEW[i].fmt;
                     break;
                 }
             }
@@ -739,7 +738,7 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
         }
 
         bool found_matching_section = false;
-        for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
+        for (int32_t secid = 0; secid < ARRAY_LEN_i32(sections); secid++) {
             if (parser_match_string(&parser, sections[secid].name) &&
                 parser_match_newline(&parser)) {
                 if (sections[secid].found) {
@@ -779,7 +778,7 @@ bool parse_vrp_file(Instance *instance, FILE *filehandle,
             goto terminate;
         }
 
-        for (int32_t secid = 0; secid < (int32_t)ARRAY_LEN(sections); secid++) {
+        for (int32_t secid = 0; secid < ARRAY_LEN_i32(sections); secid++) {
             if (sections[secid].required && !sections[secid].found) {
                 parse_error(&parser, "Required section `%s` was not found",
                             sections[secid].name);

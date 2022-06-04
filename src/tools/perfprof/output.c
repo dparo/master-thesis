@@ -203,7 +203,7 @@ void dump_performance_profiles(const AppCtx *ctx, const PerfProfBatch *batch) {
                   PERFPROF_DUMP_ROOTDIR "/Plots/%s", batch->name);
     os_mkdir(dump_dir, true);
 
-    for (int32_t stat_idx = 0; stat_idx < (int32_t)ARRAY_LEN(PLOTTING_INFO);
+    for (int32_t stat_idx = 0; stat_idx < ARRAY_LEN_i32(PLOTTING_INFO);
          stat_idx++) {
         const int32_t processing_kind = PLOTTING_INFO[stat_idx].kind;
         if (processing_kind == VALUE_PROCESSING_KIND_NONE) {
