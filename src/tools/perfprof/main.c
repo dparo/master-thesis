@@ -57,7 +57,7 @@ static const PerfProfSolver BAPCOD_SOLVER =
     ((PerfProfSolver){BAPCOD_SOLVER_NAME, {0}});
 
 // NOTE(dparo): Global variable.
-//    Unfortunately this global variable is necesary since some Unix APIs
+//    Unfortunately this global variable is necessary since some Unix APIs
 //    that we rely on (sighandler, nftw) do not allow to pass user handles
 //    to the associated callbacks
 static AppCtx *G_app_ctx_ptr = NULL;
@@ -189,7 +189,7 @@ static void update_perf_tbl_with_bapcod_json_perf_data(
     store_perfprof_run(&ctx->perf_tbl, &handle->input.uid, &run);
 }
 
-void on_proc_termination(Process *p, int exit_status, void *user_handle) {
+void on_proc_termination(const Process *p, int exit_status, void *user_handle) {
     AppCtx *ctx = G_app_ctx_ptr;
 
     if (!user_handle) {
@@ -335,7 +335,7 @@ static void handle_cptp_solver_run(AppCtx *ctx, PerfProfSolver *solver,
     //
     if (os_fexists(handle->json_output_path)) {
         printf("Found cache for hash %s. CMD:", handle->run_hash.cstr);
-        for (int32_t i = 0; args[i] && i < argidx; i++) {
+        for (int32_t i = 0; i < argidx && args[i]; i++) {
             printf(" %s", args[i]);
         }
         printf("\n");

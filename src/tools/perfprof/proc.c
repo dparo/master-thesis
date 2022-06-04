@@ -56,17 +56,26 @@ pid_t proc_spawn(char *const args[]) {
     pid_t pid = 0;
     if ((pid = fork()) == 0) {
 
-        if (!SHARE_STDIN)
-            close(STDIN_FILENO);
-        if (!SHARE_STDOUT)
-            close(STDOUT_FILENO);
-        if (!SHARE_STDERR)
-            close(STDERR_FILENO);
+#if !SHARE_STDIN
+        close(STDIN_FILENO);
+#endif
+#if !SHARE_STDOUT
+        close(STDOUT_FILENO);
+#endif
+#if !SHARE_STDERR
+        close(STDERR_FILENO);
+#endif
 
+        //
+        // Close opened filedescriptors from parent
+        //
         for (int i = STDERR_FILENO + 1; i < 256; i++)
             close(i);
-        if (!SHARE_PROCESS_GROUP)
-            setsid();
+
+#if !SHARE_PROCESS_GROUP
+        setsid();
+#endif
+
         execvp(args[0], args);
         perror("Failed");
         exit(EXIT_FAILURE);
@@ -86,7 +95,7 @@ pid_t proc_spawn(char *const args[]) {
 
 int proc_spawn_sync(char *const args[]) {
     pid_t pid = proc_spawn(args);
-    int wstatus;
+    int wstatus = 0;
     int w = waitpid(0, &wstatus, 0);
     if (w < 0) {
         perror("waitpid");
@@ -98,7 +107,7 @@ int proc_spawn_sync(char *const args[]) {
 }
 
 bool proc_terminated(pid_t pid, int *exit_status) {
-    int wstatus;
+    int wstatus = 0;
     int w = waitpid(pid, &wstatus, WNOHANG);
     if (w < 0) {
         perror("waitpid");
@@ -172,7 +181,7 @@ static int32_t pool_sync2(ProcPool *pool) {
                 kill(p->pid, SIGTERM);
             }
 
-            int exit_status;
+            int exit_status = 0;
             if (proc_terminated(p->pid, &exit_status)) {
                 printf("Process %d %s [status=%d]: ", p->pid,
                        exit_status == 0 ? "exited correctly" : "failed",

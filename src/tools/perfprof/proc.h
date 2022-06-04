@@ -53,7 +53,8 @@ typedef struct {
 typedef struct ProcPool {
     bool aborted;
     int32_t max_num_procs;
-    void (*on_async_proc_exit)(Process *proc, int exit_status, void *user_handle);
+    void (*on_async_proc_exit)(const Process *proc, int exit_status,
+                               void *user_handle);
     Process procs[PROC_POOL_SIZE];
 } ProcPool;
 
