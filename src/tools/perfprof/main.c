@@ -543,8 +543,10 @@ int32_t define_batches(PerfProfBatch *batches) {
                 char batch_name[256];
                 char dirpath[2048];
 
-                snprintf_safe(batch_name, ARRAY_LEN(batch_name),
-                              "%s-scaled-%d.0-last-10", family, scale_factor);
+                snprintf_safe(
+                    batch_name, ARRAY_LEN(batch_name),
+                    "Fractional Labeling comparison for %s-scaled-%d.0", family,
+                    scale_factor);
 
                 snprintf_safe(dirpath, ARRAY_LEN(dirpath), DIRPATH_FMT_TEMPLATE,
                               scale_factor, family);
@@ -579,10 +581,6 @@ int32_t define_batches(PerfProfBatch *batches) {
         for (int32_t fidx = 0; fidx < ARRAY_LEN_i32(FAMILIES); fidx++) {
 
             const char *family = FAMILIES[fidx];
-            if (0 != strcmp(family, "E") && 0 != strcmp(family, "F")) {
-                continue;
-            }
-
             for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
 
                 const int32_t scale_factor = SFACTORS[sidx];
@@ -594,7 +592,7 @@ int32_t define_batches(PerfProfBatch *batches) {
                 char dirpath[2048];
 
                 snprintf_safe(batch_name, ARRAY_LEN(batch_name),
-                              "%s-scaled-%d.0-last-10", family, scale_factor);
+                              "%s-scaled-%d.0", family, scale_factor);
 
                 snprintf_safe(dirpath, ARRAY_LEN(dirpath), DIRPATH_FMT_TEMPLATE,
                               scale_factor, family);
@@ -614,6 +612,7 @@ int32_t define_batches(PerfProfBatch *batches) {
                                          {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
                     batches[num_batches].solvers[num_solvers++] = BAPCOD_SOLVER;
                 }
+                ++num_batches;
             }
         }
     }
