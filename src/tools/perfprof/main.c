@@ -561,7 +561,7 @@ int32_t define_batches(PerfProfBatch *batches) {
                                          {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
                     batches[num_batches].solvers[num_solvers++] =
                         (PerfProfSolver){"BAC MIP Pricer (NFL)",
-                                         {"-DISABLE_FRACTIONAL_SEPARATION=1"}};
+                                         {"-DDISABLE_FRACTIONAL_SEPARATION=1"}};
                 }
                 ++num_batches;
             }
