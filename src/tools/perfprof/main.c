@@ -529,16 +529,9 @@ int32_t define_batches(PerfProfBatch *batches) {
         for (int32_t fidx = 0; fidx < ARRAY_LEN_i32(FAMILIES); fidx++) {
 
             const char *family = FAMILIES[fidx];
-            if (0 != strcmp(family, "E") && 0 != strcmp(family, "F")) {
-                continue;
-            }
 
             for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
-
                 const int32_t scale_factor = SFACTORS[sidx];
-                if (scale_factor > 4) {
-                    continue;
-                }
 
                 char batch_name[256];
                 char dirpath[2048];
@@ -554,7 +547,7 @@ int32_t define_batches(PerfProfBatch *batches) {
                 if (num_batches < MAX_NUM_BATCHES) {
                     batches[num_batches].max_num_procs = 1;
                     batches[num_batches].name = strdup(batch_name);
-                    batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
+                    batches[num_batches].timelimit = 3 * 60;
                     batches[num_batches].nseeds = 1;
                     batches[num_batches].dirs[0] = strdup(dirpath);
                     batches[num_batches].dirs[1] = NULL;
@@ -566,8 +559,9 @@ int32_t define_batches(PerfProfBatch *batches) {
                     batches[num_batches].solvers[num_solvers++] =
                         (PerfProfSolver){"BAC MIP Pricer (AFL)",
                                          {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
-                    // batches[num_batches].solvers[num_solvers++] =
-                    // BAPCOD_SOLVER;
+                    batches[num_batches].solvers[num_solvers++] =
+                        (PerfProfSolver){"BAC MIP Pricer (NFL)",
+                                         {"-DISABLE_FRACTIONAL_SEPARATION=1"}};
                 }
                 ++num_batches;
             }
@@ -584,7 +578,7 @@ int32_t define_batches(PerfProfBatch *batches) {
             for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
 
                 const int32_t scale_factor = SFACTORS[sidx];
-                if (scale_factor > 10) {
+                if (scale_factor > 20) {
                     continue;
                 }
 
