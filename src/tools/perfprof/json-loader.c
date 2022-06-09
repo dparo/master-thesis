@@ -113,6 +113,10 @@ void parse_cptp_solver_json_dump(PerfProfRun *run, cJSON *root) {
         primal_bound = CRASHED_SOLVER_DEFAULT_COST_VAL;
     }
 
+    if (!is_valid_reduced_cost(dual_bound)) {
+        dual_bound = INFEASIBLE_SOLUTION_DEFAULT_COST_VAL;
+    }
+
     run->solution.status = status;
     run->solution.stats[PERFPROF_STAT_KIND_TIME] = time;
     run->solution.stats[PERFPROF_STAT_KIND_PRIMAL_BOUND] = primal_bound;
