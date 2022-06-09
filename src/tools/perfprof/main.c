@@ -530,10 +530,6 @@ int32_t define_batches(PerfProfBatch *batches) {
 
             const char *family = FAMILIES[fidx];
 
-            if (0 != strcmp(family, "E") && 0 != strcmp(family, "F")) {
-                continue;
-            }
-
             for (int32_t sidx = 0; sidx < ARRAY_LEN_i32(SFACTORS); sidx++) {
                 const int32_t scale_factor = SFACTORS[sidx];
 
@@ -553,9 +549,9 @@ int32_t define_batches(PerfProfBatch *batches) {
                               scale_factor, family);
 
                 if (num_batches < MAX_NUM_BATCHES) {
-                    batches[num_batches].max_num_procs = 1;
+                    batches[num_batches].max_num_procs = 14;
                     batches[num_batches].name = strdup(batch_name);
-                    batches[num_batches].timelimit = DEFAULT_TIME_LIMIT;
+                    batches[num_batches].timelimit = 60;
                     batches[num_batches].nseeds = 1;
                     batches[num_batches].dirs[0] = strdup(dirpath);
                     batches[num_batches].dirs[1] = NULL;
@@ -563,13 +559,16 @@ int32_t define_batches(PerfProfBatch *batches) {
 
                     int32_t num_solvers = 0;
                     batches[num_batches].solvers[num_solvers++] =
-                        (PerfProfSolver){"BAC MIP Pricer (EFL)", {}};
+                        (PerfProfSolver){"BAC MIP Pricer (EFL)",
+                                         {"-DNUM_THREADS=1"}};
                     batches[num_batches].solvers[num_solvers++] =
                         (PerfProfSolver){"BAC MIP Pricer (AFL)",
-                                         {"-DAMORTIZED_FRACTIONAL_LABELING=1"}};
+                                         {"-DAMORTIZED_FRACTIONAL_LABELING=1",
+                                          "-DNUM_THREADS=1"}};
                     batches[num_batches].solvers[num_solvers++] =
                         (PerfProfSolver){"BAC MIP Pricer (NFL)",
-                                         {"-DDISABLE_FRACTIONAL_SEPARATION=1"}};
+                                         {"-DDISABLE_FRACTIONAL_SEPARATION=1",
+                                          "-DNUM_THREADS=1"}};
                 }
                 ++num_batches;
             }
