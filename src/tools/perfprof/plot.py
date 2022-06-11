@@ -13,6 +13,7 @@
 import argparse
 import sys
 from dataclasses import dataclass, field
+from io import TextIOWrapper
 from typing import List
 
 import matplotlib
@@ -188,7 +189,7 @@ class ProcessedData:
         assert self.y.shape[0] == self.nrows
 
 
-def read_csv(fp, delimiter):
+def read_csv(fp: TextIOWrapper, delimiter: str) -> ParsedCsvContents:
     """
     Read a CSV file with performance profile specification.
 
@@ -233,7 +234,7 @@ def draw_reduced_cost_regions(p: ProcessedData):
     )
 
 
-def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
+def process_data(p: ParsedCsvContents, opt: argparse.Namespace) -> ProcessedData:
     nrows, ncols = p.data.shape
 
     data = None
@@ -261,15 +262,11 @@ def process_data(p: ParsedCsvContents, opt: argparse.Namespace):
     # remap its value to x_min/x_max   +/-  1e6
     for i in range(nrows):
         for j in range(ncols):
-            if (
-                opt.x_raw_upper_limit is not None
-                and raw_data[i, j] >= opt.x_raw_upper_limit
-            ):
+            ul = opt.x_raw_upper_limit or 1e99
+            ll = opt.x_raw_lower_limit or -1e99
+            if raw_data[i, j] >= ul:
                 data[i, j] = x_max + 1e6
-            if (
-                opt.x_raw_lower_limit is not None
-                and raw_data[i, j] <= opt.x_raw_lower_limit
-            ):
+            elif raw_data[i, j] <= ll:
                 data[i, j] = x_min - 1e6
 
     return ProcessedData(x_min, x_max, data)
