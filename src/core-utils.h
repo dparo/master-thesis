@@ -184,8 +184,8 @@ static inline double solution_relgap(Solution *solution) {
     return (best_integer - best_objective) / (1e-10 + fabs(best_integer));
 }
 
-static inline void solver_params_push(SolverParams *params, char *name,
-                                      char *value) {
+static inline void solver_params_append(SolverParams *params, char *name,
+                                        char *value) {
     assert(params->num_params < MAX_NUM_SOLVER_PARAMS);
     params->params[params->num_params].name = name;
     params->params[params->num_params].value = value;

@@ -66,12 +66,15 @@ TEST solve_test_instances(void) {
         Instance instance = parse(G_TEST_INSTANCES[i].filepath);
         ASSERT(is_valid_instance(&instance));
         SolverParams params = {0};
+        solver_params_append(&params, "AMORTIZED_FRACTIONAL_LABELING", "1");
+        solver_params_append(&params, "NUM_THREADS", "1");
         Solution solution = solution_create(&instance);
         SolveStatus status = cptp_solve(&instance, "mip", &params, &solution,
                                         TIMELIMIT, RANDOMSEED);
         const bool success = status != 0 &&
                              BOOL(status & SOLVE_STATUS_CLOSED_PROBLEM) &&
                              !BOOL(status & SOLVE_STATUS_ERR);
+
         ASSERT(success);
         ASSERT(solution.dual_bound != -INFINITY);
         ASSERT(solution.primal_bound != +INFINITY);

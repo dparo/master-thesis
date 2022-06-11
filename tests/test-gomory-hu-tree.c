@@ -80,8 +80,8 @@ static void init_symm_random_flownet(FlowNetwork *net) {
 }
 
 TEST random_symm_networks(void) {
-    for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
-        for (int32_t try_it = 0; try_it < 2048; try_it++) {
+    for (int32_t nnodes = 2; nnodes <= 8; nnodes++) {
+        for (int32_t try_it = 0; try_it < 512; try_it++) {
             FlowNetwork net = {0};
             MaxFlow mf = {0};
             MaxFlowResult result1 = {0};
@@ -132,8 +132,8 @@ TEST random_symm_networks(void) {
 }
 
 TEST random_gomory_hu(void) {
-    for (int32_t nnodes = 2; nnodes <= 10; nnodes++) {
-        for (int32_t try_it = 0; try_it < 1024; try_it++) {
+    for (int32_t nnodes = 2; nnodes <= 8; nnodes++) {
+        for (int32_t try_it = 0; try_it < 512; try_it++) {
             MaxFlow mf = {0};
             FlowNetwork net = {0};
             MaxFlowResult result1 = {0};
