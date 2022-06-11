@@ -12,6 +12,7 @@
 
 import argparse
 import sys
+from dataclasses import dataclass, field
 from typing import List
 
 import matplotlib
@@ -156,42 +157,32 @@ class CmdLineParser(object):
         return self.parser.parse_args()
 
 
+@dataclass
 class ParsedCsvContents:
-    solver_names: List[str]
     instance_names: List[str]
+    solver_names: List[str]
     data: np.ndarray
 
-    def __init__(
-        self, instance_names: List[str], solver_names: List[str], data: np.ndarray
-    ):
-        self.instance_names = instance_names
-        self.solver_names = solver_names
-        self.data = data
 
-
+@dataclass
 class ProcessedData:
     x_min: float
     x_max: float
-    y_min: float
-    y_max: float
-    x: np.ndarray
-    y: np.ndarray
     data: np.ndarray
-    nrows: int
-    ncols: int
 
-    def __init__(self, x_min: float, x_max: float, data: np.ndarray):
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = 0.0
-        self.y_max = 1.0
+    y_min: float = 0.0
+    y_max: float = 1.0
 
-        self.nrows, self.ncols = data.shape
+    # Plottable X, Y arrays
+    x: np.ndarray = field(init=False)
+    y: np.ndarray = field(init=False)
+    nrows: int = field(init=False)
+    ncols: int = field(init=False)
 
-        self.data = data
+    def __post_init__(self):
+        self.nrows, self.ncols = self.data.shape
 
-        # Plottable X, Y arrays
-        self.x = np.sort(data, axis=0)
+        self.x = np.sort(self.data, axis=0)
         self.y = np.linspace(self.y_min, self.y_max, self.nrows)
 
         assert self.y.shape[0] == self.nrows
@@ -227,7 +218,7 @@ def read_csv(fp, delimiter):
     return ParsedCsvContents(instance_names, solver_names, np.array(data))
 
 
-def draw_reduced_cost_regions(p: ProcessedData, ncols):
+def draw_reduced_cost_regions(p: ProcessedData):
     plt.axvspan(p.x_min, -1e-6, facecolor="green", alpha=0.15, zorder=-100)
     plt.axvspan(0.0, p.x_max, facecolor="red", alpha=0.15, zorder=-100)
 
@@ -343,7 +334,7 @@ def generate_plot(p: ProcessedData, opt: argparse.Namespace, solver_names: List[
     plt.grid(visible=True, linewidth=PLOT_GRID_LINE_WIDTH, alpha=PLOT_GRID_ALPHA)
 
     if opt.draw_reduced_cost_regions is not None and opt.draw_reduced_cost_regions:
-        draw_reduced_cost_regions(p, p.ncols)
+        draw_reduced_cost_regions(p)
 
     # Customize the plot with additional effects/information
     if opt.plotlegend is not None and opt.plotlegend is True:
