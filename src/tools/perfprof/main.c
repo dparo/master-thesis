@@ -542,7 +542,7 @@ int32_t define_batches(PerfProfBatch *batches) {
 
                 snprintf_safe(
                     batch_name, ARRAY_LEN(batch_name),
-                    "Fractional Labeling comparison for %s-scaled-%d.0", family,
+                    "Fractional-labeling-comparison-for-%s-scaled-%d.0", family,
                     scale_factor);
 
                 snprintf_safe(dirpath, ARRAY_LEN(dirpath), DIRPATH_FMT_TEMPLATE,
@@ -641,6 +641,18 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
     // their name
     //
     for (int32_t i = 0; i < num_batches; i++) {
+
+        if (strchar(batches[i].name, ' ')) {
+            log_fatal("Avoid spaces inside batch names. Found batch name: `%s`",
+                      batches[i].name);
+            abort();
+        } else if (strchar(batches[i].name, '\\')) {
+            log_fatal("Avoid backslash `\` inside batch names. Found batch "
+                      "name: `%s`",
+                      batches[i].name);
+            abort();
+        }
+
         for (int32_t j = 0; j < num_batches; j++) {
             if (i == j) {
                 continue;
