@@ -52,7 +52,7 @@ extern "C" {
 #define INFEASIBLE_SOLUTION_DEFAULT_COST_VAL ((double)1.0)
 /// Default cost value attributed to a crashed solver, or a solver
 /// which cannot produce any cost within the resource limits.
-#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)10.0)
+#define CRASHED_SOLVER_DEFAULT_COST_VAL ((double)2.0)
 
 #define CPTP_EXE "./build/Release/src/cptp"
 #define PYTHON3_PERF_SCRIPT "./src/tools/perfprof/plot.py"

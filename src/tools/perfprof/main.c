@@ -642,12 +642,12 @@ static void verify_batches_consistency(const PerfProfBatch *batches,
     //
     for (int32_t i = 0; i < num_batches; i++) {
 
-        if (strchar(batches[i].name, ' ')) {
+        if (strchr(batches[i].name, ' ')) {
             log_fatal("Avoid spaces inside batch names. Found batch name: `%s`",
                       batches[i].name);
             abort();
-        } else if (strchar(batches[i].name, '\\')) {
-            log_fatal("Avoid backslash `\` inside batch names. Found batch "
+        } else if (strchr(batches[i].name, '\\')) {
+            log_fatal("Avoid backslash `\\` inside batch names. Found batch "
                       "name: `%s`",
                       batches[i].name);
             abort();
