@@ -9,7 +9,7 @@
 A Mixed Integer Programming (MIP) model and branch-and-cut framework algorithm for solving the CPTP.
 The CPTP appears as the pricing sub-problem in column generation schemes for the CVRP.
 
-## About
+## :bulb: About
 
 The Capacitated Vehicle Routing Problem, CVRP for short,
 is a combinatorial optimization routing problem in which,
@@ -42,41 +42,40 @@ and verifies whether branch-and-cut algorithms may be effectively employed
 for tackling the PP.
 
 
-## Getting Started
-- Requirements:
-    - A working `C` compiler
-    - `cmake`
-    - `git`
-    - `CPLEX>=12.10`: A free academic license can be downloaded at this [URL](https://www.ibm.com/academic/topic/data-science)
-- Getting the source code:
+## :rocket: Getting Started
+
+### :anchor: Requirements
+- A working `C` compiler
+- `cmake`
+- `git`
+- `CPLEX>=12.10`: A free academic license can be downloaded at this [URL](https://www.ibm.com/academic/topic/data-science)
+
+### :inbox_tray: Getting the source code
     ```bash
     git clone --recursive https://github.com/dparo/master-thesis/
     ```
-- Building it:
-    ```
-    cd master-thesis
-    mkdir -p build
-    cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ../
-    cmake --build ./ --config Release
-    ```
-- Running the tests:
-    ```
-    ctest --progress --force-new-ctest-process --output-on-failure -C Release
-    ```
-- Running the main solver:
-    ```
-    ./src/cptp --help
-    ```
+### :hammer: Building it
+```
+cd master-thesis
+mkdir -p build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ../
+cmake --build ./ --config Release
+```
+### :wrench: Running the tests
+```
+ctest --progress --force-new-ctest-process --output-on-failure -C Release
+```
+### :car: Running the main solver
+```
+./src/cptp --help
+```
 
-## TODO
-The project is currently under heavy-development.
-
-## Contact
+## :mailbox_with_mail: Contact
 - Insitutional EMAIL address: `davide.paro@studenti.unipd.it`
 - Personal EMAIL address: `dparo@outlook.it`
 
-## References
+## :bookmark_tabs: References
 - <a id="Jepsen2014">[1]</a>
 Jepsen, M. K., Petersen, B., Spoorendonk, S., & Pisinger, D. (2014). A branch-and-cut algorithm for the capacitated profitable tour problem. Discrete Optimization, 14, 78–96. https://doi.org/10.1016/j.disopt.2014.08.001
 - <a id="baldacci2008exact">[2]</a>
@@ -84,7 +83,7 @@ Baldacci, R., Christofides, N., & Mingozzi, A. (2008). An exact algorithm for th
 - <a id="baldacci2011new">[3]</a>
 Baldacci, R., Mingozzi, A., & Roberti, R. (2011). New route relaxation and pricing strategies for the vehicle routing problem. Operations Research, 59(5), 1269–1283.
 
-## License
+## :libra: License
 This project is licensed under the **MIT** license. Check the [LICENSE file](LICENSE).
 
 This project makes use of thirdy party projects, located under the `deps` folder, licensed respectively in their corresponding licenses:
@@ -96,5 +95,5 @@ This project makes use of thirdy party projects, located under the `deps` folder
 6. [B-Con/crypto-algorithms](https://github.com/B-Con/crypto-algorithms) **Public domain**
 7. [johthepro/doxygen-awesome-css](https://github.com/jothepro/doxygen-awesome-css) [**MIT license**](https://github.com/jothepro/doxygen-awesome-css/blob/main/LICENSE)
 
-## Funding
+## :sparkling_heart: Funding
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/J3J47WJB2)
