@@ -246,7 +246,7 @@ def process_data(p: ParsedCsvContents, opt: argparse.Namespace) -> ProcessedData
         data = raw_data
     else:
         data = raw_data + opt.shift
-        baseline = p.data.min(axis=1)
+        baseline = data.min(axis=1)
         for j in range(ncols):
             data[:, j] = data[:, j] / baseline
 
