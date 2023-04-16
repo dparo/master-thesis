@@ -51,9 +51,9 @@ for tackling the PP.
 - `CPLEX>=12.10`: A free academic license can be downloaded at this [URL](https://www.ibm.com/academic/topic/data-science)
 
 ### :inbox_tray: Getting the source code
-    ```bash
-    git clone --recursive https://github.com/dparo/master-thesis/
-    ```
+```bash
+git clone --recursive https://github.com/dparo/master-thesis/
+```
 ### :hammer: Building it
 ```
 cd master-thesis
