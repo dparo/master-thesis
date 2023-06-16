@@ -1,5 +1,5 @@
 ![License](https://img.shields.io/github/license/dparo/master-thesis)
-![CI](https://img.shields.io/github/workflow/status/dparo/master-thesis/CI)
+![CI](https://img.shields.io/github/actions/workflow/status/dparo/master-thesis/ci.yml?branch=master)
 ![Release](https://img.shields.io/github/v/release/dparo/master-thesis)
 ![Downloads](https://img.shields.io/github/downloads/dparo/master-thesis/total)
 
